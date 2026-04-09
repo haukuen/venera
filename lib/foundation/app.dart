@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/foundation/history.dart';
 
@@ -13,7 +14,7 @@ export "widget_utils.dart";
 export "context.dart";
 
 class _App {
-  final version = "1.6.3";
+  late String version;
 
   bool get isAndroid => Platform.isAndroid;
 
@@ -80,6 +81,8 @@ class _App {
   }
 
   Future<void> init() async {
+    var packageInfo = await PackageInfo.fromPlatform();
+    version = packageInfo.version;
     cachePath = (await getApplicationCacheDirectory()).path;
     dataPath = (await getApplicationSupportDirectory()).path;
     if (isAndroid) {
