@@ -14,6 +14,13 @@ class _ReaderImagesState extends State<_ReaderImages> {
 
   late _ReaderState reader;
 
+  void _savePagesCache(String key, List<String> images) async {
+    try {
+      var data = utf8.encode(jsonEncode(images));
+      await CacheManager().writeCache(key, data);
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     reader = context.reader;
@@ -69,6 +76,32 @@ class _ReaderImagesState extends State<_ReaderImages> {
       }
     } else {
       var cp = reader.widget.chapters?.ids.elementAtOrNull(reader.chapter - 1);
+      var cacheKey =
+          "loadComicPages@${reader.type.sourceKey}@${reader.cid}@$cp";
+
+      // Try cache first
+      var cacheFile = await CacheManager().findCache(cacheKey);
+      if (cacheFile != null) {
+        try {
+          var cacheData = await cacheFile.readAsBytes();
+          var cacheList =
+              (jsonDecode(utf8.decode(cacheData)) as List).cast<String>();
+          setState(() {
+            reader.images = cacheList;
+            reader.isLoading = false;
+            inProgress = false;
+            _handleJumpToLastPage();
+            Future.microtask(() {
+              reader.updateHistory();
+            });
+          });
+          context.readerScaffold.update();
+          return;
+        } catch (_) {
+          // Cache corrupted, fall through to network request
+        }
+      }
+
       var res = await reader.type.comicSource!.loadComicPages!(
         reader.widget.cid,
         cp,
@@ -80,6 +113,8 @@ class _ReaderImagesState extends State<_ReaderImages> {
           inProgress = false;
         });
       } else {
+        // Save to cache in background
+        _savePagesCache(cacheKey, res.data);
         setState(() {
           reader.images = res.data;
           reader.isLoading = false;

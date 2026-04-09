@@ -185,10 +185,20 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
           setState(() {
             _lastException = error;
           });
+          _onImageLoadError();
         },
       );
     }
     return _imageStreamListener!;
+  }
+
+  void _onImageLoadError() {
+    final provider = widget.image;
+    if (provider is ReaderImageProvider) {
+      var cacheKey =
+          "loadComicPages@${provider.sourceKey}@${provider.cid}@${provider.eid}";
+      CacheManager().delete(cacheKey);
+    }
   }
 
   void _handleImageFrame(ImageInfo imageInfo, bool synchronousCall) {
