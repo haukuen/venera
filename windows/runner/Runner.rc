@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "haukuen" "\0"
+            VALUE "CompanyName", "io.github.haukuen" "\0"
             VALUE "FileDescription", "venera" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "venera" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 haukuen. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 io.github.haukuen. All rights reserved." "\0"
             VALUE "OriginalFilename", "venera.exe" "\0"
             VALUE "ProductName", "venera" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
