@@ -133,6 +133,7 @@ abstract class ImageDownloader {
         totalBytes: data.length,
         imageBytes: data,
       );
+      return;
     }
 
     Future<Map<String, dynamic>?> Function()? onLoadFailed;
