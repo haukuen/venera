@@ -28,6 +28,7 @@ if (flutterVersionName == null) {
 def keystorePropertiesFile = rootProject.file("key.properties")
 def keystoreProperties = new Properties()
 keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+def resolvedKeystoreFile = rootProject.file(keystoreProperties['storeFile'])
 
 android {
     namespace = "io.github.haukuen.venera"
@@ -59,7 +60,7 @@ android {
 
     signingConfigs {
         debug {
-            storeFile file(keystoreProperties['storeFile'])
+            storeFile resolvedKeystoreFile
             storePassword keystoreProperties['storePassword']
             keyAlias keystoreProperties['keyAlias']
             keyPassword keystoreProperties['keyPassword']
@@ -67,7 +68,7 @@ android {
         release {
             keyAlias keystoreProperties['keyAlias']
             keyPassword keystoreProperties['keyPassword']
-            storeFile file(keystoreProperties['storeFile'])
+            storeFile resolvedKeystoreFile
             storePassword keystoreProperties['storePassword']
         }
     }

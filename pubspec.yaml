@@ -108,6 +108,7 @@ flutter:
 
 flutter_to_arch:
   name: Venera
+  url: https://github.com/haukuen/venera
   icon: debian/gui/venera.png
   categories: Utility
   keywords: Flutter;comic;images;
