@@ -3,8 +3,7 @@
 
 #define MyAppName "Venera"
 #define MyAppVersion "{{version}}"
-#define MyAppPublisher "nyne"
-#define MyAppURL "https://github.com/venera-app/venera"
+#define MyAppPublisher "haukuen"
 #define MyAppExeName "venera.exe"
 #define RootPath "{{root_path}}"
 
@@ -16,9 +15,6 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}
-AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only.)

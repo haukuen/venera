@@ -8,7 +8,7 @@
 PRODUCT_NAME = venera
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.github.wgh136.venera
+PRODUCT_BUNDLE_IDENTIFIER = io.github.haukuen.venera
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2024 com.github.wgh136. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 haukuen. All rights reserved.
