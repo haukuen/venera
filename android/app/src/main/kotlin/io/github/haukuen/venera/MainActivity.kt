@@ -1,4 +1,4 @@
-package com.github.wgh136.venera
+package io.github.haukuen.venera
 
 import android.Manifest
 import android.app.Activity
@@ -415,4 +415,3 @@ class VolumeListen {
         onDown()
     }
 }
-

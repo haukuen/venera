@@ -284,7 +284,7 @@ class _BodyState extends State<_Body> {
 
   void help() {
     launchUrlString(
-      "https://github.com/venera-app/venera/blob/master/doc/comic_source.md",
+      "https://github.com/haukuen/venera/blob/main/doc/comic_source.md",
     );
   }
 
@@ -443,7 +443,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
                     TextButton(
                       onPressed: () {
                         launchUrlString(
-                          "https://github.com/venera-app/venera/blob/master/doc/comic_source.md",
+                          "https://github.com/haukuen/venera/blob/main/doc/comic_source.md",
                         );
                       },
                       child: Text("Help".tl),

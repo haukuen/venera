@@ -66,17 +66,10 @@ class _AboutSettingsState extends State<AboutSettings> {
           settingKey: "checkUpdateOnStart",
         ).toSliver(),
         ListTile(
-          title: const Text("Github"),
+          title: const Text("Repository"),
           trailing: const Icon(Icons.open_in_new),
           onTap: () {
-            launchUrlString("https://github.com/venera-app/venera");
-          },
-        ).toSliver(),
-        ListTile(
-          title: const Text("Telegram"),
-          trailing: const Icon(Icons.open_in_new),
-          onTap: () {
-            launchUrlString("https://t.me/venera_release");
+            launchUrlString("https://github.com/haukuen/venera");
           },
         ).toSliver(),
       ],
@@ -86,7 +79,7 @@ class _AboutSettingsState extends State<AboutSettings> {
 
 Future<bool> checkUpdate() async {
   var res = await AppDio()
-      .get("https://cdn.jsdelivr.net/gh/venera-app/venera@master/pubspec.yaml");
+      .get("https://raw.githubusercontent.com/haukuen/venera/main/pubspec.yaml");
   if (res.statusCode == 200) {
     var data = loadYaml(res.data);
     if (data["version"] != null) {
@@ -116,8 +109,7 @@ Future<void> checkUpdateUi([bool showMessageIfNoUpdate = true, bool delay = fals
                 Button.text(
                   onPressed: () {
                     Navigator.pop(context);
-                    launchUrlString(
-                        "https://github.com/venera-app/venera/releases");
+                    launchUrlString("https://github.com/haukuen/venera/releases");
                   },
                   child: Text("Update".tl),
                 ),
