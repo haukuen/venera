@@ -5,6 +5,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   Build_MacOS:
     runs-on: macos-15
@@ -17,15 +20,6 @@ jobs:
           architecture: x64
       - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
       - run: flutter pub get
-        # Step 1: Decode and install the certificate
-      - name: Decode and install certificate
-        env:
-          CERTIFICATE: ${{ secrets.CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-        run: |
-          echo "$CERTIFICATE" | base64 --decode > signing_certificate.p12
-          security import signing_certificate.p12 -k ~/Library/Keychains/login.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-
       - name: Check rust-toolchain.toml
         run: rustup show
 
@@ -228,4 +222,4 @@ jobs:
             outputs/*.zst
             outputs/*.AppImage
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTION_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
