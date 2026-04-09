@@ -75,6 +75,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
         });
       }
     } else {
+      var cp = reader.widget.chapters?.ids.elementAtOrNull(reader.chapter - 1);
       var cacheKey =
           "loadComicPages@${reader.type.sourceKey}@${reader.cid}@${reader.eid}";
 
