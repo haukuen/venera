@@ -109,7 +109,7 @@ Future<void> checkUpdateUi([bool showMessageIfNoUpdate = true, bool delay = fals
                 Button.text(
                   onPressed: () {
                     Navigator.pop(context);
-                    launchUrlString("https://github.com/haukuen/venera");
+                    launchUrlString("https://github.com/haukuen/venera/releases");
                   },
                   child: Text("Update".tl),
                 ),
