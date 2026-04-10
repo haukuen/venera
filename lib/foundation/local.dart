@@ -337,7 +337,7 @@ class LocalManager with ChangeNotifier {
     notifyListeners();
   }
 
-  void remove(String id, ComicType comicType) async {
+  void remove(String id, ComicType comicType) {
     _db.execute(
       'DELETE FROM comics WHERE id = ? AND comic_type = ?;',
       [id, comicType.value],

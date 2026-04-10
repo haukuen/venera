@@ -337,7 +337,7 @@ void clearUnfavoritedHistory() {
   notifyListeners();
 }
 
-  void remove(String id, ComicType type) async {
+  void remove(String id, ComicType type) {
     _db.execute("""
       delete from history
       where id == ? and type == ?;
