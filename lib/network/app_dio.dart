@@ -175,8 +175,12 @@ class AppDio with DioMixin {
 }
 
 class RHttpAdapter implements HttpClientAdapter {
+  final bool enableProxy;
+
+  RHttpAdapter({this.enableProxy = true});
+
   Future<rhttp.ClientSettings> get settings async {
-    var proxy = await getProxy();
+    var proxy = enableProxy ? await getProxy() : null;
 
     return rhttp.ClientSettings(
       proxySettings: proxy == null

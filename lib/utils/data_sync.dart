@@ -124,7 +124,9 @@ class DataSync with ChangeNotifier {
         url,
         user: user,
         password: pass,
-        adapter: RHttpAdapter(),
+        adapter: RHttpAdapter(
+          enableProxy: appdata.settings['webdavProxyEnabled'] != false,
+        ),
       );
 
       try {
@@ -191,7 +193,9 @@ class DataSync with ChangeNotifier {
         url,
         user: user,
         password: pass,
-        adapter: RHttpAdapter(),
+        adapter: RHttpAdapter(
+          enableProxy: appdata.settings['webdavProxyEnabled'] != false,
+        ),
       );
 
       try {

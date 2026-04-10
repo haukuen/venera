@@ -90,6 +90,7 @@ class Appdata with Init {
     "authorizationRequired",
     "customImageProcessing",
     "webdav",
+    "webdavProxyEnabled",
     "disableSyncFields",
     "deviceId",
   ];
@@ -203,6 +204,7 @@ class Settings with ChangeNotifier {
     'checkUpdateOnStart': false,
     'limitImageWidth': true,
     'webdav': [], // empty means not configured
+    'webdavProxyEnabled': true,
     "disableSyncFields": "", // "field1, field2, ..."
     'dataVersion': 0,
     'quickFavorite': null,

@@ -17,6 +17,10 @@ class _NetworkSettingsState extends State<NetworkSettings> {
           title: "Proxy".tl,
           builder: () => const _ProxySettingView(),
         ).toSliver(),
+        _SwitchSetting(
+          title: "WebDAV Proxy".tl,
+          settingKey: 'webdavProxyEnabled',
+        ).toSliver(),
         _PopupWindowSetting(
           title: "DNS Overrides".tl,
           builder: () => const _DNSOverrides(),

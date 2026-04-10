@@ -48,7 +48,7 @@ Future<String?> _getProxy() async {
   }
 
   final RegExp regex = RegExp(
-    r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+$',
+    r'^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*|\[[0-9a-fA-F:]+\]):\d+$',
     caseSensitive: false,
     multiLine: false,
   );
