@@ -66,6 +66,16 @@ void monitorUIThread() {
     }
 }
 
+/**
+ * @brief Create and initialize the Flutter window, its FlutterViewController, and platform channels.
+ *
+ * Initializes the FlutterViewController sized to the client area, verifies the controller is usable,
+ * registers plugins, and installs method/event channels for proxy queries, heartbeat (debug builds),
+ * mouse side-button events, and clipboard image writing. Embeds the Flutter view as child content,
+ * schedules a next-frame callback, and forces an initial redraw to ensure the window is shown.
+ *
+ * @return true if the window and Flutter controller were successfully created and initialized; false otherwise.
+ */
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
