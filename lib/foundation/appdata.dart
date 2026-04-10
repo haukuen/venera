@@ -90,6 +90,7 @@ class Appdata with Init {
     "authorizationRequired",
     "customImageProcessing",
     "webdav",
+    "webdavProxyEnabled",
     "disableSyncFields",
     "deviceId",
   ];
