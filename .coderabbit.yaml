@@ -1,0 +1,47 @@
+language: "zh-CN"
+tone_and_style_guidelines: |
+  - 请使用清晰、专业且友好的语气进行代码审查。
+  - 这个项目是 Venera（一个跨平台漫画应用），主要使用 Flutter/Dart 开发，请确保代码审查符合 Dart 和 Flutter 的最佳实践。
+  - 重点关注代码的可读性、可维护性以及潜在的性能问题（例如：不必要的 Widget 重建、异步操作异常捕获、空安全处理）。
+  - 鼓励使用 `const` 构造函数以提升 Flutter 渲染性能。
+  - 如果发现问题，请尽可能提供符合项目上下文的、可直接应用的修复建议代码片段。
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  path_filters:
+    - "!*.lock"
+    - "!pubspec.lock"
+    - "!build/**"
+    - "!.dart_tool/**"
+    - "!ios/Pods/**"
+    - "!macos/Pods/**"
+    - "!ios/Flutter/ephemeral/**"
+    - "!assets/**"
+    - "!patch/**"
+    - "!debian/**"
+    - "!windows/flutter/**"
+    - "!linux/flutter/**"
+    - "!**/*.g.dart"
+    - "!**/*.freezed.dart"
+  path_instructions:
+    - path: "lib/**/*.dart"
+      instructions: |
+        - 检查是否恰当地使用了 Dart 的异步特性（Future, Stream）。
+        - 检查 Widget 树中是否存在不必要的层级嵌套。
+        - 检查是否正确且及时地释放了控制器资源（如 `dispose` 方法中的 ScrollController, TextEditingController 等）。
+        - 针对漫画阅读器的核心代码逻辑（在 `lib/pages/reader/` 等目录下），需要额外关注内存占用及图片加载逻辑是否存在隐患。
+    - path: "android/**/*.{java,kt}"
+      instructions: "关注 Android 原生端与 Flutter MethodChannel 交互的安全性和数据类型映射。"
+    - path: "ios/**/*.swift"
+      instructions: "关注 iOS 原生端与 Flutter MethodChannel 交互的稳定性和内存管理。"
+    - path: "macos/**/*.swift"
+      instructions: "关注 macOS 原生端与 Flutter 插件交互的逻辑一致性。"
+    - path: "windows/**/*.cc"
+      instructions: "关注 Windows 原生端 C++ 代码的内存泄漏风险和线程安全。"
+    - path: "linux/**/*.cc"
+      instructions: "关注 Linux 原生端 C++ 代码的 GTK/Flutter 集成规范。"
+    - path: "**/*.{yaml,yml}"
+      instructions: "检查配置文件（如 pubspec.yaml, analysis_options.yaml）是否有冗余或格式错误。"
+chat:
+  auto_reply: true
