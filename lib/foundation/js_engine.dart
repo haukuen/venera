@@ -59,8 +59,9 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
   Dio? _dio;
 
   static void reset() {
+    var old = _cache;
     _cache = null;
-    _cache?.dispose();
+    old?.dispose();
     JsEngine().init();
   }
 
