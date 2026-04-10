@@ -97,7 +97,7 @@ bool FlutterWindow::OnCreate() {
           }
         else
           result->Success(flutter::EncodableValue("No Proxy"));
-        delete(res);
+        delete[] res;
         return;
       }
 #ifdef NDEBUG
