@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:math';
-import 'dart:ffi' as ffi;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -188,6 +187,8 @@ class HistoryManager with ChangeNotifier {
 
   late Database _db;
 
+  late String _dbPath;
+
   int get length => _db.select("select count(*) from history;").first[0] as int;
 
   /// Cache of history ids. Improve the performance of find operation.
@@ -202,7 +203,8 @@ class HistoryManager with ChangeNotifier {
     if (isInitialized) {
       return;
     }
-    _db = sqlite3.open("${App.dataPath}/history.db");
+    _dbPath = "${App.dataPath}/history.db";
+    _db = sqlite3.open(_dbPath);
 
     _db.execute("""
         create table if not exists history  (
@@ -235,22 +237,26 @@ class HistoryManager with ChangeNotifier {
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       """;
 
-  static Future<void> _addHistoryAsync(int dbAddr, History newItem) {
+  static Future<void> _addHistoryAsync(String dbPath, History newItem) {
     return Isolate.run(() {
-      var db = sqlite3.fromPointer(ffi.Pointer.fromAddress(dbAddr));
-      db.execute(_insertHistorySql, [
-        newItem.id,
-        newItem.title,
-        newItem.subtitle,
-        newItem.cover,
-        newItem.time.millisecondsSinceEpoch,
-        newItem.type.value,
-        newItem.ep,
-        newItem.page,
-        newItem.readEpisode.join(','),
-        newItem.maxPage,
-        newItem.group
-      ]);
+      var db = sqlite3.open(dbPath);
+      try {
+        db.execute(_insertHistorySql, [
+          newItem.id,
+          newItem.title,
+          newItem.subtitle,
+          newItem.cover,
+          newItem.time.millisecondsSinceEpoch,
+          newItem.type.value,
+          newItem.ep,
+          newItem.page,
+          newItem.readEpisode.join(','),
+          newItem.maxPage,
+          newItem.group
+        ]);
+      } finally {
+        db.dispose();
+      }
     });
   }
 
@@ -263,7 +269,7 @@ class HistoryManager with ChangeNotifier {
     }
 
     _haveAsyncTask = true;
-    await _addHistoryAsync(_db.handle.address, newItem);
+    await _addHistoryAsync(_dbPath, newItem);
     _haveAsyncTask = false;
     if (_cachedHistoryIds == null) {
       updateCache();
