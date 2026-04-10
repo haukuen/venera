@@ -407,20 +407,30 @@ class Share {
     required String mime,
   }) {
     if (!App.isWindows) {
-      s.Share.shareXFiles(
-        [s.XFile.fromData(data, mimeType: mime)],
-        fileNameOverrides: [filename],
+      s.SharePlus.instance.share(
+        s.ShareParams(
+          files: [s.XFile.fromData(data, mimeType: mime)],
+          fileNameOverrides: [filename],
+        ),
       );
     } else {
       // write to cache
       var file = File(FilePath.join(App.cachePath, filename));
       file.writeAsBytesSync(data);
-      s.Share.shareXFiles([s.XFile(file.path)]);
+      s.SharePlus.instance.share(
+        s.ShareParams(
+          files: [s.XFile(file.path)],
+        ),
+      );
     }
   }
 
   static void shareText(String text) {
-    s.Share.share(text);
+    s.SharePlus.instance.share(
+      s.ShareParams(
+        text: text,
+      ),
+    );
   }
 }
 

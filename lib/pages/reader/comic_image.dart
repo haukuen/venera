@@ -113,7 +113,7 @@ class _ComicImageState extends State<ComicImage> with WidgetsBindingObserver {
     _updateInvertColors();
     _resolveImage();
 
-    if (TickerMode.of(context)) {
+    if (TickerMode.valuesOf(context).enabled) {
       _listenToStream();
     } else {
       _stopListeningToStream(keepStreamAlive: true);
