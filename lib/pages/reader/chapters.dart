@@ -135,6 +135,13 @@ class _GroupedChaptersViewState extends State<_GroupedChaptersView>
   }
 
   @override
+  void dispose() {
+    tabController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [

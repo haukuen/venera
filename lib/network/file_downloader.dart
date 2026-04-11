@@ -223,12 +223,15 @@ class FileDownloader {
         if (_isWriting) continue;
         _currentBytes += buffer.length;
         _isWriting = true;
-        await _file!.setPosition(start + block.downloadedBytes);
-        await _file!.writeFrom(buffer);
-        block.downloadedBytes += buffer.length;
-        buffer.clear();
-        await _writeStatus();
-        _isWriting = false;
+        try {
+          await _file!.setPosition(start + block.downloadedBytes);
+          await _file!.writeFrom(buffer);
+          block.downloadedBytes += buffer.length;
+          buffer.clear();
+          await _writeStatus();
+        } finally {
+          _isWriting = false;
+        }
       }
     }
 
@@ -237,12 +240,15 @@ class FileDownloader {
         await Future.delayed(const Duration(milliseconds: 10));
       }
       _isWriting = true;
-      _currentBytes += buffer.length;
-      await _file!.setPosition(start + block.downloadedBytes);
-      await _file!.writeFrom(buffer);
-      block.downloadedBytes += buffer.length;
-      await _writeStatus();
-      _isWriting = false;
+      try {
+        _currentBytes += buffer.length;
+        await _file!.setPosition(start + block.downloadedBytes);
+        await _file!.writeFrom(buffer);
+        block.downloadedBytes += buffer.length;
+        await _writeStatus();
+      } finally {
+        _isWriting = false;
+      }
     }
 
     block.downloading = false;

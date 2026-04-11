@@ -132,6 +132,10 @@ Future<void> runHeadlessMode(List<String> args) async {
 
       var updateIndex = args.indexOf('--update-comic-by-id-type');
       if (updateIndex != -1) {
+        if (updateIndex + 2 >= args.length) {
+          cliPrint({'status': 'error', 'message': 'Missing arguments for --update-comic-by-id-type. Expected: --update-comic-by-id-type <id> <type>'});
+          exit(1);
+        }
         var id = args[updateIndex + 1];
         var type = args[updateIndex + 2];
         var comics = LocalFavoritesManager().getComicsWithUpdatesInfo(folder);
