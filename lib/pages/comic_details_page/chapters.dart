@@ -185,7 +185,9 @@ class _GroupedComicChaptersState extends State<_GroupedComicChapters>
 
   late ComicChapters chapters;
 
-  late TabController tabController;
+  TabController? _tabController;
+
+  TabController get tabController => _tabController!;
 
   late int index;
 
@@ -205,12 +207,14 @@ class _GroupedComicChaptersState extends State<_GroupedComicChapters>
   void didChangeDependencies() {
     state = context.findAncestorStateOfType<_ComicPageState>()!;
     chapters = state.comic.chapters!;
-    tabController = TabController(
+    var oldController = _tabController;
+    _tabController = TabController(
       initialIndex: index,
       length: chapters.ids.length,
       vsync: this,
     );
-    tabController.addListener(onTabChange);
+    _tabController!.addListener(onTabChange);
+    oldController?.dispose();
     super.didChangeDependencies();
   }
 
@@ -220,6 +224,12 @@ class _GroupedComicChaptersState extends State<_GroupedComicChapters>
         index = tabController.index;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
   }
 
   @override

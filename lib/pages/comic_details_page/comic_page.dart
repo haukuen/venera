@@ -758,16 +758,18 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
       final imageStream = imageProvider.resolve(const ImageConfiguration());
       final completer = Completer<Uint8List>();
 
-      imageStream.addListener(
-        ImageStreamListener((ImageInfo info, bool _) async {
-          final byteData = await info.image.toByteData(
-            format: ImageByteFormat.png,
-          );
-          if (byteData != null) {
-            completer.complete(byteData.buffer.asUint8List());
-          }
-        }),
-      );
+      late ImageStreamListener listener;
+      listener = ImageStreamListener((ImageInfo info, bool _) async {
+        imageStream.removeListener(listener);
+        final byteData = await info.image.toByteData(
+          format: ImageByteFormat.png,
+        );
+        if (byteData != null) {
+          completer.complete(byteData.buffer.asUint8List());
+        }
+      });
+
+      imageStream.addListener(listener);
 
       final data = await completer.future;
       final fileType = detectFileType(data);

@@ -269,8 +269,11 @@ class HistoryManager with ChangeNotifier {
     }
 
     _haveAsyncTask = true;
-    await _addHistoryAsync(_dbPath, newItem);
-    _haveAsyncTask = false;
+    try {
+      await _addHistoryAsync(_dbPath, newItem);
+    } finally {
+      _haveAsyncTask = false;
+    }
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {

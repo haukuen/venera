@@ -359,7 +359,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           if (imageFavoritesEp.eid != eid) {
             // 空字符串说明是从pica导入的, 那我们就手动刷一遍保证一致
             if (imageFavoritesEp.eid == "") {
-              imageFavoritesEp.eid == eid;
+              imageFavoritesEp.eid = eid;
             } else {
               // 避免多章节漫画源的章节顺序发生变化, 如果情况比较多, 做一个以eid为准更新ep的功能
               showToast(
@@ -971,7 +971,7 @@ class _BatteryWidgetState extends State<_BatteryWidget> {
         });
         _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
           _battery.batteryLevel.then((level) {
-            if (_batteryLevel != level) {
+            if (_batteryLevel != level && mounted) {
               setState(() {
                 _batteryLevel = level;
               });
