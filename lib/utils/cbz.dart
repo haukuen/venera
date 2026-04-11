@@ -161,12 +161,13 @@ abstract class CBZ {
         cpMap[i.toString()] = chapter.key;
         var chapterDir = Directory(FilePath.join(dest.path, i.toString()));
         chapterDir.createSync();
-        for (var i = 0; i < chapter.value.length; i++) {
-          var src = chapter.value[i];
+        for (var j = 0; j < chapter.value.length; j++) {
+          var src = chapter.value[j];
           var dst = File(FilePath.join(
-              chapterDir.path, '${i + 1}.${src.path.split('.').last}'));
+              chapterDir.path, '${j + 1}.${src.path.split('.').last}'));
           await src.copyMem(dst.path);
         }
+        i++;
       }
     }
     var comic = LocalComic(
