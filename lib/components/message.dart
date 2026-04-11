@@ -185,9 +185,7 @@ class LoadingDialogController {
       return;
     }
     closed = true;
-    if (_closeDialog == null) {
-      Future.microtask(_closeDialog!);
-    } else {
+    if (_closeDialog != null) {
       _closeDialog!();
     }
   }
