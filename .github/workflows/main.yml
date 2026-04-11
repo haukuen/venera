@@ -48,32 +48,32 @@ jobs:
         with:
           name: macos_build
           path: result/
-  Build_IOS:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: "stable"
-          flutter-version-file: pubspec.yaml
-          architecture: x64
-      - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
-      - run: flutter pub get
-      - run: flutter build ios --release --no-codesign
-      - run: |
-          mkdir -p /Users/runner/work/venera/venera/build/ios/iphoneos/Payload
-          mv /Users/runner/work/venera/venera/build/ios/iphoneos/Runner.app /Users/runner/work/venera/venera/build/ios/iphoneos/Payload
-          cd /Users/runner/work/venera/venera/build/ios/iphoneos/
-          zip -r venera-ios.ipa Payload
-      - name: Add version to filename
-        run: |
-          APP_VERSION=$(grep "version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
-          mkdir -p result
-          mv build/ios/iphoneos/venera-ios.ipa result/venera-ios-$APP_VERSION.ipa
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios_build
-          path: result/
+  # Build_IOS:
+  #   runs-on: macos-15
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: subosito/flutter-action@v2
+  #       with:
+  #         channel: "stable"
+  #         flutter-version-file: pubspec.yaml
+  #         architecture: x64
+  #     - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+  #     - run: flutter pub get
+  #     - run: flutter build ios --release --no-codesign
+  #     - run: |
+  #         mkdir -p /Users/runner/work/venera/venera/build/ios/iphoneos/Payload
+  #         mv /Users/runner/work/venera/venera/build/ios/iphoneos/Runner.app /Users/runner/work/venera/venera/build/ios/iphoneos/Payload
+  #         cd /Users/runner/work/venera/venera/build/ios/iphoneos/
+  #         zip -r venera-ios.ipa Payload
+  #     - name: Add version to filename
+  #       run: |
+  #         APP_VERSION=$(grep "version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+  #         mkdir -p result
+  #         mv build/ios/iphoneos/venera-ios.ipa result/venera-ios-$APP_VERSION.ipa
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: ios_build
+  #         path: result/
   Build_Android:
     runs-on: ubuntu-22.04
     steps:
@@ -178,17 +178,17 @@ jobs:
 
   Release:
     runs-on: ubuntu-22.04
-    needs: [Build_MacOS, Build_IOS, Build_Android, Build_Windows, Build_Linux, Build_Linux_ARM64]
+    needs: [Build_MacOS, Build_Android, Build_Windows, Build_Linux, Build_Linux_ARM64]
     if: github.event_name == 'release'  # 仅在 push 事件时执行
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: macos_build
           path: outputs
-      - uses: actions/download-artifact@v4
-        with:
-          name: ios_build
-          path: outputs
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     name: ios_build
+      #     path: outputs
       - uses: actions/download-artifact@v4
         with:
           name: apks
@@ -213,7 +213,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: |
-            outputs/*.ipa
+            # outputs/*.ipa
             outputs/*.dmg
             outputs/*.apk
             outputs/*.zip
