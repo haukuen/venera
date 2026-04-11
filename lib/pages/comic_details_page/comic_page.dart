@@ -759,15 +759,23 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
       final completer = Completer<Uint8List>();
 
       late ImageStreamListener listener;
-      listener = ImageStreamListener((ImageInfo info, bool _) async {
-        imageStream.removeListener(listener);
-        final byteData = await info.image.toByteData(
-          format: ImageByteFormat.png,
-        );
-        if (byteData != null) {
-          completer.complete(byteData.buffer.asUint8List());
-        }
-      });
+      listener = ImageStreamListener(
+        (ImageInfo info, bool _) async {
+          imageStream.removeListener(listener);
+          final byteData = await info.image.toByteData(
+            format: ImageByteFormat.png,
+          );
+          if (byteData != null) {
+            completer.complete(byteData.buffer.asUint8List());
+          } else {
+            completer.completeError(Exception('Failed to convert image'));
+          }
+        },
+        onError: (exception, stackTrace) {
+          imageStream.removeListener(listener);
+          completer.completeError(exception, stackTrace);
+        },
+      );
 
       imageStream.addListener(listener);
 
