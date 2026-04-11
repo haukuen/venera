@@ -130,8 +130,6 @@ class DataSync with ChangeNotifier {
       );
 
       try {
-        appdata.settings['dataVersion']++;
-        await appdata.saveData(false);
         var data = await exportAppData(
             appdata.settings['disableSyncFields'].toString().isNotEmpty
         );
@@ -153,6 +151,8 @@ class DataSync with ChangeNotifier {
         }
         await client.write(filename, await data.readAsBytes());
         data.deleteIgnoreError();
+        appdata.settings['dataVersion']++;
+        await appdata.saveData(false);
         Log.info("Upload Data", "Data uploaded successfully");
         return const Res(true);
       } catch (e, s) {
