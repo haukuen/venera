@@ -774,9 +774,9 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: a1255d1b5945aad4b7323303ec2ecdf0c90ffc4c
-      resolved-ref: a1255d1b5945aad4b7323303ec2ecdf0c90ffc4c
-      url: "https://github.com/venera-app/photo_view"
+      ref: main
+      resolved-ref: cd8017aa35c3c2f637720b720a0464450292d390
+      url: "https://github.com/haukuen/photo_view"
     source: git
     version: "0.14.0"
   platform:
