@@ -209,7 +209,7 @@ class _GroupedComicChaptersState extends State<_GroupedComicChapters>
     chapters = state.comic.chapters!;
     var oldController = _tabController;
     _tabController = TabController(
-      initialIndex: index,
+      initialIndex: index.clamp(0, chapters.ids.length > 0 ? chapters.ids.length - 1 : 0),
       length: chapters.ids.length,
       vsync: this,
     );
