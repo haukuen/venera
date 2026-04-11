@@ -190,7 +190,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
               ),
               clipBehavior: Clip.antiAlias,
               child: Hero(
-                tag: "${image.sourceKey}${image.ep}${image.page}",
+                tag: "${image.id}_${image.ep}_${image.page}",
                 child: AnimatedImage(
                   image: ImageFavoritesProvider(image),
                   width: 96,

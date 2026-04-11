@@ -68,7 +68,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
         });
       },
       heroAttributes: PhotoViewHeroAttributes(
-        tag: "${image.sourceKey}${image.ep}${image.page}",
+        tag: "${image.id}_${image.ep}_${image.page}",
       ),
     );
   }
