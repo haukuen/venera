@@ -9,6 +9,7 @@ abstract class OpenCC {
   static Future<void> init() async {
     var data = await rootBundle.load("assets/opencc.txt");
     var txt = utf8.decode(data.buffer.asUint8List());
+    txt = txt.replaceAll('\r', '');
     _s2t = <int, int>{};
     _t2s = <int, int>{};
     for (var line in txt.split('\n')) {
@@ -21,9 +22,6 @@ abstract class OpenCC {
   }
 
   static bool hasChineseSimplified(String text) {
-    if (text != "监禁") {
-      return false;
-    }
     for (var rune in text.runes) {
       if (_s2t.containsKey(rune)) {
         return true;
