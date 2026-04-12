@@ -9,6 +9,7 @@ import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/read_later.dart';
 import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:zip_flutter/zip_flutter.dart';
@@ -33,6 +34,8 @@ Future<File> exportAppData([bool sync = true]) async {
     zipFile.addFile("local_favorite.db", localFavoriteFile);
     zipFile.addFile("appdata.json", appdata);
     zipFile.addFile("cookie.db", cookies);
+    var readLaterFile = FilePath.join(dataPath, "read_later.db");
+    zipFile.addFile("read_later.db", readLaterFile);
     for (var file
         in Directory(FilePath.join(dataPath, "comic_source")).listSync()) {
       if (file is File) {
@@ -79,6 +82,13 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
       localFavoriteFile
           .renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
       LocalFavoritesManager().init();
+    }
+    var readLaterFile = cacheDir.joinFile("read_later.db");
+    if (await readLaterFile.exists()) {
+      ReadLaterManager().close();
+      File(FilePath.join(App.dataPath, "read_later.db")).deleteIfExistsSync();
+      readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
+      ReadLaterManager().init();
     }
     if (await appdataFile.exists()) {
       var content = await appdataFile.readAsString();
