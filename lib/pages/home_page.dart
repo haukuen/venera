@@ -1238,7 +1238,7 @@ class _ReadLaterState extends State<_ReadLater> {
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    final heroID = item.id.hashCode;
+                    final heroID = '${item.id}_readLater'.hashCode;
                     return SimpleComicTile(
                       comic: item,
                       heroID: heroID,
