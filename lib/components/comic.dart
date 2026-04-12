@@ -121,6 +121,28 @@ class ComicTile extends StatelessWidget {
           },
         ),
         MenuEntry(
+          icon: Icons.watch_later_outlined,
+          text: ReadLaterManager().exists(
+                  comic.id,
+                  ComicType(comic.sourceKey == 'local'
+                      ? 0
+                      : comic.sourceKey.hashCode),
+                )
+              ? 'Remove from Read Later'.tl
+              : 'Read Later'.tl,
+          onClick: () {
+            final manager = ReadLaterManager();
+            final type = ComicType(comic.sourceKey == 'local'
+                ? 0
+                : comic.sourceKey.hashCode);
+            if (manager.exists(comic.id, type)) {
+              manager.remove(comic.id, type);
+            } else {
+              manager.add(ReadLaterItem.fromComic(comic));
+            }
+          },
+        ),
+        MenuEntry(
           icon: Icons.block,
           text: 'Block'.tl,
           onClick: () => block(context),
