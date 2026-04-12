@@ -9,6 +9,7 @@ import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/read_later.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/comic_source_page.dart';
 import 'package:venera/pages/downloading_page.dart';
@@ -33,6 +34,7 @@ class HomePage extends StatelessWidget {
         SliverPadding(padding: EdgeInsets.only(top: context.padding.top)),
         const _SearchBar(),
         const _SyncDataWidget(),
+        const _ReadLater(),
         const _History(),
         const _Local(),
         const FollowUpdatesWidget(),
@@ -1144,5 +1146,114 @@ class __ChartLineState extends State<_ChartLine>
         ).fixWidth(context.width > 600 ? 60 : 30),
       ],
     ).fixHeight(28);
+  }
+}
+
+class _ReadLater extends StatefulWidget {
+  const _ReadLater();
+
+  @override
+  State<_ReadLater> createState() => _ReadLaterState();
+}
+
+class _ReadLaterState extends State<_ReadLater> {
+  List<ReadLaterItem> items = [];
+  int itemCount = 0;
+
+  void _onDataChanged() {
+    if (mounted) {
+      setState(() {
+        items = ReadLaterManager().getAll();
+        itemCount = ReadLaterManager().count;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    items = ReadLaterManager().getAll();
+    itemCount = ReadLaterManager().count;
+    ReadLaterManager().addListener(_onDataChanged);
+  }
+
+  @override
+  void dispose() {
+    ReadLaterManager().removeListener(_onDataChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SliverPadding(padding: EdgeInsets.zero);
+    }
+
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+            width: 0.6,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: 56,
+              child: Row(
+                children: [
+                  Center(
+                    child: Text('Read Later'.tl, style: ts.s18),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color:
+                          Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(itemCount.toString(), style: ts.s12),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.arrow_right),
+                ],
+              ),
+            ).paddingHorizontal(16),
+            SizedBox(
+              height: 136,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final heroID = item.id.hashCode;
+                  return SimpleComicTile(
+                    comic: item,
+                    heroID: heroID,
+                    onTap: () {
+                      context.to(
+                        () => ComicPage(
+                          id: item.id,
+                          sourceKey: item.sourceKey,
+                          cover: item.cover,
+                          title: item.title,
+                          heroID: heroID,
+                        ),
+                      );
+                    },
+                  ).paddingHorizontal(8).paddingVertical(2);
+                },
+              ),
+            ).paddingHorizontal(8).paddingBottom(16),
+          ],
+        ),
+      ),
+    );
   }
 }
