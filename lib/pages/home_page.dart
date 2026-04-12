@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/consts.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/history.dart';
@@ -1199,58 +1200,286 @@ class _ReadLaterState extends State<_ReadLater> {
           ),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              height: 56,
-              child: Row(
-                children: [
-                  Center(
-                    child: Text('Read Later'.tl, style: ts.s18),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            context.to(() => const _ReadLaterPage());
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    Center(
+                      child: Text('Read Later'.tl, style: ts.s18),
                     ),
-                    child: Text(itemCount.toString(), style: ts.s12),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.arrow_right),
-                ],
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color:
+                            Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(itemCount.toString(), style: ts.s12),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.arrow_right),
+                  ],
+                ),
+              ).paddingHorizontal(16),
+              SizedBox(
+                height: 136,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final heroID = item.id.hashCode;
+                    return SimpleComicTile(
+                      comic: item,
+                      heroID: heroID,
+                      onTap: () {
+                        context.to(
+                          () => ComicPage(
+                            id: item.id,
+                            sourceKey: item.sourceKey,
+                            cover: item.cover,
+                            title: item.title,
+                            heroID: heroID,
+                          ),
+                        );
+                      },
+                    ).paddingHorizontal(8).paddingVertical(2);
+                  },
+                ),
+              ).paddingHorizontal(8).paddingBottom(16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadLaterPage extends StatefulWidget {
+  const _ReadLaterPage();
+
+  @override
+  State<_ReadLaterPage> createState() => _ReadLaterPageState();
+}
+
+class _ReadLaterPageState extends State<_ReadLaterPage> {
+  @override
+  void initState() {
+    ReadLaterManager().addListener(onUpdate);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    ReadLaterManager().removeListener(onUpdate);
+    super.dispose();
+  }
+
+  var comics = ReadLaterManager().getAll();
+  bool multiSelectMode = false;
+  Map<ReadLaterItem, bool> selectedComics = {};
+
+  void onUpdate() {
+    if (mounted) {
+      setState(() {
+        comics = ReadLaterManager().getAll();
+        selectedComics.removeWhere((comic, _) => !comics.contains(comic));
+        if (selectedComics.isEmpty) {
+          multiSelectMode = false;
+        }
+      });
+    }
+  }
+
+  void selectAll() {
+    setState(() {
+      selectedComics = {for (var c in comics) c: true};
+    });
+  }
+
+  void deSelect() {
+    setState(() {
+      selectedComics.clear();
+    });
+  }
+
+  void invertSelection() {
+    setState(() {
+      for (var c in comics) {
+        selectedComics[c] = !selectedComics.putIfAbsent(c, () => false);
+      }
+      selectedComics.removeWhere((k, v) => !v);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<Widget> selectActions = [
+      IconButton(
+          icon: const Icon(Icons.select_all),
+          tooltip: "Select All".tl,
+          onPressed: selectAll),
+      IconButton(
+          icon: const Icon(Icons.deselect),
+          tooltip: "Deselect".tl,
+          onPressed: deSelect),
+      IconButton(
+          icon: const Icon(Icons.flip),
+          tooltip: "Invert Selection".tl,
+          onPressed: invertSelection),
+      IconButton(
+        icon: const Icon(Icons.delete),
+        tooltip: "Delete".tl,
+        onPressed: selectedComics.isEmpty
+            ? null
+            : () {
+                final toDelete =
+                    List<ReadLaterItem>.from(selectedComics.keys);
+                setState(() {
+                  multiSelectMode = false;
+                  selectedComics.clear();
+                });
+                for (final comic in toDelete) {
+                  ReadLaterManager().remove(comic.id, comic.type);
+                }
+              },
+      ),
+    ];
+
+    List<Widget> normalActions = [
+      IconButton(
+        icon: const Icon(Icons.checklist),
+        tooltip:
+            multiSelectMode ? "Exit Multi-Select".tl : "Multi-Select".tl,
+        onPressed: () {
+          setState(() {
+            multiSelectMode = !multiSelectMode;
+          });
+        },
+      ),
+      Tooltip(
+        message: 'Clear'.tl,
+        child: IconButton(
+          icon: const Icon(Icons.clear_all),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) {
+                return ContentDialog(
+                  title: 'Clear'.tl,
+                  content: Text(
+                      'Are you sure you want to clear your read later list?'
+                          .tl),
+                  actions: [
+                    Button.filled(
+                      color: context.colorScheme.error,
+                      onPressed: () {
+                        ReadLaterManager().removeAll();
+                        context.pop();
+                      },
+                      child: Text('Clear'.tl),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ),
+    ];
+
+    return PopScope(
+      canPop: !multiSelectMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (multiSelectMode) {
+          setState(() {
+            multiSelectMode = false;
+            selectedComics.clear();
+          });
+        }
+      },
+      child: Scaffold(
+        body: SmoothCustomScrollView(
+          slivers: [
+            SliverAppbar(
+              leading: Tooltip(
+                message: multiSelectMode ? "Cancel".tl : "Back".tl,
+                child: IconButton(
+                  onPressed: () {
+                    if (multiSelectMode) {
+                      setState(() {
+                        multiSelectMode = false;
+                        selectedComics.clear();
+                      });
+                    } else {
+                      context.pop();
+                    }
+                  },
+                  icon: multiSelectMode
+                      ? const Icon(Icons.close)
+                      : const Icon(Icons.arrow_back),
+                ),
               ),
-            ).paddingHorizontal(16),
-            SizedBox(
-              height: 136,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final heroID = item.id.hashCode;
-                  return SimpleComicTile(
-                    comic: item,
-                    heroID: heroID,
-                    onTap: () {
-                      context.to(
-                        () => ComicPage(
-                          id: item.id,
-                          sourceKey: item.sourceKey,
-                          cover: item.cover,
-                          title: item.title,
-                          heroID: heroID,
-                        ),
-                      );
-                    },
-                  ).paddingHorizontal(8).paddingVertical(2);
+              title: multiSelectMode
+                  ? Text(selectedComics.length.toString())
+                  : Text('Read Later'.tl),
+              actions: multiSelectMode ? selectActions : normalActions,
+            ),
+            if (comics.isEmpty)
+              SliverToBoxAdapter(
+                child: Center(
+                  child: Text('No items'.tl).paddingTop(200),
+                ),
+              )
+            else
+              SliverGridComics(
+                comics: comics,
+                selections: selectedComics,
+                onLongPressed: null,
+                onTap: multiSelectMode
+                    ? (c, heroID) {
+                        setState(() {
+                          if (selectedComics
+                              .containsKey(c as ReadLaterItem)) {
+                            selectedComics.remove(c);
+                          } else {
+                            selectedComics[c] = true;
+                          }
+                          if (selectedComics.isEmpty) {
+                            multiSelectMode = false;
+                          }
+                        });
+                      }
+                    : null,
+                badgeBuilder: (c) {
+                  return ComicSource.find(c.sourceKey)?.name;
+                },
+                menuBuilder: (c) {
+                  return [
+                    MenuEntry(
+                      icon: Icons.remove,
+                      text: 'Remove'.tl,
+                      color: context.colorScheme.error,
+                      onClick: () {
+                        ReadLaterManager()
+                            .remove(c.id, ComicType(c.sourceKey == 'local'
+                                ? 0
+                                : c.sourceKey.hashCode));
+                      },
+                    ),
+                  ];
                 },
               ),
-            ).paddingHorizontal(8).paddingBottom(16),
           ],
         ),
       ),
