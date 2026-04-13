@@ -811,6 +811,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.3"
+  pub_semver:
+    dependency: "direct main"
+    description:
+      name: pub_semver
+      sha256: "5bfcf68ca79ef689f8990d1160781b4bad40a3bd5e5218ad4076ddb7f4081585"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   rhttp:
     dependency: "direct main"
     description:

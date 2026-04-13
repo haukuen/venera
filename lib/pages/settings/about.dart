@@ -83,7 +83,7 @@ Future<bool> checkUpdate() async {
   if (res.statusCode == 200) {
     var data = loadYaml(res.data);
     if (data["version"] != null) {
-      return _compareVersion(data["version"].split("+")[0], App.version);
+      return _compareVersion(data["version"], App.version);
     }
   }
   return false;
@@ -126,15 +126,20 @@ Future<void> checkUpdateUi([bool showMessageIfNoUpdate = true, bool delay = fals
 
 /// return true if version1 > version2
 bool _compareVersion(String version1, String version2) {
-  var v1 = version1.split(".");
-  var v2 = version2.split(".");
-  for (var i = 0; i < v1.length; i++) {
-    if (int.parse(v1[i]) > int.parse(v2[i])) {
-      return true;
+  try {
+    var v1 = Version.parse(version1);
+    var v2 = Version.parse(version2);
+    return v1 > v2;
+  } catch (_) {
+    // Fallback for non-semver strings
+    var v1 = version1.split('+').first.split('-').first.split('.');
+    var v2 = version2.split('+').first.split('-').first.split('.');
+    for (var i = 0; i < v1.length && i < v2.length; i++) {
+      var n1 = int.tryParse(v1[i]) ?? 0;
+      var n2 = int.tryParse(v2[i]) ?? 0;
+      if (n1 > n2) return true;
+      if (n1 < n2) return false;
     }
-    if (int.parse(v1[i]) < int.parse(v2[i])) {
-      return false;
-    }
+    return false;
   }
-  return false;
 }
