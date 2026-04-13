@@ -368,16 +368,6 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
           useDeviceSettings: useDeviceSpecificSettings,
         ).toSliver(),
-        _SwitchSetting(
-          title: "Show system status bar".tl,
-          settingKey: "showSystemStatusBar",
-          onChanged: () {
-            widget.onChanged?.call("showSystemStatusBar");
-          },
-          comicId: isEnabledSpecificSettings ? widget.comicId : null,
-          comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
-          useDeviceSettings: useDeviceSpecificSettings,
-        ).toSliver(),
         SelectSetting(
           title: "Quick collect image".tl,
           settingKey: "quickCollectImage",
