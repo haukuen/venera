@@ -12,6 +12,7 @@ import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/image_provider/image_favorites_provider.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/sqlite_connection.dart';
 import 'package:venera/utils/channel.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/translations.dart';
@@ -204,7 +205,7 @@ class HistoryManager with ChangeNotifier {
       return;
     }
     _dbPath = "${App.dataPath}/history.db";
-    _db = sqlite3.open(_dbPath);
+    _db = openSqliteDatabase(_dbPath);
 
     _db.execute("""
         create table if not exists history  (
@@ -239,7 +240,7 @@ class HistoryManager with ChangeNotifier {
 
   static Future<void> _addHistoryAsync(String dbPath, History newItem) {
     return Isolate.run(() {
-      var db = sqlite3.open(dbPath);
+      var db = openSqliteDatabase(dbPath);
       try {
         db.execute(_insertHistorySql, [
           newItem.id,

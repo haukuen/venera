@@ -8,6 +8,7 @@ import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/image_provider/local_favorite_image.dart';
 import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/sqlite_connection.dart';
 import 'package:venera/pages/follow_updates_page.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'dart:io';
@@ -228,7 +229,7 @@ class LocalFavoritesManager with ChangeNotifier {
   Future<void> init() async {
     counts = {};
     _dbPath = "${App.dataPath}/local_favorite.db";
-    _db = sqlite3.open(_dbPath);
+    _db = openSqliteDatabase(_dbPath);
     _db.execute("""
       create table if not exists folder_order (
         folder_name text primary key,
@@ -308,7 +309,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<Map<int, int>> _initHashedIds(
       List<String> folders, String dbPath) {
     return Isolate.run(() {
-      var db = sqlite3.open(dbPath);
+      var db = openSqliteDatabase(dbPath);
       try {
         var hashedIds = <int, int>{};
         for (var folder in folders) {
@@ -431,7 +432,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<List<FavoriteItem>> _getFolderComicsAsync(
       String folder, String dbPath) {
     return Isolate.run(() {
-      var db = sqlite3.open(dbPath);
+      var db = openSqliteDatabase(dbPath);
       try {
         var rows = db.select("""
           select * from "$folder"
@@ -463,7 +464,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<List<FavoriteItem>> _getAllComicsAsync(
       List<String> folders, String dbPath) {
     return Isolate.run(() {
-      var db = sqlite3.open(dbPath);
+      var db = openSqliteDatabase(dbPath);
       try {
         var res = <FavoriteItem>{};
         for (final folder in folders) {
