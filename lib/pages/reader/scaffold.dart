@@ -93,7 +93,13 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (rotation != null) {
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     }
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (!appdata.settings.getReaderSetting(
+      context.reader.cid,
+      context.reader.type.sourceKey,
+      'showSystemStatusBar',
+    )) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
     super.initState();
     Future.delayed(const Duration(milliseconds: 200), addDragListener);
   }
@@ -108,7 +114,15 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (!_isOpen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      if (appdata.settings.getReaderSetting(
+        context.reader.cid,
+        context.reader.type.sourceKey,
+        'showSystemStatusBar',
+      )) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
     }
     setState(() {
       _isOpen = !_isOpen;
