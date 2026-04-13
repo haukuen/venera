@@ -93,6 +93,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (rotation != null) {
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     }
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     super.initState();
     Future.delayed(const Duration(milliseconds: 200), addDragListener);
   }
@@ -107,7 +108,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (!_isOpen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
     setState(() {
       _isOpen = !_isOpen;
