@@ -1,0 +1,194 @@
+name: Build
+run-name: Build ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_android:
+        description: 'Build Android'
+        required: true
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        type: boolean
+        default: true
+      build_macos:
+        description: 'Build macOS'
+        required: true
+        type: boolean
+        default: true
+      build_linux_x64:
+        description: 'Build Linux x64'
+        required: true
+        type: boolean
+        default: true
+      build_linux_arm64:
+        description: 'Build Linux ARM64'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  Build_Android:
+    if: ${{ inputs.build_android }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: rm -rf /opt/hostedtoolcache
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - name: Decode and install certificate
+        env:
+          STORE_FILE: ${{ secrets.ANDROID_KEYSTORE }}
+          PROPERTY_FILE: ${{ secrets.ANDROID_KEY_PROPERTIES }}
+        run: |
+            echo "$STORE_FILE" | base64 --decode > android/keystore.jks
+            echo "$PROPERTY_FILE" > android/key.properties
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'oracle'
+          java-version: '17'
+      - name: Check rust-toolchain.toml
+        run: rustup show
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - name: Upload APK (armeabi-v7a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-armeabi-v7a
+          path: build/app/outputs/apk/release/*armeabi-v7a*.apk
+      - name: Upload APK (arm64-v8a)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-arm64-v8a
+          path: build/app/outputs/apk/release/*arm64-v8a*.apk
+      - name: Upload APK (x86_64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-x86_64
+          path: build/app/outputs/apk/release/*x86_64*.apk
+      - name: Upload APK (universal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-universal
+          path: build/app/outputs/apk/release/*universal*.apk
+
+  Build_Windows:
+    if: ${{ inputs.build_windows }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: install dependencies
+        run: |
+          choco install yq -y
+          pip install httpx
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - name: build
+        run: |
+          flutter pub get
+          python windows/build.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows_build
+          path: build/windows/Venera-*
+
+  Build_MacOS:
+    if: ${{ inputs.build_macos }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - run: sudo xcode-select --switch /Applications/Xcode_16.4.app
+      - run: flutter pub get
+      - name: Check rust-toolchain.toml
+        run: rustup show
+      - name: Build Flutter macOS App
+        run: flutter build macos --release
+      - name: Create DMG
+        run: |
+          mkdir -p dist
+          mkdir -p dist/dmg_contents
+          cp -R build/macos/Build/Products/Release/venera.app dist/dmg_contents/
+          ln -s /Applications dist/dmg_contents/Applications
+          hdiutil create -volname "venera" -srcfolder dist/dmg_contents -ov -format UDZO "dist/venera.dmg"
+      - name: Add version to filename
+        run: |
+          APP_VERSION=$(grep "version:" pubspec.yaml | cut -d':' -f2 | tr -d ' ')
+          mkdir -p result
+          mv dist/venera.dmg result/venera-$APP_VERSION.dmg
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos_build
+          path: result/
+
+  Build_Linux_x64:
+    if: ${{ inputs.build_linux_x64 }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: pubspec.yaml
+          architecture: x64
+      - run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev webkit2gtk-4.1
+          dart pub global activate -s git https://github.com/venera-app/flutter_to_debian.git
+      - run: python3 debian/build.py x64
+      - run: dart run flutter_to_arch
+      - run: |
+          sudo rm -rf build/linux/arch/app.tar.gz
+          sudo rm -rf build/linux/arch/pkg
+          sudo rm -rf build/linux/arch/src
+          sudo rm -rf build/linux/arch/PKGBUILD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb_build
+          path: build/linux/x64/release/debian
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch_build
+          path: build/linux/arch/
+
+  Build_Linux_ARM64:
+    if: ${{ inputs.build_linux_arm64 }}
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'master'
+          flutter-version-file: pubspec.yaml
+      - run: |
+          flutter pub get
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev webkit2gtk-4.1
+          dart pub global activate -s git https://github.com/venera-app/flutter_to_debian.git
+      - name: "Patch font"
+        run: |
+          dart run patch/font.dart
+      - run: python3 debian/build.py arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb_arm64_build
+          path: build/linux/x64/release/debian
