@@ -1359,8 +1359,7 @@ class _ReadLaterPageState extends State<_ReadLaterPage> {
     List<Widget> normalActions = [
       IconButton(
         icon: const Icon(Icons.checklist),
-        tooltip:
-            multiSelectMode ? "Exit Multi-Select".tl : "Multi-Select".tl,
+        tooltip: "Multi-Select".tl,
         onPressed: () {
           setState(() {
             multiSelectMode = !multiSelectMode;
