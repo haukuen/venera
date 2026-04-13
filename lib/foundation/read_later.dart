@@ -70,6 +70,13 @@ class ReadLaterItem implements Comic {
   List<String>? get tags => null;
 
   @override
+  bool operator ==(Object other) =>
+      other is ReadLaterItem && other.id == id && other.type == type;
+
+  @override
+  int get hashCode => Object.hash(id, type);
+
+  @override
   Map<String, dynamic> toJson() {
     return {
       "id": id,
