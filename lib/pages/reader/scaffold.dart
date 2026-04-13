@@ -130,9 +130,16 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     return Stack(
       children: [
         Positioned.fill(
-          child: AbsorbPointer(
-            absorbing: context.reader.isPageAnimating,
-            child: widget.child,
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            removeBottom: true,
+            removeLeft: true,
+            removeRight: true,
+            child: AbsorbPointer(
+              absorbing: context.reader.isPageAnimating,
+              child: widget.child,
+            ),
           ),
         ),
         if (appdata.settings['showPageNumberInReader'] == true && !isOnChapterCommentsPage)
