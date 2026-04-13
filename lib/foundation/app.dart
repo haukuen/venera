@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/foundation/history.dart';
 
+import 'read_later.dart';
 import 'appdata.dart';
 import 'favorites.dart';
 import 'local.dart';
@@ -68,6 +69,8 @@ class _App {
 
   final LocalManager local = LocalManager();
 
+  final ReadLaterManager readLater = ReadLaterManager();
+
   void rootPop() {
     rootNavigatorKey.currentState?.maybePop();
   }
@@ -97,6 +100,7 @@ class _App {
       history.init(),
       favorites.init(),
       local.init(),
+      readLater.init(),
     ]);
   }
 
