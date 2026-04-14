@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:venera/foundation/sqlite_connection.dart';
 import 'package:venera/utils/io.dart';
 
 import 'app.dart';
@@ -70,7 +71,7 @@ class CacheManager {
 
   CacheManager._create() {
     Directory(cachePath).createSync(recursive: true);
-    _db = sqlite3.open('${App.dataPath}/cache.db');
+    _db = openSqliteDatabase('${App.dataPath}/cache.db');
     _db.execute('''
       CREATE TABLE IF NOT EXISTS cache (
         key TEXT PRIMARY KEY NOT NULL,

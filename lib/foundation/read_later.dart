@@ -4,6 +4,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
+import 'package:venera/foundation/sqlite_connection.dart';
 
 class ReadLaterItem implements Comic {
   @override
@@ -112,7 +113,7 @@ class ReadLaterManager with ChangeNotifier {
   Future<void> init() async {
     if (isInitialized) return;
     _dbPath = "${App.dataPath}/read_later.db";
-    _db = sqlite3.open(_dbPath);
+    _db = openSqliteDatabase(_dbPath);
     _db.execute("""
       CREATE TABLE IF NOT EXISTS read_later (
         id TEXT NOT NULL,
