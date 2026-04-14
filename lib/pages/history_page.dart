@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
+import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
@@ -537,12 +538,39 @@ class _SliverGridComicsNoListenerState
       }
     }
     generateHeroID();
+    appdata.settings.addListener(_onSettingsChanged);
     super.initState();
   }
 
   @override
+  void dispose() {
+    appdata.settings.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    // 重新过滤漫画列表，屏蔽词变化时移除被屏蔽的漫画
+    var changed = false;
+    final newComics = <Comic>[];
+    for (var comic in widget.comics) {
+      if (isBlocked(comic) == null) {
+        newComics.add(comic);
+      } else {
+        changed = true;
+      }
+    }
+    if (changed || newComics.length != comics.length) {
+      setState(() {
+        comics
+          ..clear()
+          ..addAll(newComics);
+      });
+    }
+  }
+
+  @override
   void didUpdateWidget(covariant _SliverGridComicsNoListener oldWidget) {
-    if (!comics.isEqualTo(widget.comics)) {
+    if (!oldWidget.comics.isEqualTo(widget.comics)) {
       comics.clear();
       for (var comic in widget.comics) {
         if (isBlocked(comic) == null) {
