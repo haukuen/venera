@@ -519,8 +519,8 @@ class ComicTile extends StatelessWidget {
                   appdata.saveData();
                   context.showMessage(message: 'Blocked'.tl);
                   comicTileContext
-                      .findAncestorStateOfType<_SliverGridComicsState>()!
-                      .update();
+                      .findAncestorStateOfType<_SliverGridComicsState>()
+                      ?.update();
                 },
                 child: Text('Block'.tl),
               ),
