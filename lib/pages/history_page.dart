@@ -564,6 +564,7 @@ class _SliverGridComicsNoListenerState
         comics
           ..clear()
           ..addAll(newComics);
+        generateHeroID();
       });
     }
   }
