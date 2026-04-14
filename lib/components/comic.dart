@@ -513,14 +513,18 @@ class ComicTile extends StatelessWidget {
               Button.filled(
                 onPressed: () {
                   context.pop();
+                  final blockedWords =
+                      appdata.settings['blockedWords'] as List;
                   for (var word in words) {
-                    appdata.settings['blockedWords'].add(word);
+                    blockedWords.add(word);
                   }
+                  // 触发 Settings.notifyListeners，使监听者刷新
+                  appdata.settings['blockedWords'] = blockedWords;
                   appdata.saveData();
                   context.showMessage(message: 'Blocked'.tl);
                   comicTileContext
-                      .findAncestorStateOfType<_SliverGridComicsState>()!
-                      .update();
+                      .findAncestorStateOfType<_SliverGridComicsState>()
+                      ?.update();
                 },
                 child: Text('Block'.tl),
               ),
