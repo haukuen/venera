@@ -4,6 +4,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
+import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/translations.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -217,7 +218,7 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
       ));
 
-      slivers.add(SliverGridComics(
+      slivers.add(_SliverGridComicsNoListener(
         comics: items,
         selections: selectedComics,
         onLongPressed: null,
@@ -482,5 +483,117 @@ class _HistoryPageState extends State<HistoryPage> {
       });
     }
     return res;
+  }
+}
+
+/// A version of SliverGridComics that does NOT listen to HistoryManager.
+///
+/// The parent _HistoryPageState already listens to HistoryManager and calls
+/// setState, which rebuilds this widget with updated comics. If this widget
+/// also listens, it triggers a setState inside didUpdateWidget's check, causing
+/// the widget to lose its state (like scroll position) and making search/filter
+/// behave incorrectly.
+class _SliverGridComicsNoListener extends StatefulWidget {
+  const _SliverGridComicsNoListener({
+    required this.comics,
+    this.selections,
+    this.onLongPressed,
+    this.onTap,
+    this.badgeBuilder,
+    this.menuBuilder,
+  });
+
+  final List<Comic> comics;
+  final Map<Comic, bool>? selections;
+  final void Function(Comic, int)? onLongPressed;
+  final void Function(Comic, int)? onTap;
+  final String? Function(Comic)? badgeBuilder;
+  final List<MenuEntry> Function(Comic)? menuBuilder;
+
+  @override
+  State<_SliverGridComicsNoListener> createState() =>
+      _SliverGridComicsNoListenerState();
+}
+
+class _SliverGridComicsNoListenerState
+    extends State<_SliverGridComicsNoListener> {
+  List<Comic> comics = [];
+  List<int> heroIDs = [];
+
+  static int _nextHeroID = 0;
+
+  void generateHeroID() {
+    heroIDs.clear();
+    for (var i = 0; i < comics.length; i++) {
+      heroIDs.add(_nextHeroID++);
+    }
+  }
+
+  @override
+  void initState() {
+    for (var comic in widget.comics) {
+      if (isBlocked(comic) == null) {
+        comics.add(comic);
+      }
+    }
+    generateHeroID();
+    super.initState();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SliverGridComicsNoListener oldWidget) {
+    if (!comics.isEqualTo(widget.comics)) {
+      comics.clear();
+      for (var comic in widget.comics) {
+        if (isBlocked(comic) == null) {
+          comics.add(comic);
+        }
+      }
+      generateHeroID();
+    }
+    super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverGrid(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        var badge = widget.badgeBuilder?.call(comics[index]);
+        var isSelected = widget.selections == null
+            ? false
+            : widget.selections![comics[index]] ?? false;
+        var comic = ComicTile(
+          comic: comics[index],
+          badge: badge,
+          menuOptions: widget.menuBuilder?.call(comics[index]),
+          onTap: widget.onTap != null
+              ? () => widget.onTap!(comics[index], heroIDs[index])
+              : null,
+          onLongPressed: widget.onLongPressed != null
+              ? () => widget.onLongPressed!(comics[index], heroIDs[index])
+              : null,
+          heroID: heroIDs[index],
+        );
+        if (widget.selections == null) {
+          return comic;
+        }
+        return AnimatedContainer(
+          key: ValueKey(comics[index].id),
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Theme.of(context)
+                    .colorScheme
+                    .secondaryContainer
+                    .toOpacity(0.72)
+                : null,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(4),
+          child: comic,
+        );
+      }, childCount: comics.length),
+      gridDelegate: SliverGridDelegateWithComics(),
+    );
   }
 }
