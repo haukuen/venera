@@ -396,7 +396,11 @@ class _HistoryPageState extends State<HistoryPage> {
           slivers: [
             SliverAppbar(
               leading: Tooltip(
-                message: multiSelectMode ? "Cancel".tl : "Back".tl,
+                message: multiSelectMode
+                    ? "Cancel".tl
+                    : _isSearchMode
+                        ? "Cancel".tl
+                        : "Back".tl,
                 child: IconButton(
                   onPressed: () {
                     if (multiSelectMode) {
@@ -404,11 +408,16 @@ class _HistoryPageState extends State<HistoryPage> {
                         multiSelectMode = false;
                         selectedComics.clear();
                       });
+                    } else if (_isSearchMode) {
+                      setState(() {
+                        _isSearchMode = false;
+                        _searchQuery = '';
+                      });
                     } else {
                       context.pop();
                     }
                   },
-                  icon: multiSelectMode
+                  icon: multiSelectMode || _isSearchMode
                       ? const Icon(Icons.close)
                       : const Icon(Icons.arrow_back),
                 ),
