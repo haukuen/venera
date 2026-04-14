@@ -94,6 +94,17 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     }
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final show = appdata.settings.getReaderSetting(
+        context.reader.cid,
+        context.reader.type.sourceKey,
+        'showSystemStatusBar',
+      ) == true;
+      if (!show) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    });
     Future.delayed(const Duration(milliseconds: 200), addDragListener);
   }
 
@@ -107,10 +118,14 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (!_isOpen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     } else {
-      if (!appdata.settings['showSystemStatusBar']) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-      } else {
+      if (appdata.settings.getReaderSetting(
+        context.reader.cid,
+        context.reader.type.sourceKey,
+        'showSystemStatusBar',
+      ) == true) {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }
     }
     setState(() {

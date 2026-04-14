@@ -213,13 +213,6 @@ class _ReaderState extends State<Reader>
       appdata.settings.getReaderSetting(cid, type.sourceKey, 'readerMode'),
     );
     history = widget.history;
-    if (!appdata.settings.getReaderSetting(
-      cid,
-      type.sourceKey,
-      'showSystemStatusBar',
-    )) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    }
     if (appdata.settings.getReaderSetting(
       cid,
       type.sourceKey,
