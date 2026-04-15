@@ -47,7 +47,7 @@ Future<File> exportAppData([bool sync = true]) async {
   return cacheFile;
 }
 
-Future<void> importAppData(File file, [bool checkVersion = false]) async {
+Future<void> importAppData(File file) async {
   var cacheDirPath = FilePath.join(App.cachePath, 'temp_data');
   var cacheDir = Directory(cacheDirPath);
   if (cacheDir.existsSync()) {
@@ -58,28 +58,25 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
     await Isolate.run(() {
       ZipFile.openAndExtract(file.path, cacheDirPath);
     });
-    var historyFile = cacheDir.joinFile("history.db");
-    var localFavoriteFile = cacheDir.joinFile("local_favorite.db");
+
+    // Validate contents
     var appdataFile = cacheDir.joinFile("appdata.json");
-    var cookieFile = cacheDir.joinFile("cookie.db");
-    if (checkVersion && appdataFile.existsSync()) {
-      var data = jsonDecode(await appdataFile.readAsString());
-      var version = data["settings"]["dataVersion"];
-      if (version is int && version <= appdata.settings["dataVersion"]) {
-        return;
-      }
+    if (appdataFile.existsSync()) {
+      var content = await appdataFile.readAsString();
+      jsonDecode(content); // throws if invalid JSON
     }
-    if (await historyFile.exists()) {
+
+    if (await cacheDir.joinFile("history.db").exists()) {
       HistoryManager().close();
       File(FilePath.join(App.dataPath, "history.db")).deleteIfExistsSync();
-      historyFile.renameSync(FilePath.join(App.dataPath, "history.db"));
+      cacheDir.joinFile("history.db").renameSync(FilePath.join(App.dataPath, "history.db"));
       HistoryManager().init();
     }
-    if (await localFavoriteFile.exists()) {
+    if (await cacheDir.joinFile("local_favorite.db").exists()) {
       LocalFavoritesManager().close();
       File(FilePath.join(App.dataPath, "local_favorite.db"))
           .deleteIfExistsSync();
-      localFavoriteFile
+      cacheDir.joinFile("local_favorite.db")
           .renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
       LocalFavoritesManager().init();
     }
@@ -90,15 +87,15 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
       ReadLaterManager().init();
     }
-    if (await appdataFile.exists()) {
+    if (appdataFile.existsSync()) {
       var content = await appdataFile.readAsString();
       var data = jsonDecode(content);
       appdata.syncData(data);
     }
-    if (await cookieFile.exists()) {
+    if (await cacheDir.joinFile("cookie.db").exists()) {
       SingleInstanceCookieJar.instance?.dispose();
       File(FilePath.join(App.dataPath, "cookie.db")).deleteIfExistsSync();
-      cookieFile.renameSync(FilePath.join(App.dataPath, "cookie.db"));
+      cacheDir.joinFile("cookie.db").renameSync(FilePath.join(App.dataPath, "cookie.db"));
       SingleInstanceCookieJar.instance =
           SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
             ..init();
