@@ -1,5 +1,3 @@
-# Venera
-
 ## 安装
 
 ### 从 Release 下载
