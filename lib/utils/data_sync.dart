@@ -35,9 +35,11 @@ class DataSync with ChangeNotifier {
   }
 
   void onDataChanged() {
-    if (isEnabled) {
+    if (!isEnabled) return;
+    _uploadDebounce?.cancel();
+    _uploadDebounce = Timer(const Duration(seconds: 5), () {
       uploadData();
-    }
+    });
   }
 
   bool _handleWindowClose() {
@@ -75,6 +77,7 @@ class DataSync with ChangeNotifier {
   bool get isUploading => _isUploading;
 
   Completer<void>? _syncLock;
+  Timer? _uploadDebounce;
 
   Future<void> _acquireLock() async {
     while (_syncLock != null) {
@@ -87,6 +90,12 @@ class DataSync with ChangeNotifier {
     var lock = _syncLock;
     _syncLock = null;
     lock?.complete();
+  }
+
+  @override
+  void dispose() {
+    _uploadDebounce?.cancel();
+    super.dispose();
   }
 
   static const _backupFiles = [
