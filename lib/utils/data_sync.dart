@@ -139,12 +139,21 @@ class DataSync with ChangeNotifier {
     var backupDir = Directory(_backupDir);
     if (!backupDir.existsSync()) return;
 
+    // 先关闭所有数据库连接，避免 Windows 文件锁
+    HistoryManager().close();
+    LocalFavoritesManager().close();
+    ReadLaterManager().close();
+    SingleInstanceCookieJar.instance?.dispose();
+
     for (var name in _backupFiles) {
       var src = File(FilePath.join(_backupDir, name));
       if (src.existsSync()) {
         var dst = File(FilePath.join(App.dataPath, name));
-        dst.deleteIfExistsSync();
+        if (dst.existsSync()) {
+          dst.renameSync(FilePath.join(App.dataPath, '$name.bak'));
+        }
         src.copySync(dst.path);
+        File(FilePath.join(App.dataPath, '$name.bak')).deleteIgnoreError();
       }
     }
 
