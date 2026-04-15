@@ -145,6 +145,10 @@ Future<void> importAppData(File file) async {
       }
       await ComicSourceManager().reload();
     }
+    // 确保所有 manager 的监听者收到数据变更通知
+    HistoryManager().notifyListeners();
+    LocalFavoritesManager().notifyListeners();
+    ReadLaterManager().notifyListeners();
   } finally {
     cacheDir.deleteIgnoreError(recursive: true);
   }
