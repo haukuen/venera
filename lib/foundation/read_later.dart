@@ -201,6 +201,5 @@ class ReadLaterManager with ChangeNotifier {
     isInitialized = false;
     HistoryManager().removeListener(_onHistoryChanged);
     _db.dispose();
-    _cache = null;
   }
 }
