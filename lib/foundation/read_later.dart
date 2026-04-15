@@ -52,6 +52,21 @@ class ReadLaterItem implements Comic {
     );
   }
 
+  factory ReadLaterItem.fromComicDetails(
+    ComicDetails comic,
+    String sourceKey,
+  ) {
+    return ReadLaterItem(
+      id: comic.comicId,
+      type: ComicType.fromKey(sourceKey),
+      title: comic.title,
+      subtitle: comic.subTitle,
+      cover: comic.cover,
+      sourceKey: sourceKey,
+      addedTime: DateTime.now(),
+    );
+  }
+
   @override
   String get description => subtitle ?? '';
 
