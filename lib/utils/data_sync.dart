@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/window_frame.dart';
@@ -5,9 +6,12 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/favorites.dart';
+import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/read_later.dart';
 import 'package:venera/foundation/res.dart';
 import 'package:venera/network/app_dio.dart';
+import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/utils/data.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:webdav_client/webdav_client.dart' hide File;
@@ -70,7 +74,97 @@ class DataSync with ChangeNotifier {
 
   bool get isUploading => _isUploading;
 
-  bool _haveWaitingTask = false;
+  Completer<void>? _syncLock;
+
+  Future<void> _acquireLock() async {
+    while (_syncLock != null) {
+      await _syncLock!.future;
+    }
+    _syncLock = Completer<void>();
+  }
+
+  void _releaseLock() {
+    var lock = _syncLock;
+    _syncLock = null;
+    lock?.complete();
+  }
+
+  static const _backupFiles = [
+    'history.db',
+    'local_favorite.db',
+    'read_later.db',
+    'cookie.db',
+    'appdata.json',
+  ];
+
+  String get _backupDir =>
+      FilePath.join(App.cachePath, 'sync_backup');
+
+  Future<void> _backupLocalData() async {
+    var backupDir = Directory(_backupDir);
+    if (backupDir.existsSync()) {
+      backupDir.deleteSync(recursive: true);
+    }
+    backupDir.createSync();
+
+    for (var name in _backupFiles) {
+      var src = File(FilePath.join(App.dataPath, name));
+      if (src.existsSync()) {
+        src.copySync(FilePath.join(_backupDir, name));
+      }
+    }
+
+    var srcDir = Directory(FilePath.join(App.dataPath, 'comic_source'));
+    var dstDir = Directory(FilePath.join(_backupDir, 'comic_source'));
+    if (srcDir.existsSync()) {
+      dstDir.createSync();
+      for (var f in srcDir.listSync()) {
+        if (f is File) {
+          f.copySync(FilePath.join(_backupDir, 'comic_source', f.name));
+        }
+      }
+    }
+  }
+
+  void _restoreBackup() {
+    var backupDir = Directory(_backupDir);
+    if (!backupDir.existsSync()) return;
+
+    for (var name in _backupFiles) {
+      var src = File(FilePath.join(_backupDir, name));
+      if (src.existsSync()) {
+        var dst = File(FilePath.join(App.dataPath, name));
+        dst.deleteIfExistsSync();
+        src.copySync(dst.path);
+      }
+    }
+
+    var srcDir = Directory(FilePath.join(_backupDir, 'comic_source'));
+    if (srcDir.existsSync()) {
+      var dstDir = Directory(FilePath.join(App.dataPath, 'comic_source'));
+      dstDir.deleteIfExistsSync(recursive: true);
+      dstDir.createSync();
+      for (var f in srcDir.listSync()) {
+        if (f is File) {
+          f.copySync(FilePath.join(App.dataPath, 'comic_source', f.name));
+        }
+      }
+    }
+
+    HistoryManager().init();
+    LocalFavoritesManager().init();
+    ReadLaterManager().init();
+    SingleInstanceCookieJar.instance =
+        SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
+          ..init();
+  }
+
+  void _cleanupBackup() {
+    var backupDir = Directory(_backupDir);
+    if (backupDir.existsSync()) {
+      backupDir.deleteSync(recursive: true);
+    }
+  }
 
   String? _lastError;
 
