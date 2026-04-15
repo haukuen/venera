@@ -420,6 +420,8 @@ void clearUnfavoritedHistory() {
 
   void close() {
     isInitialized = false;
+    _cachedHistoryIds = null;
+    cachedHistories.clear();
     _db.dispose();
   }
 
