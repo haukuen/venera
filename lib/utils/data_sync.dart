@@ -175,6 +175,11 @@ class DataSync with ChangeNotifier {
     SingleInstanceCookieJar.instance =
         SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
           ..init();
+
+    // 确保所有监听者收到通知
+    HistoryManager().notifyListeners();
+    LocalFavoritesManager().notifyListeners();
+    ReadLaterManager().notifyListeners();
   }
 
   void _cleanupBackup() {
