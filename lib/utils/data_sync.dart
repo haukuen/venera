@@ -289,12 +289,8 @@ class DataSync with ChangeNotifier {
   }
 
   Future<Res<bool>> downloadData() async {
-    if (_haveWaitingTask) return const Res(true);
-    while (isDownloading || isUploading) {
-      _haveWaitingTask = true;
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    _haveWaitingTask = false;
+    if (_isUploading) return const Res(true);
+    await _acquireLock();
     _isDownloading = true;
     _lastError = null;
     notifyListeners();
@@ -322,27 +318,57 @@ class DataSync with ChangeNotifier {
 
       try {
         var files = await client.readDir('/');
-        files.sort((a, b) => b.name!.compareTo(a.name!));
-        var file = files.firstWhereOrNull((e) => e.name!.endsWith('.venera'));
-        if (file == null) {
-          throw 'No data file found';
+        files = files.where((e) => e.name!.endsWith('.venera')).toList();
+        files.sort((a, b) {
+          var ta = int.tryParse(a.name!.replaceAll('.venera', '')) ?? 0;
+          var tb = int.tryParse(b.name!.replaceAll('.venera', '')) ?? 0;
+          return tb.compareTo(ta); // newest first
+        });
+
+        if (files.isEmpty) {
+          Log.info("Data Sync", 'No data file found on server');
+          return const Res(true);
         }
-        var version =
-            file.name!.split('-').elementAtOrNull(1)?.split('.').first;
-        if (version != null && int.tryParse(version) != null) {
-          var currentVersion = appdata.settings['dataVersion'];
-          if (currentVersion != null && int.parse(version) <= currentVersion) {
-            Log.info("Data Sync", 'No new data to download');
-            return const Res(true);
-          }
+
+        var remoteFile = files.first;
+        var remoteTimestamp =
+            int.tryParse(remoteFile.name!.replaceAll('.venera', ''));
+        var lastSyncTime = appdata.settings['lastSyncTime'] as int;
+
+        // If remote file is old format ({days}-{version}.venera), always download
+        // Old format files contain a dash, new format is pure timestamp
+        var isOldFormat = remoteFile.name!.contains('-');
+
+        if (!isOldFormat && remoteTimestamp != null && remoteTimestamp <= lastSyncTime) {
+          Log.info("Data Sync", 'No new data to download');
+          return const Res(true);
         }
+
         Log.info("Data Sync", "Downloading data from WebDAV server");
-        var localFile = File(FilePath.join(App.cachePath, file.name!));
-        await client.read2File(file.name!, localFile.path);
-        await importAppData(localFile, true);
-        await localFile.delete();
-        Log.info("Data Sync", "Data downloaded successfully");
-        return const Res(true);
+        var localFile = File(FilePath.join(App.cachePath, remoteFile.name!));
+        await client.read2File(remoteFile.name!, localFile.path);
+
+        await _backupLocalData();
+        try {
+          await importAppData(localFile);
+          await localFile.delete();
+
+          // Update lastSyncTime from the downloaded file's timestamp
+          if (remoteTimestamp != null) {
+            appdata.settings['lastSyncTime'] = remoteTimestamp;
+            await appdata.saveData(false);
+          }
+
+          _cleanupBackup();
+          Log.info("Data Sync", "Data downloaded successfully");
+          return const Res(true);
+        } catch (e, s) {
+          Log.error("Data Sync", "Import failed, restoring backup", s);
+          _restoreBackup();
+          _cleanupBackup();
+          _lastError = 'Download failed: $e';
+          return Res.error(_lastError!);
+        }
       } catch (e, s) {
         Log.error("Data Sync", e, s);
         _lastError = e.toString();
@@ -350,6 +376,7 @@ class DataSync with ChangeNotifier {
       }
     } finally {
       _isDownloading = false;
+      _releaseLock();
       notifyListeners();
     }
   }
