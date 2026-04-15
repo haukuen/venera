@@ -207,6 +207,7 @@ class Settings with ChangeNotifier {
     'webdavProxyEnabled': true,
     "disableSyncFields": "", // "field1, field2, ..."
     'dataVersion': 0,
+    'lastSyncTime': 0,
     'quickFavorite': null,
     'enableTurnPageByVolumeKey': true,
     'enableClockAndBatteryInfoInReader': true,
