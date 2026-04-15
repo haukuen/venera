@@ -16,11 +16,28 @@ import 'package:zip_flutter/zip_flutter.dart';
 
 import 'io.dart';
 
+/// 对指定数据库执行 WAL checkpoint，将 WAL 内容合并回主文件
+void _checkpointDb(String path) {
+  if (!File(path).existsSync()) return;
+  var db = sqlite3.open(path);
+  try {
+    db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+  } finally {
+    db.dispose();
+  }
+}
+
 Future<File> exportAppData([bool sync = true]) async {
+  // 先对 WAL 模式的数据库执行 checkpoint，确保数据完整写入主 .db 文件
+  var dataPath = App.dataPath;
+  _checkpointDb(FilePath.join(dataPath, "history.db"));
+  _checkpointDb(FilePath.join(dataPath, "local_favorite.db"));
+  _checkpointDb(FilePath.join(dataPath, "read_later.db"));
+  _checkpointDb(FilePath.join(dataPath, "cookie.db"));
+
   var time = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   var cacheFilePath = FilePath.join(App.cachePath, '$time.venera');
   var cacheFile = File(cacheFilePath);
-  var dataPath = App.dataPath;
   if (await cacheFile.exists()) {
     await cacheFile.delete();
   }
@@ -68,24 +85,34 @@ Future<void> importAppData(File file) async {
 
     if (await cacheDir.joinFile("history.db").exists()) {
       HistoryManager().close();
-      File(FilePath.join(App.dataPath, "history.db")).deleteIfExistsSync();
+      var localFile = File(FilePath.join(App.dataPath, "history.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "history.db.bak"));
+      }
       cacheDir.joinFile("history.db").renameSync(FilePath.join(App.dataPath, "history.db"));
-      HistoryManager().init();
+      File(FilePath.join(App.dataPath, "history.db.bak")).deleteIgnoreError();
+      await HistoryManager().init();
     }
     if (await cacheDir.joinFile("local_favorite.db").exists()) {
       LocalFavoritesManager().close();
-      File(FilePath.join(App.dataPath, "local_favorite.db"))
-          .deleteIfExistsSync();
-      cacheDir.joinFile("local_favorite.db")
-          .renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
-      LocalFavoritesManager().init();
+      var localFile = File(FilePath.join(App.dataPath, "local_favorite.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "local_favorite.db.bak"));
+      }
+      cacheDir.joinFile("local_favorite.db").renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
+      File(FilePath.join(App.dataPath, "local_favorite.db.bak")).deleteIgnoreError();
+      await LocalFavoritesManager().init();
     }
     var readLaterFile = cacheDir.joinFile("read_later.db");
     if (await readLaterFile.exists()) {
       ReadLaterManager().close();
-      File(FilePath.join(App.dataPath, "read_later.db")).deleteIfExistsSync();
+      var localFile = File(FilePath.join(App.dataPath, "read_later.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "read_later.db.bak"));
+      }
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
-      ReadLaterManager().init();
+      File(FilePath.join(App.dataPath, "read_later.db.bak")).deleteIgnoreError();
+      await ReadLaterManager().init();
     }
     if (appdataFile.existsSync()) {
       var content = await appdataFile.readAsString();
@@ -94,8 +121,12 @@ Future<void> importAppData(File file) async {
     }
     if (await cacheDir.joinFile("cookie.db").exists()) {
       SingleInstanceCookieJar.instance?.dispose();
-      File(FilePath.join(App.dataPath, "cookie.db")).deleteIfExistsSync();
+      var localFile = File(FilePath.join(App.dataPath, "cookie.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "cookie.db.bak"));
+      }
       cacheDir.joinFile("cookie.db").renameSync(FilePath.join(App.dataPath, "cookie.db"));
+      File(FilePath.join(App.dataPath, "cookie.db.bak")).deleteIgnoreError();
       SingleInstanceCookieJar.instance =
           SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
             ..init();
