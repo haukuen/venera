@@ -93,6 +93,7 @@ class Appdata with Init {
     "webdavProxyEnabled",
     "disableSyncFields",
     "deviceId",
+    "lastSyncTime",
   ];
 
   /// Sync data from another device
