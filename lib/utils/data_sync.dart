@@ -200,13 +200,8 @@ class DataSync with ChangeNotifier {
   }
 
   Future<Res<bool>> uploadData() async {
-    if (isDownloading) return const Res(true);
-    if (_haveWaitingTask) return const Res(true);
-    while (isUploading) {
-      _haveWaitingTask = true;
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-    _haveWaitingTask = false;
+    if (_isDownloading) return const Res(true);
+    await _acquireLock();
     _isUploading = true;
     _lastError = null;
     notifyListeners();
@@ -234,28 +229,51 @@ class DataSync with ChangeNotifier {
 
       try {
         var data = await exportAppData(
-            appdata.settings['disableSyncFields'].toString().isNotEmpty
-        );
-        var time =
-            (DateTime.now().millisecondsSinceEpoch ~/ 86400000).toString();
-        var filename = time;
-        filename += '-';
-        filename += appdata.settings['dataVersion'].toString();
-        filename += '.venera';
+            appdata.settings['disableSyncFields'].toString().isNotEmpty);
+        var now = DateTime.now().millisecondsSinceEpoch;
+        var filename = '$now.venera';
         var files = await client.readDir('/');
         files = files.where((e) => e.name!.endsWith('.venera')).toList();
-        var old = files.firstWhereOrNull((e) => e.name!.startsWith("$time-"));
-        if (old != null) {
-          await client.remove(old.name!);
+
+        // Remove file with same timestamp prefix (extremely unlikely but safe)
+        var existing = files.firstWhereOrNull((e) => e.name == filename);
+        if (existing != null) {
+          await client.remove(existing.name!);
         }
-        if (files.length >= 10) {
-          files.sort((a, b) => a.name!.compareTo(b.name!));
-          await client.remove(files.first.name!);
-        }
+
         await client.write(filename, await data.readAsBytes());
         data.deleteIgnoreError();
-        appdata.settings['dataVersion']++;
+
+        // Update lastSyncTime
+        appdata.settings['lastSyncTime'] = now;
         await appdata.saveData(false);
+
+        // Sort numerically and remove oldest if over 10 files
+        files = await client.readDir('/');
+        files = files.where((e) => e.name!.endsWith('.venera')).toList();
+        files.sort((a, b) {
+          var ta = int.tryParse(a.name!.replaceAll('.venera', '')) ?? 0;
+          var tb = int.tryParse(b.name!.replaceAll('.venera', '')) ?? 0;
+          return ta.compareTo(tb);
+        });
+        while (files.length > 10) {
+          await client.remove(files.first.name!);
+          files.removeAt(0);
+        }
+
+        // Clean up old format files ({days}-{version}.venera)
+        for (var f in files) {
+          if (f.name!.contains('-') && !f.name!.startsWith('${now ~/ 86400000}-')) {
+            var part = f.name!.replaceAll('.venera', '');
+            var parts = part.split('-');
+            if (parts.length == 2 &&
+                int.tryParse(parts[0]) != null &&
+                int.tryParse(parts[1]) != null) {
+              await client.remove(f.name!);
+            }
+          }
+        }
+
         Log.info("Upload Data", "Data uploaded successfully");
         return const Res(true);
       } catch (e, s) {
@@ -265,6 +283,7 @@ class DataSync with ChangeNotifier {
       }
     } finally {
       _isUploading = false;
+      _releaseLock();
       notifyListeners();
     }
   }
