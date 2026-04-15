@@ -425,6 +425,10 @@ void clearUnfavoritedHistory() {
     _db.dispose();
   }
 
+  void notifyChanges() {
+    notifyListeners();
+  }
+
   void batchDeleteHistories(List<ComicID> histories) {
     if (histories.isEmpty) return;
     _db.execute('BEGIN TRANSACTION;');

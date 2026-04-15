@@ -177,9 +177,9 @@ class DataSync with ChangeNotifier {
           ..init();
 
     // 确保所有监听者收到通知
-    HistoryManager().notifyListeners();
-    LocalFavoritesManager().notifyListeners();
-    ReadLaterManager().notifyListeners();
+    HistoryManager().notifyChanges();
+    LocalFavoritesManager().notifyChanges();
+    ReadLaterManager().notifyChanges();
   }
 
   void _cleanupBackup() {

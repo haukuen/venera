@@ -202,4 +202,8 @@ class ReadLaterManager with ChangeNotifier {
     HistoryManager().removeListener(_onHistoryChanged);
     _db.dispose();
   }
+
+  void notifyChanges() {
+    notifyListeners();
+  }
 }
