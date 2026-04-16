@@ -136,7 +136,7 @@ class DataSync with ChangeNotifier {
     }
   }
 
-  void _restoreBackup() {
+  Future<void> _restoreBackup() async {
     var backupDir = Directory(_backupDir);
     if (!backupDir.existsSync()) return;
 
@@ -170,9 +170,9 @@ class DataSync with ChangeNotifier {
       }
     }
 
-    HistoryManager().init();
-    LocalFavoritesManager().init();
-    ReadLaterManager().init();
+    await HistoryManager().init();
+    await LocalFavoritesManager().init();
+    await ReadLaterManager().init();
     SingleInstanceCookieJar.instance =
         SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
           ..init();
@@ -379,7 +379,7 @@ class DataSync with ChangeNotifier {
           return const Res(true);
         } catch (e, s) {
           Log.error("Data Sync", "Import failed, restoring backup", s);
-          _restoreBackup();
+          await _restoreBackup();
           _cleanupBackup();
           _lastError = 'Download failed: $e';
           return Res.error(_lastError!);

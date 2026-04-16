@@ -78,9 +78,14 @@ Future<void> importAppData(File file) async {
 
     // Validate contents
     var appdataFile = cacheDir.joinFile("appdata.json");
+    Map<String, dynamic>? appdataContent;
     if (appdataFile.existsSync()) {
       var content = await appdataFile.readAsString();
-      jsonDecode(content); // throws if invalid JSON
+      appdataContent = jsonDecode(content) as Map<String, dynamic>; // throws if invalid JSON
+      var version = appdataContent["settings"]?["dataVersion"];
+      if (version is int && version <= appdata.settings["dataVersion"]) {
+        return;
+      }
     }
 
     var bakFiles = <String>[];
@@ -116,10 +121,8 @@ Future<void> importAppData(File file) async {
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
       await ReadLaterManager().init();
     }
-    if (appdataFile.existsSync()) {
-      var content = await appdataFile.readAsString();
-      var data = jsonDecode(content);
-      appdata.syncData(data);
+    if (appdataContent != null) {
+      appdata.syncData(appdataContent);
     }
     if (await cacheDir.joinFile("cookie.db").exists()) {
       SingleInstanceCookieJar.instance?.dispose();
