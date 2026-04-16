@@ -255,8 +255,9 @@ class DataSync with ChangeNotifier {
       );
 
       try {
+        var disableFields = appdata.settings['disableSyncFields'];
         var data = await exportAppData(
-            appdata.settings['disableSyncFields'].toString().isNotEmpty);
+            disableFields != null && disableFields.toString().isNotEmpty);
         var now = DateTime.now().millisecondsSinceEpoch;
         var filename = '$now.venera';
         var files = await client.readDir('/');
@@ -360,7 +361,7 @@ class DataSync with ChangeNotifier {
         var remoteFile = files.first;
         var remoteTimestamp =
             int.tryParse(remoteFile.name!.replaceAll('.venera', ''));
-        var lastSyncTime = appdata.settings['lastSyncTime'] as int;
+        var lastSyncTime = (appdata.settings['lastSyncTime'] as int?) ?? 0;
 
         // If remote file is old format ({days}-{version}.venera), always download
         // Old format files contain a dash, new format is pure timestamp
