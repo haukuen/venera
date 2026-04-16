@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/window_frame.dart';
@@ -176,6 +177,17 @@ class DataSync with ChangeNotifier {
     SingleInstanceCookieJar.instance =
         SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
           ..init();
+
+    // Reload in-memory appdata from the restored appdata.json
+    var restoredAppdata = File(FilePath.join(App.dataPath, 'appdata.json'));
+    if (restoredAppdata.existsSync()) {
+      try {
+        var json = jsonDecode(await restoredAppdata.readAsString());
+        appdata.syncData(json);
+      } catch (e) {
+        Log.error("Data Sync", "Failed to reload appdata after restore: $e");
+      }
+    }
 
     // 确保所有监听者收到通知
     HistoryManager().notifyChanges();
