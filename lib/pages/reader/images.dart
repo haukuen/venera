@@ -40,6 +40,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
       error = null;
       reader.isLoading = true;
     });
+    context.readerScaffold.update();
   }
 
   /// Handle jumping to last page when _jumpToLastPageOnLoad is true
