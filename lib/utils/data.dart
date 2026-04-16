@@ -64,7 +64,7 @@ Future<File> exportAppData([bool sync = true]) async {
   return cacheFile;
 }
 
-Future<void> importAppData(File file) async {
+Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async {
   var cacheDirPath = FilePath.join(App.cachePath, 'temp_data');
   var cacheDir = Directory(cacheDirPath);
   if (cacheDir.existsSync()) {
@@ -83,7 +83,7 @@ Future<void> importAppData(File file) async {
       var content = await appdataFile.readAsString();
       appdataContent = jsonDecode(content) as Map<String, dynamic>; // throws if invalid JSON
       var version = appdataContent["settings"]?["dataVersion"];
-      if (version is int && version <= appdata.settings["dataVersion"]) {
+      if (!skipDataVersionCheck && version is int && version <= appdata.settings["dataVersion"]) {
         return;
       }
     }

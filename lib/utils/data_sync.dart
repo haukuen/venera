@@ -378,7 +378,7 @@ class DataSync with ChangeNotifier {
 
         await _backupLocalData();
         try {
-          await importAppData(localFile);
+          await importAppData(localFile, skipDataVersionCheck: true);
           await localFile.delete();
 
           // Update lastSyncTime from the downloaded file's timestamp
