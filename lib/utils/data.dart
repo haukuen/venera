@@ -83,14 +83,16 @@ Future<void> importAppData(File file) async {
       jsonDecode(content); // throws if invalid JSON
     }
 
+    var bakFiles = <String>[];
+
     if (await cacheDir.joinFile("history.db").exists()) {
       HistoryManager().close();
       var localFile = File(FilePath.join(App.dataPath, "history.db"));
       if (localFile.existsSync()) {
         localFile.renameSync(FilePath.join(App.dataPath, "history.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "history.db.bak"));
       }
       cacheDir.joinFile("history.db").renameSync(FilePath.join(App.dataPath, "history.db"));
-      File(FilePath.join(App.dataPath, "history.db.bak")).deleteIgnoreError();
       await HistoryManager().init();
     }
     if (await cacheDir.joinFile("local_favorite.db").exists()) {
@@ -98,9 +100,9 @@ Future<void> importAppData(File file) async {
       var localFile = File(FilePath.join(App.dataPath, "local_favorite.db"));
       if (localFile.existsSync()) {
         localFile.renameSync(FilePath.join(App.dataPath, "local_favorite.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "local_favorite.db.bak"));
       }
       cacheDir.joinFile("local_favorite.db").renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
-      File(FilePath.join(App.dataPath, "local_favorite.db.bak")).deleteIgnoreError();
       await LocalFavoritesManager().init();
     }
     var readLaterFile = cacheDir.joinFile("read_later.db");
@@ -109,9 +111,9 @@ Future<void> importAppData(File file) async {
       var localFile = File(FilePath.join(App.dataPath, "read_later.db"));
       if (localFile.existsSync()) {
         localFile.renameSync(FilePath.join(App.dataPath, "read_later.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "read_later.db.bak"));
       }
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
-      File(FilePath.join(App.dataPath, "read_later.db.bak")).deleteIgnoreError();
       await ReadLaterManager().init();
     }
     if (appdataFile.existsSync()) {
@@ -124,12 +126,15 @@ Future<void> importAppData(File file) async {
       var localFile = File(FilePath.join(App.dataPath, "cookie.db"));
       if (localFile.existsSync()) {
         localFile.renameSync(FilePath.join(App.dataPath, "cookie.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "cookie.db.bak"));
       }
       cacheDir.joinFile("cookie.db").renameSync(FilePath.join(App.dataPath, "cookie.db"));
-      File(FilePath.join(App.dataPath, "cookie.db.bak")).deleteIgnoreError();
       SingleInstanceCookieJar.instance =
           SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
             ..init();
+    }
+    for (var bak in bakFiles) {
+      File(bak).deleteIgnoreError();
     }
     var comicSourceDir = FilePath.join(cacheDirPath, "comic_source");
     if (Directory(comicSourceDir).existsSync()) {

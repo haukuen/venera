@@ -419,6 +419,7 @@ void clearUnfavoritedHistory() {
   }
 
   void close() {
+    if (!isInitialized) return;
     isInitialized = false;
     _cachedHistoryIds = null;
     cachedHistories.clear();

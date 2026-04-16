@@ -35,9 +35,10 @@ class DataSync with ChangeNotifier {
   }
 
   void onDataChanged() {
-    if (!isEnabled) return;
     _uploadDebounce?.cancel();
+    if (!isEnabled) return;
     _uploadDebounce = Timer(const Duration(seconds: 5), () {
+      if (!isEnabled) return;
       uploadData();
     });
   }
