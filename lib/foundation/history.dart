@@ -101,7 +101,8 @@ class History implements Comic {
         readEpisode = Set<String>.from(
             (map["readEpisode"] as List<dynamic>?)?.toSet() ??
                 const <String>{}),
-        maxPage = map["max_page"];
+        maxPage = map["max_page"],
+        group = map["chapter_group"];
 
   @override
   String toString() {
@@ -193,7 +194,7 @@ class HistoryManager with ChangeNotifier {
   int get length => _db.select("select count(*) from history;").first[0] as int;
 
   /// Cache of history ids. Improve the performance of find operation.
-  Map<String, bool>? _cachedHistoryIds;
+  Set<String>? _cachedHistoryIds;
 
   /// Cache records recently modified by the app. Improve the performance of listeners.
   final cachedHistories = <String, History>{};
@@ -209,7 +210,7 @@ class HistoryManager with ChangeNotifier {
 
     _db.execute("""
         create table if not exists history  (
-          id text primary key,
+          id text,
           title text,
           subtitle text,
           cover text,
@@ -219,13 +220,44 @@ class HistoryManager with ChangeNotifier {
           page int,
           readEpisode text,
           max_page int,
-          chapter_group int
+          chapter_group int,
+          primary key (id, type)
         );
       """);
 
     var columns = _db.select("PRAGMA table_info(history);");
     if (!columns.any((element) => element["name"] == "chapter_group")) {
       _db.execute("alter table history add column chapter_group int;");
+    }
+
+    // Migrate from single-column PK (id) to composite PK (id, type)
+    var pkColumns = _db.select("""
+      SELECT COUNT(*) as c FROM pragma_table_info('history')
+      WHERE pk > 0;
+    """);
+    if (pkColumns.first["c"] == 1) {
+      _db.execute("""
+        CREATE TABLE history_new (
+          id text,
+          title text,
+          subtitle text,
+          cover text,
+          time int,
+          type int,
+          ep int,
+          page int,
+          readEpisode text,
+          max_page int,
+          chapter_group int,
+          PRIMARY KEY (id, type)
+        );
+      """);
+      _db.execute("""
+        INSERT OR IGNORE INTO history_new
+        SELECT * FROM history ORDER BY time DESC;
+      """);
+      _db.execute("DROP TABLE history;");
+      _db.execute("ALTER TABLE history_new RENAME TO history;");
     }
 
     notifyListeners();
@@ -278,7 +310,7 @@ class HistoryManager with ChangeNotifier {
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {
-      _cachedHistoryIds![newItem.id] = true;
+      _cachedHistoryIds!.add('${newItem.id}_${newItem.type.value}');
     }
     cachedHistories[newItem.id] = newItem;
     if (cachedHistories.length > 10) {
@@ -307,7 +339,7 @@ class HistoryManager with ChangeNotifier {
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {
-      _cachedHistoryIds![newItem.id] = true;
+      _cachedHistoryIds!.add('${newItem.id}_${newItem.type.value}');
     }
     cachedHistories[newItem.id] = newItem;
     if (cachedHistories.length > 10) {
@@ -359,13 +391,16 @@ void clearUnfavoritedHistory() {
   void updateCache() {
     _cachedHistoryIds = {};
     var res = _db.select("""
-        select id from history;
+        select id, type from history;
       """);
     for (var element in res) {
-      _cachedHistoryIds![element["id"] as String] = true;
+      _cachedHistoryIds!
+          .add('${element["id"] as String}_${element["type"] as int}');
     }
     for (var key in cachedHistories.keys.toList()) {
-      if (!_cachedHistoryIds!.containsKey(key)) {
+      // cachedHistories is keyed by id only; check if any type variant exists
+      var hasMatch = _cachedHistoryIds!.any((e) => e.startsWith('${key}_'));
+      if (!hasMatch) {
         cachedHistories.remove(key);
       }
     }
@@ -375,7 +410,7 @@ void clearUnfavoritedHistory() {
     if (_cachedHistoryIds == null) {
       updateCache();
     }
-    if (!_cachedHistoryIds!.containsKey(id)) {
+    if (!_cachedHistoryIds!.contains('${id}_${type.value}')) {
       return null;
     }
     if (cachedHistories.containsKey(id)) {
