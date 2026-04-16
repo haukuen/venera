@@ -682,7 +682,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                             tag,
                             e.key.toLowerCase(),
                           )
-                        : tag,
+                        : TagsTranslation.convertIfNeeded(tag),
                     onTap: () => onTapTag(tag, e.key),
                   ),
               ],

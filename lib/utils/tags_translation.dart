@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/utils/ext.dart';
+import 'package:venera/utils/opencc.dart';
 
 extension TagsTranslation on String{
   static final Map<String, Map<String, String>> _data = {};
@@ -32,22 +33,34 @@ extension TagsTranslation on String{
     return _data.containsKey(key);
   }
 
+  /// 对文本进行繁简转换，简中locale转简体，繁中locale转繁体，其他locale不处理
+  static String convertIfNeeded(String text) {
+    var locale = App.locale;
+    if (locale.languageCode != "zh") return text;
+    if (locale.countryCode == "TW") {
+      return OpenCC.simplifiedToTraditional(text);
+    } else {
+      return OpenCC.traditionalToSimplified(text);
+    }
+  }
+
   /// 对tag进行处理后进行翻译: 代表'或'的分割符'|', namespace.
   static String _translateTags(String tag){
     if (tag.contains('|')) {
       var splits = tag.split('|');
-      return enTagsTranslations[splits[0].trim()]
-          ?? enTagsTranslations[splits[1].trim()]
-          ?? tag;
+      var result = enTagsTranslations[splits[0].trim()]
+          ?? enTagsTranslations[splits[1].trim()];
+      if (result != null) return result;
+      return convertIfNeeded(tag);
     } else if(tag.contains(':')) {
       var splits = tag.split(':');
       if(_haveNamespace(splits[0])) {
         return translationTagWithNamespace(splits[1], splits[0]);
       } else {
-        return tag;
+        return convertIfNeeded(tag);
       }
     } else {
-      return enTagsTranslations[tag]??tag;
+      return enTagsTranslations[tag] ?? convertIfNeeded(tag);
     }
   }
 
@@ -77,20 +90,21 @@ extension TagsTranslation on String{
     if(text != "reclass" && text.endsWith('s')){
       text.replaceLast('s', '');
     }
-    return switch(namespace){
-      "male" => maleTags[text] ?? text,
-      "female" => femaleTags[text] ?? text,
-      "mixed" => mixedTags[text] ?? text,
-      "other" => otherTags[text] ?? text,
-      "parody" => parodyTags[text] ?? text,
-      "character" => characterTranslations[text] ?? text,
-      "group" => groupTags[text] ?? text,
-      "cosplayer" => cosplayerTags[text] ?? text,
-      "reclass" => reclassTags[text] ?? text,
-      "language" => languageTranslations[text] ?? text,
-      "artist" => artistTags[text] ?? text,
+    var result = switch(namespace){
+      "male" => maleTags[text],
+      "female" => femaleTags[text],
+      "mixed" => mixedTags[text],
+      "other" => otherTags[text],
+      "parody" => parodyTags[text],
+      "character" => characterTranslations[text],
+      "group" => groupTags[text],
+      "cosplayer" => cosplayerTags[text],
+      "reclass" => reclassTags[text],
+      "language" => languageTranslations[text],
+      "artist" => artistTags[text],
       _ => text.translateTagsToCN
     };
+    return result ?? convertIfNeeded(text);
   }
 
   String _categoryTextDynamic(String c){
