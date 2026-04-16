@@ -218,6 +218,8 @@ class LocalFavoritesManager with ChangeNotifier {
 
   var _hashedIds = <int, int>{};
 
+  bool isInitialized = false;
+
   int get totalComics {
     return _hashedIds.length;
   }
@@ -276,6 +278,7 @@ class LocalFavoritesManager with ChangeNotifier {
       appdata.settings['followUpdatesFolder'] = null;
     }
     initCounts();
+    isInitialized = true;
   }
 
   void initCounts() {
@@ -1256,6 +1259,8 @@ class LocalFavoritesManager with ChangeNotifier {
   }
 
   void close() {
+    if (!isInitialized) return;
+    isInitialized = false;
     _db.dispose();
   }
 

@@ -49,3 +49,5 @@ add_translation.py
 
 */*/generated_*
 */*/Generated*
+.claude/settings.local.json
+docs/superpowers/

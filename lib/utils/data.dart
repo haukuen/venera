@@ -16,11 +16,28 @@ import 'package:zip_flutter/zip_flutter.dart';
 
 import 'io.dart';
 
+/// 对指定数据库执行 WAL checkpoint，将 WAL 内容合并回主文件
+void _checkpointDb(String path) {
+  if (!File(path).existsSync()) return;
+  var db = sqlite3.open(path);
+  try {
+    db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+  } finally {
+    db.dispose();
+  }
+}
+
 Future<File> exportAppData([bool sync = true]) async {
+  // 先对 WAL 模式的数据库执行 checkpoint，确保数据完整写入主 .db 文件
+  var dataPath = App.dataPath;
+  _checkpointDb(FilePath.join(dataPath, "history.db"));
+  _checkpointDb(FilePath.join(dataPath, "local_favorite.db"));
+  _checkpointDb(FilePath.join(dataPath, "read_later.db"));
+  _checkpointDb(FilePath.join(dataPath, "cookie.db"));
+
   var time = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   var cacheFilePath = FilePath.join(App.cachePath, '$time.venera');
   var cacheFile = File(cacheFilePath);
-  var dataPath = App.dataPath;
   if (await cacheFile.exists()) {
     await cacheFile.delete();
   }
@@ -47,7 +64,7 @@ Future<File> exportAppData([bool sync = true]) async {
   return cacheFile;
 }
 
-Future<void> importAppData(File file, [bool checkVersion = false]) async {
+Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async {
   var cacheDirPath = FilePath.join(App.cachePath, 'temp_data');
   var cacheDir = Directory(cacheDirPath);
   if (cacheDir.existsSync()) {
@@ -58,50 +75,69 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
     await Isolate.run(() {
       ZipFile.openAndExtract(file.path, cacheDirPath);
     });
-    var historyFile = cacheDir.joinFile("history.db");
-    var localFavoriteFile = cacheDir.joinFile("local_favorite.db");
+
+    // Validate contents
     var appdataFile = cacheDir.joinFile("appdata.json");
-    var cookieFile = cacheDir.joinFile("cookie.db");
-    if (checkVersion && appdataFile.existsSync()) {
-      var data = jsonDecode(await appdataFile.readAsString());
-      var version = data["settings"]["dataVersion"];
-      if (version is int && version <= appdata.settings["dataVersion"]) {
+    Map<String, dynamic>? appdataContent;
+    if (appdataFile.existsSync()) {
+      var content = await appdataFile.readAsString();
+      appdataContent = jsonDecode(content) as Map<String, dynamic>; // throws if invalid JSON
+      var version = appdataContent["settings"]?["dataVersion"];
+      if (!skipDataVersionCheck && version is int && version <= appdata.settings["dataVersion"]) {
         return;
       }
     }
-    if (await historyFile.exists()) {
+
+    var bakFiles = <String>[];
+
+    if (await cacheDir.joinFile("history.db").exists()) {
       HistoryManager().close();
-      File(FilePath.join(App.dataPath, "history.db")).deleteIfExistsSync();
-      historyFile.renameSync(FilePath.join(App.dataPath, "history.db"));
-      HistoryManager().init();
+      var localFile = File(FilePath.join(App.dataPath, "history.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "history.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "history.db.bak"));
+      }
+      cacheDir.joinFile("history.db").renameSync(FilePath.join(App.dataPath, "history.db"));
+      await HistoryManager().init();
     }
-    if (await localFavoriteFile.exists()) {
+    if (await cacheDir.joinFile("local_favorite.db").exists()) {
       LocalFavoritesManager().close();
-      File(FilePath.join(App.dataPath, "local_favorite.db"))
-          .deleteIfExistsSync();
-      localFavoriteFile
-          .renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
-      LocalFavoritesManager().init();
+      var localFile = File(FilePath.join(App.dataPath, "local_favorite.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "local_favorite.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "local_favorite.db.bak"));
+      }
+      cacheDir.joinFile("local_favorite.db").renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
+      await LocalFavoritesManager().init();
     }
     var readLaterFile = cacheDir.joinFile("read_later.db");
     if (await readLaterFile.exists()) {
       ReadLaterManager().close();
-      File(FilePath.join(App.dataPath, "read_later.db")).deleteIfExistsSync();
+      var localFile = File(FilePath.join(App.dataPath, "read_later.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "read_later.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "read_later.db.bak"));
+      }
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
-      ReadLaterManager().init();
+      await ReadLaterManager().init();
     }
-    if (await appdataFile.exists()) {
-      var content = await appdataFile.readAsString();
-      var data = jsonDecode(content);
-      appdata.syncData(data);
+    if (appdataContent != null) {
+      appdata.syncData(appdataContent);
     }
-    if (await cookieFile.exists()) {
+    if (await cacheDir.joinFile("cookie.db").exists()) {
       SingleInstanceCookieJar.instance?.dispose();
-      File(FilePath.join(App.dataPath, "cookie.db")).deleteIfExistsSync();
-      cookieFile.renameSync(FilePath.join(App.dataPath, "cookie.db"));
+      var localFile = File(FilePath.join(App.dataPath, "cookie.db"));
+      if (localFile.existsSync()) {
+        localFile.renameSync(FilePath.join(App.dataPath, "cookie.db.bak"));
+        bakFiles.add(FilePath.join(App.dataPath, "cookie.db.bak"));
+      }
+      cacheDir.joinFile("cookie.db").renameSync(FilePath.join(App.dataPath, "cookie.db"));
       SingleInstanceCookieJar.instance =
           SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
             ..init();
+    }
+    for (var bak in bakFiles) {
+      File(bak).deleteIgnoreError();
     }
     var comicSourceDir = FilePath.join(cacheDirPath, "comic_source");
     if (Directory(comicSourceDir).existsSync()) {
@@ -117,6 +153,10 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
       }
       await ComicSourceManager().reload();
     }
+    // 确保所有 manager 的监听者收到数据变更通知
+    HistoryManager().notifyChanges();
+    LocalFavoritesManager().notifyChanges();
+    ReadLaterManager().notifyChanges();
   } finally {
     cacheDir.deleteIgnoreError(recursive: true);
   }

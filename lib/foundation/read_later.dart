@@ -198,9 +198,13 @@ class ReadLaterManager with ChangeNotifier {
   }
 
   void close() {
+    if (!isInitialized) return;
     isInitialized = false;
     HistoryManager().removeListener(_onHistoryChanged);
     _db.dispose();
-    _cache = null;
+  }
+
+  void notifyChanges() {
+    notifyListeners();
   }
 }

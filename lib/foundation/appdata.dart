@@ -93,6 +93,7 @@ class Appdata with Init {
     "webdavProxyEnabled",
     "disableSyncFields",
     "deviceId",
+    "lastSyncTime",
   ];
 
   /// Sync data from another device
@@ -207,6 +208,7 @@ class Settings with ChangeNotifier {
     'webdavProxyEnabled': true,
     "disableSyncFields": "", // "field1, field2, ..."
     'dataVersion': 0,
+    'lastSyncTime': 0,
     'quickFavorite': null,
     'enableTurnPageByVolumeKey': true,
     'enableClockAndBatteryInfoInReader': true,
