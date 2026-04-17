@@ -13,21 +13,6 @@ class _ExploreSettingsState extends State<ExploreSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("Explore".tl)),
-        SelectSetting(
-          title: "Display mode of comic tile".tl,
-          settingKey: "comicDisplayMode",
-          optionTranslation: {
-            "detailed": "Detailed".tl,
-            "brief": "Brief".tl,
-          },
-        ).toSliver(),
-        _SliderSetting(
-          title: "Size of comic tile".tl,
-          settingsIndex: "comicTileScale",
-          interval: 0.05,
-          min: 0.5,
-          max: 1.5,
-        ).toSliver(),
         _PopupWindowSetting(
           title: "Explore Pages".tl,
           builder: setExplorePagesWidget,
@@ -51,10 +36,6 @@ class _ExploreSettingsState extends State<ExploreSettings> {
         _SwitchSetting(
           title: "Show history on comic tile".tl,
           settingKey: "showHistoryStatusOnTile",
-        ).toSliver(),
-        _SwitchSetting(
-          title: "Reverse default chapter order".tl,
-          settingKey: "reverseChapterOrder",
         ).toSliver(),
         _PopupWindowSetting(
           title: "Keyword blocking".tl,
@@ -86,24 +67,6 @@ class _ExploreSettingsState extends State<ExploreSettings> {
             'chinese': "Chinese",
             'english': "English",
             'japanese': "Japanese",
-          },
-        ).toSliver(),
-        SelectSetting(
-          title: "Initial Page".tl,
-          settingKey: "initialPage",
-          optionTranslation: {
-            '0': "Home Page".tl,
-            '1': "Favorites Page".tl,
-            '2': "Explore Page".tl,
-            '3': "Categories Page".tl,
-          },
-        ).toSliver(),
-        SelectSetting(
-          title: "Display mode of comic list".tl,
-          settingKey: "comicListDisplayMode",
-          optionTranslation: {
-            "paging": "Paging".tl,
-            "Continuous": "Continuous".tl,
           },
         ).toSliver(),
       ],

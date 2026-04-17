@@ -381,6 +381,7 @@ class _SliderSetting extends StatefulWidget {
     required this.min,
     required this.max,
     this.onChanged,
+    this.subtitle,
     this.comicId,
     this.comicSource,
     this.useDeviceSettings = false,
@@ -398,6 +399,8 @@ class _SliderSetting extends StatefulWidget {
 
   final VoidCallback? onChanged;
 
+  final String? subtitle;
+
   final String? comicId;
 
   final String? comicSource;
@@ -409,6 +412,42 @@ class _SliderSetting extends StatefulWidget {
 }
 
 class _SliderSettingState extends State<_SliderSetting> {
+  void _setValue(double value) {
+    if (value.toInt() == value) {
+      if (widget.comicId != null) {
+        appdata.settings.setReaderSetting(
+          widget.comicId!,
+          widget.comicSource!,
+          widget.settingsIndex,
+          value.toInt(),
+        );
+      } else if (widget.useDeviceSettings) {
+        appdata.settings.setDeviceReaderSetting(
+          widget.settingsIndex,
+          value.toInt(),
+        );
+      } else {
+        appdata.settings[widget.settingsIndex] = value.toInt();
+      }
+    } else {
+      if (widget.comicId != null) {
+        appdata.settings.setReaderSetting(
+          widget.comicId!,
+          widget.comicSource!,
+          widget.settingsIndex,
+          value,
+        );
+      } else if (widget.useDeviceSettings) {
+        appdata.settings.setDeviceReaderSetting(
+          widget.settingsIndex,
+          value,
+        );
+      } else {
+        appdata.settings[widget.settingsIndex] = value;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     var value =
@@ -425,53 +464,27 @@ class _SliderSettingState extends State<_SliderSetting> {
     return ListTile(
       title: Text(widget.title, softWrap: true, maxLines: 2),
       trailing: Text(value.toString(), style: ts.s12),
-      subtitle: Slider(
-        value: value,
-        onChanged: (value) {
-          if (value.toInt() == value) {
-            setState(() {
-              if (widget.comicId != null) {
-                appdata.settings.setReaderSetting(
-                  widget.comicId!,
-                  widget.comicSource!,
-                  widget.settingsIndex,
-                  value.toInt(),
-                );
-              } else if (widget.useDeviceSettings) {
-                appdata.settings.setDeviceReaderSetting(
-                  widget.settingsIndex,
-                  value.toInt(),
-                );
-              } else {
-                appdata.settings[widget.settingsIndex] = value.toInt();
-              }
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.subtitle != null)
+            Text(widget.subtitle!, style: ts.s12),
+          Slider(
+            value: value,
+            onChanged: (value) {
+              setState(() {
+                _setValue(value);
+              });
+              widget.onChanged?.call();
+            },
+            onChangeEnd: (value) {
               appdata.saveData();
-            });
-          } else {
-            setState(() {
-              if (widget.comicId != null) {
-                appdata.settings.setReaderSetting(
-                  widget.comicId!,
-                  widget.comicSource!,
-                  widget.settingsIndex,
-                  value,
-                );
-              } else if (widget.useDeviceSettings) {
-                appdata.settings.setDeviceReaderSetting(
-                  widget.settingsIndex,
-                  value,
-                );
-              } else {
-                appdata.settings[widget.settingsIndex] = value;
-              }
-              appdata.saveData();
-            });
-          }
-          widget.onChanged?.call();
-        },
-        divisions: ((widget.max - widget.min) / widget.interval).toInt(),
-        min: widget.min,
-        max: widget.max,
+            },
+            divisions: ((widget.max - widget.min) / widget.interval).toInt(),
+            min: widget.min,
+            max: widget.max,
+          ),
+        ],
       ),
     );
   }
@@ -699,12 +712,9 @@ class _CallbackSetting extends StatelessWidget {
     required this.title,
     required this.callback,
     required this.actionTitle,
-    this.subtitle,
   });
 
   final String title;
-
-  final String? subtitle;
 
   final VoidCallback callback;
 
@@ -714,7 +724,6 @@ class _CallbackSetting extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(title),
-      subtitle: subtitle == null ? null : Text(subtitle!),
       trailing: Button.normal(
         onPressed: callback,
         child: Text(actionTitle),
