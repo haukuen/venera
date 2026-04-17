@@ -268,7 +268,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     var map = <String, String>{};
     for (var entry in overrides) {
       if (entry.$1.text.isNotEmpty && entry.$2.text.isNotEmpty) {
@@ -276,7 +276,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
       }
     }
     appdata.settings['dnsOverrides'] = map;
-    appdata.saveData();
+    await appdata.saveData();
     JsEngine().resetDio();
   }
 
@@ -286,9 +286,11 @@ class __DNSOverridesState extends State<_DNSOverrides> {
       title: "DNS Overrides".tl,
       tailing: [
         TextButton.icon(
-          onPressed: () {
-            _save();
-            context.pop();
+          onPressed: () async {
+            await _save();
+            if (context.mounted) {
+              context.pop();
+            }
           },
           icon: const Icon(Icons.save),
           label: Text("Save".tl),
