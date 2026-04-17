@@ -76,25 +76,15 @@ class _AppSettingsState extends State<AppSettings> {
             setState(() {});
           },
         ).toSliver(),
-        _CallbackSetting(
+        _SliderSetting(
           title: "Cache Limit".tl,
-          subtitle: "${appdata.settings['cacheSize']} MB",
-          callback: () {
-            showInputDialog(
-              context: context,
-              title: "Set Cache Limit".tl,
-              hintText: "Size in MB".tl,
-              inputValidator: RegExp(r"^\d+$"),
-              onConfirm: (value) {
-                appdata.settings['cacheSize'] = int.parse(value);
-                appdata.saveData();
-                setState(() {});
-                CacheManager().setLimitSize(appdata.settings['cacheSize']);
-                return null;
-              },
-            );
+          settingsIndex: "cacheSize",
+          interval: 256,
+          min: 256,
+          max: 8192,
+          onChanged: () {
+            CacheManager().setLimitSize(appdata.settings['cacheSize']);
           },
-          actionTitle: 'Set'.tl,
         ).toSliver(),
         _CallbackSetting(
           title: "Export App Data".tl,
@@ -155,6 +145,16 @@ class _AppSettingsState extends State<AppSettings> {
           },
           onChanged: () {
             App.forceRebuild();
+          },
+        ).toSliver(),
+        SelectSetting(
+          title: "Initial Page".tl,
+          settingKey: "initialPage",
+          optionTranslation: {
+            '0': "Home Page".tl,
+            '1': "Favorites Page".tl,
+            '2': "Explore Page".tl,
+            '3': "Categories Page".tl,
           },
         ).toSliver(),
         if (!App.isLinux)
@@ -353,7 +353,6 @@ class _WebdavSettingState extends State<_WebdavSetting> {
   String url = "";
   String user = "";
   String pass = "";
-  String disableSync = "";
 
   bool autoSync = true;
 
@@ -365,9 +364,6 @@ class _WebdavSettingState extends State<_WebdavSetting> {
     super.initState();
     if (appdata.settings['webdav'] is! List) {
       appdata.settings['webdav'] = [];
-    }
-    if (appdata.settings['disableSyncFields'].trim().isNotEmpty) {
-      disableSync = appdata.settings['disableSyncFields'];
     }
     var configs = appdata.settings['webdav'] as List;
     if (configs.whereType<String>().length != 3) {
@@ -421,56 +417,6 @@ class _WebdavSettingState extends State<_WebdavSetting> {
               ),
               controller: TextEditingController(text: pass),
               onChanged: (value) => pass = value,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              decoration: InputDecoration(
-                labelText: "Skip Setting Fields (Optional)".tl,
-                hintText: "field0, field1, field2, ...",
-                hintStyle: TextStyle(color: Theme.of(context).hintColor),
-                border: OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(Icons.help_outline),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: Text("Skip Setting Fields".tl),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "When sync data, skip certain setting fields, which means these won't be uploaded / override.".tl,
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    "See source code for available fields.".tl,
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.open_in_new),
-                                    onPressed: () {
-                                      launchUrlString("https://github.com/haukuen/venera/blob/main/lib/foundation/appdata.dart");
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              controller: TextEditingController(text: disableSync),
-              onChanged: (value) => disableSync = value,
             ),
             const SizedBox(height: 12),
             ListTile(
@@ -549,7 +495,6 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                   }
 
                   appdata.settings['webdav'] = [url, user, pass];
-                  appdata.settings['disableSyncFields'] = disableSync;
                   appdata.implicitData['webdavAutoSync'] = autoSync;
                   appdata.writeImplicitData();
 

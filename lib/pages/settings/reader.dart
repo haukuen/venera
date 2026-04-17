@@ -403,6 +403,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
         ).toSliver(),
         _SliderSetting(
           title: "Number of images preloaded".tl,
+          subtitle: "Higher values use more memory".tl,
           settingsIndex: "preloadImageCount",
           interval: 1,
           min: 1,
@@ -442,6 +443,11 @@ class _ReaderSettingsState extends State<ReaderSettings> {
             useDeviceSettings: useDeviceSpecificSettings,
           ),
         ),
+        if (comicId == null)
+          _SwitchSetting(
+            title: "Reverse default chapter order".tl,
+            settingKey: "reverseChapterOrder",
+          ).toSliver(),
       ],
     );
   }

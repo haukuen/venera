@@ -261,20 +261,39 @@ class __DNSOverridesState extends State<_DNSOverrides> {
 
   @override
   void dispose() {
+    for (var entry in overrides) {
+      entry.$1.dispose();
+      entry.$2.dispose();
+    }
+    super.dispose();
+  }
+
+  void _save() {
     var map = <String, String>{};
     for (var entry in overrides) {
-      map[entry.$1.text] = entry.$2.text;
+      if (entry.$1.text.isNotEmpty && entry.$2.text.isNotEmpty) {
+        map[entry.$1.text] = entry.$2.text;
+      }
     }
     appdata.settings['dnsOverrides'] = map;
     appdata.saveData();
     JsEngine().resetDio();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return PopUpWidgetScaffold(
       title: "DNS Overrides".tl,
+      tailing: [
+        TextButton.icon(
+          onPressed: () {
+            _save();
+            context.pop();
+          },
+          icon: const Icon(Icons.save),
+          label: Text("Save".tl),
+        ),
+      ],
       body: SingleChildScrollView(
         child: Column(
           children: [
