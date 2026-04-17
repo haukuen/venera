@@ -23,6 +23,51 @@ ImageProvider? _findImageProvider(Comic comic) {
   return image;
 }
 
+class _TapScaleBuilder extends StatefulWidget {
+  const _TapScaleBuilder({
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.onSecondaryTapDown,
+    this.borderRadius,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final void Function(TapDownDetails)? onSecondaryTapDown;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<_TapScaleBuilder> createState() => _TapScaleBuilderState();
+}
+
+class _TapScaleBuilderState extends State<_TapScaleBuilder> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onLongPressStart: (_) => setState(() => _pressed = true),
+      onLongPressEnd: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: InkWell(
+          borderRadius: widget.borderRadius,
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onSecondaryTapDown: widget.onSecondaryTapDown,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 class ComicTile extends StatelessWidget {
   const ComicTile({
     super.key,
@@ -243,7 +288,7 @@ class ComicTile extends StatelessWidget {
         height: double.infinity,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
               color: context.colorScheme.outlineVariant,
@@ -263,8 +308,8 @@ class ComicTile extends StatelessWidget {
         );
       }
 
-      return InkWell(
-        borderRadius: BorderRadius.circular(12),
+      return _TapScaleBuilder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         onTap: _onTap,
         onLongPress: enableLongPressed ? () => _onLongPressed(context) : null,
         onSecondaryTapDown: (detail) => onSecondaryTap(detail, context),
@@ -305,7 +350,7 @@ class ComicTile extends StatelessWidget {
         Widget image = Container(
           decoration: BoxDecoration(
             color: context.colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.toOpacity(0.2),
@@ -325,8 +370,8 @@ class ComicTile extends StatelessWidget {
           );
         }
 
-        return InkWell(
-          borderRadius: BorderRadius.circular(8),
+        return _TapScaleBuilder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
           onTap: _onTap,
           onLongPress: enableLongPressed ? () => _onLongPressed(context) : null,
           onSecondaryTapDown: (detail) => onSecondaryTap(detail, context),
@@ -371,7 +416,7 @@ class ComicTile extends StatelessWidget {
                                     ? const EdgeInsets.fromLTRB(4, 2, 4, 2)
                                     : const EdgeInsets.fromLTRB(5, 2, 5, 2),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
                               color: Colors.black.toOpacity(0.5),
                             ),
                             constraints: BoxConstraints(
@@ -621,7 +666,7 @@ class _ComicDescription extends StatelessWidget {
                           color: s == "Unavailable"
                               ? context.colorScheme.errorContainer
                               : context.colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                         child: Center(
                           widthFactor: 1,
@@ -667,7 +712,7 @@ class _ComicDescription extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.tertiaryContainer,
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  borderRadius: const BorderRadius.all(Radius.circular(AppRadius.md)),
                 ),
                 child: Center(
                   child: Text(
@@ -1680,7 +1725,7 @@ class SimpleComicTile extends StatelessWidget {
       width: 98,
       height: 136,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         color: Theme.of(context).colorScheme.secondaryContainer,
       ),
       clipBehavior: Clip.antiAlias,
@@ -1695,7 +1740,7 @@ class SimpleComicTile extends StatelessWidget {
     }
 
     child = AnimatedTapRegion(
-      borderRadius: 8,
+      borderRadius: AppRadius.md,
       onTap: onTap ??
           () {
             context.to(
