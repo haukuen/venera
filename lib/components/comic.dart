@@ -23,6 +23,51 @@ ImageProvider? _findImageProvider(Comic comic) {
   return image;
 }
 
+class _TapScaleBuilder extends StatefulWidget {
+  const _TapScaleBuilder({
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.onSecondaryTapDown,
+    this.borderRadius,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final void Function(TapDownDetails)? onSecondaryTapDown;
+  final BorderRadius? borderRadius;
+
+  @override
+  State<_TapScaleBuilder> createState() => _TapScaleBuilderState();
+}
+
+class _TapScaleBuilderState extends State<_TapScaleBuilder> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onLongPressStart: (_) => setState(() => _pressed = true),
+      onLongPressEnd: (_) => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: InkWell(
+          borderRadius: widget.borderRadius,
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onSecondaryTapDown: widget.onSecondaryTapDown,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 class ComicTile extends StatelessWidget {
   const ComicTile({
     super.key,
@@ -263,7 +308,7 @@ class ComicTile extends StatelessWidget {
         );
       }
 
-      return InkWell(
+      return _TapScaleBuilder(
         borderRadius: BorderRadius.circular(AppRadius.lg),
         onTap: _onTap,
         onLongPress: enableLongPressed ? () => _onLongPressed(context) : null,
@@ -325,7 +370,7 @@ class ComicTile extends StatelessWidget {
           );
         }
 
-        return InkWell(
+        return _TapScaleBuilder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           onTap: _onTap,
           onLongPress: enableLongPressed ? () => _onLongPressed(context) : null,
