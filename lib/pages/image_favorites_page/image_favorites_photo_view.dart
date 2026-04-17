@@ -17,6 +17,7 @@ class ImageFavoritesPhotoView extends StatefulWidget {
 
 class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
   late PageController controller;
+  final _focusNode = FocusNode();
   Map<ImageFavorite, bool> cancelImageFavorites = {};
 
   var images = <ImageFavorite>[];
@@ -39,6 +40,39 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
     currentPage = current;
     controller = PageController(initialPage: current);
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (HardwareKeyboard.instance.isControlPressed) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      if (controller.page! >= images.length - 1) {
+        return KeyEventResult.handled;
+      }
+      controller.nextPage(
+          duration: Duration(milliseconds: 180), curve: Curves.ease);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      if (controller.page! <= 0) {
+        return KeyEventResult.handled;
+      }
+      controller.previousPage(
+          duration: Duration(milliseconds: 180), curve: Curves.ease);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void onPop() {
@@ -81,7 +115,11 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
           onPop();
         }
       },
-      child: Listener(
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: Listener(
         onPointerSignal: (event) {
           if (HardwareKeyboard.instance.isControlPressed) {
             return;
@@ -140,6 +178,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
             child: buildAppBar(),
           ),
         ]),
+        ),
       ),
     );
   }
