@@ -129,6 +129,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
         PaintingBinding.instance.imageCache.evict(key);
       });
       Log.error("Image Loading", e, s);
+      onLoadError();
       rethrow;
     } finally {
       chunkEvents.close();
@@ -156,6 +157,10 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
   }
 
   bool get enableResize => false;
+
+  /// Called when image loading fails after all retries are exhausted.
+  /// Subclasses can override to perform cleanup (e.g. invalidate page cache).
+  void onLoadError() {}
 }
 
 typedef FileDecoderCallback = Future<ui.Codec> Function(Uint8List);

@@ -34,6 +34,15 @@ class _ReaderImagesState extends State<_ReaderImages> {
     ImageDownloader.cancelAllLoadingImages();
   }
 
+  void _onPagesCacheInvalid() {
+    if (!mounted || inProgress) return;
+    setState(() {
+      error = null;
+      reader.isLoading = true;
+    });
+    context.readerScaffold.update();
+  }
+
   /// Handle jumping to last page when _jumpToLastPageOnLoad is true
   void _handleJumpToLastPage() {
     if (reader._jumpToLastPageOnLoad) {
@@ -1259,13 +1268,23 @@ ImageProvider _createImageProviderFromKey(
   int page,
 ) {
   var reader = context.reader;
+  // Find the _ReaderImagesState ancestor to get the callback
+  _ReaderImagesState? imagesState;
+  context.visitAncestorElements((element) {
+    if (element.findAncestorStateOfType<_ReaderImagesState>() != null) {
+      imagesState = element.findAncestorStateOfType<_ReaderImagesState>();
+      return false;
+    }
+    return true;
+  });
   return ReaderImageProvider(
     imageKey,
     reader.type.comicSource?.key,
     reader.cid,
     reader.eid,
     reader.page,
-    enableResize: reader.mode.isContinuous, // For continuous mode, we need to resize the image to improve performance
+    enableResize: reader.mode.isContinuous,
+    onLoadFailed: imagesState?._onPagesCacheInvalid,
   );
 }
 
