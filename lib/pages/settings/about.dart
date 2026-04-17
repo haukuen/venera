@@ -83,7 +83,8 @@ Future<bool> checkUpdate() async {
   if (res.statusCode == 200) {
     var data = loadYaml(res.data);
     if (data["version"] != null) {
-      return _compareVersion(data["version"], App.version);
+      var remoteVersion = data["version"].toString().split('+').first;
+      return _compareVersion(remoteVersion, App.version);
     }
   }
   return false;
