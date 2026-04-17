@@ -44,6 +44,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
 
   @override
   void dispose() {
+    controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
