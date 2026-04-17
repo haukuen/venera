@@ -342,8 +342,11 @@ class NaviPaneState extends State<NaviPane>
         ),
         child: Column(
           children: [
-            const SizedBox(height: 16),
-            SizedBox(height: MediaQuery.of(context).padding.top),
+            DragToMoveArea(
+              child: SizedBox(
+                height: 16 + MediaQuery.of(context).padding.top,
+              ),
+            ),
             ...List<Widget>.generate(
               widget.paneItems.length,
               (index) => _SideNaviWidget(
@@ -356,7 +359,7 @@ class NaviPaneState extends State<NaviPane>
                 key: ValueKey(index),
               ),
             ),
-            const Spacer(),
+            const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
             ...List<Widget>.generate(
               widget.paneActions.length,
               (index) => _PaneActionWidget(
@@ -365,7 +368,7 @@ class NaviPaneState extends State<NaviPane>
                 key: ValueKey(index + widget.paneItems.length),
               ),
             ),
-            const SizedBox(height: 16),
+            const DragToMoveArea(child: SizedBox(height: 16)),
           ],
         ),
       ),
