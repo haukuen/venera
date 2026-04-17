@@ -156,6 +156,12 @@ class FavoriteItemWithFolderInfo extends FavoriteItem {
           type: item.type,
           tags: item.tags,
         );
+
+  @override
+  String get description {
+    var base = super.description;
+    return "$folder | $base";
+  }
 }
 
 class FavoriteItemWithUpdateInfo extends FavoriteItem {
@@ -507,6 +513,31 @@ class LocalFavoritesManager with ChangeNotifier {
           FavoriteItemWithFolderInfo(FavoriteItem.fromRow(element), folder)));
     }
     return res;
+  }
+
+  static Future<List<FavoriteItemWithFolderInfo>> _allComicsAsync(
+      List<String> folders, String dbPath) {
+    return Isolate.run(() {
+      var db = openSqliteDatabase(dbPath);
+      try {
+        var res = <FavoriteItemWithFolderInfo>[];
+        for (final folder in folders) {
+          var comics = db.select("""
+            select * from "$folder";
+          """);
+          res.addAll(comics.map((element) =>
+              FavoriteItemWithFolderInfo(
+                  FavoriteItem.fromRow(element), folder)));
+        }
+        return res;
+      } finally {
+        db.dispose();
+      }
+    });
+  }
+
+  Future<List<FavoriteItemWithFolderInfo>> allComicsAsync() {
+    return _allComicsAsync(folderNames, _dbPath);
   }
 
   bool existsFolder(String name) {
