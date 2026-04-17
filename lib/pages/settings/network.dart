@@ -381,9 +381,10 @@ class __DNSOverridesState extends State<_DNSOverrides> {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () {
-              setState(() {
-                overrides.removeAt(index);
-              });
+              var removed = overrides.removeAt(index);
+              removed.$1.dispose();
+              removed.$2.dispose();
+              setState(() {});
             },
           ),
         ],
