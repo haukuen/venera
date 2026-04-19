@@ -16,24 +16,40 @@ import 'package:zip_flutter/zip_flutter.dart';
 
 import 'io.dart';
 
-/// 对指定数据库执行 WAL checkpoint，将 WAL 内容合并回主文件
-void _checkpointDb(String path) {
+void _flushDb(String path) {
   if (!File(path).existsSync()) return;
   var db = sqlite3.open(path);
   try {
+    db.execute('PRAGMA busy_timeout = 5000;');
+    // For databases still in WAL mode (upgraded from older versions),
+    // checkpoint merges WAL data into the main .db file.
+    // For databases already in DELETE mode, this is a safe no-op.
     db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
   } finally {
     db.dispose();
   }
 }
 
+/// Delete WAL companion files (-wal, -shm) that may remain from older versions.
+void _cleanWalFiles(String dbPath) {
+  for (final suffix in const ['-wal', '-shm']) {
+    final f = File('$dbPath$suffix');
+    if (f.existsSync()) {
+      try {
+        f.deleteSync();
+      } catch (_) {}
+    }
+  }
+}
+
 Future<File> exportAppData([bool sync = true]) async {
-  // 先对 WAL 模式的数据库执行 checkpoint，确保数据完整写入主 .db 文件
   var dataPath = App.dataPath;
-  _checkpointDb(FilePath.join(dataPath, "history.db"));
-  _checkpointDb(FilePath.join(dataPath, "local_favorite.db"));
-  _checkpointDb(FilePath.join(dataPath, "read_later.db"));
-  _checkpointDb(FilePath.join(dataPath, "cookie.db"));
+
+  // Flush WAL data into main .db files before copying
+  _flushDb(FilePath.join(dataPath, "history.db"));
+  _flushDb(FilePath.join(dataPath, "local_favorite.db"));
+  _flushDb(FilePath.join(dataPath, "read_later.db"));
+  _flushDb(FilePath.join(dataPath, "cookie.db"));
 
   var time = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   var cacheFilePath = FilePath.join(App.cachePath, '$time.venera');
@@ -97,6 +113,7 @@ Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async
         localFile.renameSync(FilePath.join(App.dataPath, "history.db.bak"));
         bakFiles.add(FilePath.join(App.dataPath, "history.db.bak"));
       }
+      _cleanWalFiles(FilePath.join(App.dataPath, "history.db"));
       cacheDir.joinFile("history.db").renameSync(FilePath.join(App.dataPath, "history.db"));
       await HistoryManager().init();
     }
@@ -107,6 +124,7 @@ Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async
         localFile.renameSync(FilePath.join(App.dataPath, "local_favorite.db.bak"));
         bakFiles.add(FilePath.join(App.dataPath, "local_favorite.db.bak"));
       }
+      _cleanWalFiles(FilePath.join(App.dataPath, "local_favorite.db"));
       cacheDir.joinFile("local_favorite.db").renameSync(FilePath.join(App.dataPath, "local_favorite.db"));
       await LocalFavoritesManager().init();
     }
@@ -118,6 +136,7 @@ Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async
         localFile.renameSync(FilePath.join(App.dataPath, "read_later.db.bak"));
         bakFiles.add(FilePath.join(App.dataPath, "read_later.db.bak"));
       }
+      _cleanWalFiles(FilePath.join(App.dataPath, "read_later.db"));
       readLaterFile.renameSync(FilePath.join(App.dataPath, "read_later.db"));
       await ReadLaterManager().init();
     }
@@ -131,6 +150,7 @@ Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async
         localFile.renameSync(FilePath.join(App.dataPath, "cookie.db.bak"));
         bakFiles.add(FilePath.join(App.dataPath, "cookie.db.bak"));
       }
+      _cleanWalFiles(FilePath.join(App.dataPath, "cookie.db"));
       cacheDir.joinFile("cookie.db").renameSync(FilePath.join(App.dataPath, "cookie.db"));
       SingleInstanceCookieJar.instance =
           SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))

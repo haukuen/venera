@@ -154,6 +154,17 @@ class DataSync with ChangeNotifier {
         if (dst.existsSync()) {
           dst.renameSync(FilePath.join(App.dataPath, '$name.bak'));
         }
+        // Clean WAL companion files from older versions
+        if (name.endsWith('.db')) {
+          for (final suffix in const ['-wal', '-shm']) {
+            final f = File(FilePath.join(App.dataPath, '$name$suffix'));
+            if (f.existsSync()) {
+              try {
+                f.deleteSync();
+              } catch (_) {}
+            }
+          }
+        }
         src.copySync(dst.path);
         File(FilePath.join(App.dataPath, '$name.bak')).deleteIgnoreError();
       }

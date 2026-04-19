@@ -318,8 +318,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<Map<int, int>> _initHashedIds(
       List<String> folders, String dbPath) {
     return Isolate.run(() {
-      var db = openSqliteDatabase(dbPath);
-      try {
+      return withDatabase(dbPath, (db) async {
         var hashedIds = <int, int>{};
         for (var folder in folders) {
           var rows = db.select("""
@@ -333,9 +332,7 @@ class LocalFavoritesManager with ChangeNotifier {
           }
         }
         return hashedIds;
-      } finally {
-        db.dispose();
-      }
+      });
     });
   }
 
@@ -441,16 +438,13 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<List<FavoriteItem>> _getFolderComicsAsync(
       String folder, String dbPath) {
     return Isolate.run(() {
-      var db = openSqliteDatabase(dbPath);
-      try {
+      return withDatabase(dbPath, (db) async {
         var rows = db.select("""
           select * from "$folder"
           ORDER BY display_order;
         """);
         return rows.map((element) => FavoriteItem.fromRow(element)).toList();
-      } finally {
-        db.dispose();
-      }
+      });
     });
   }
 
@@ -473,8 +467,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<List<FavoriteItem>> _getAllComicsAsync(
       List<String> folders, String dbPath) {
     return Isolate.run(() {
-      var db = openSqliteDatabase(dbPath);
-      try {
+      return withDatabase(dbPath, (db) async {
         var res = <FavoriteItem>{};
         for (final folder in folders) {
           var comics = db.select("""
@@ -483,9 +476,7 @@ class LocalFavoritesManager with ChangeNotifier {
           res.addAll(comics.map((element) => FavoriteItem.fromRow(element)));
         }
         return res.toList();
-      } finally {
-        db.dispose();
-      }
+      });
     });
   }
 
@@ -518,8 +509,7 @@ class LocalFavoritesManager with ChangeNotifier {
   static Future<List<FavoriteItemWithFolderInfo>> _allComicsAsync(
       List<String> folders, String dbPath) {
     return Isolate.run(() {
-      var db = openSqliteDatabase(dbPath);
-      try {
+      return withDatabase(dbPath, (db) async {
         var res = <FavoriteItemWithFolderInfo>[];
         for (final folder in folders) {
           var comics = db.select("""
@@ -530,9 +520,7 @@ class LocalFavoritesManager with ChangeNotifier {
                   FavoriteItem.fromRow(element), folder)));
         }
         return res;
-      } finally {
-        db.dispose();
-      }
+      });
     });
   }
 

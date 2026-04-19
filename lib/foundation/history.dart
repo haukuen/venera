@@ -272,8 +272,7 @@ class HistoryManager with ChangeNotifier {
 
   static Future<void> _addHistoryAsync(String dbPath, History newItem) {
     return Isolate.run(() {
-      var db = openSqliteDatabase(dbPath);
-      try {
+      return withDatabase(dbPath, (db) async {
         db.execute(_insertHistorySql, [
           newItem.id,
           newItem.title,
@@ -287,9 +286,7 @@ class HistoryManager with ChangeNotifier {
           newItem.maxPage,
           newItem.group
         ]);
-      } finally {
-        db.dispose();
-      }
+      });
     });
   }
 

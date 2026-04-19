@@ -15,7 +15,7 @@ void _initializeDatabase(String path) {
 }
 
 void main() {
-  test('openSqliteDatabase enables WAL and NORMAL synchronous mode', () {
+  test('openSqliteDatabase sets DELETE journal mode, NORMAL synchronous, and busy_timeout', () {
     final dir = Directory.systemTemp.createTempSync('venera-sqlite-helper-');
     addTearDown(() {
       if (dir.existsSync()) {
@@ -30,12 +30,36 @@ void main() {
         db.select('PRAGMA journal_mode;').first['journal_mode'];
     final synchronous =
         db.select('PRAGMA synchronous;').first['synchronous'];
+    final busyTimeout =
+        db.select('PRAGMA busy_timeout;').first['timeout'];
 
-    expect((journalMode as String).toLowerCase(), 'wal');
+    expect((journalMode as String).toLowerCase(), 'delete');
     expect(synchronous, 1);
+    expect(busyTimeout, 5000);
   });
 
-  test('plain sqlite3 connections hit a read-then-write lock on the same file',
+  test('withDatabase opens, executes, and disposes', () async {
+    final dir = Directory.systemTemp.createTempSync('venera-sqlite-withdb-');
+    addTearDown(() {
+      if (dir.existsSync()) {
+        dir.deleteSync(recursive: true);
+      }
+    });
+
+    final dbPath = '${dir.path}/test.db';
+    _initializeDatabase(dbPath);
+
+    final count = await withDatabase<int>(dbPath, (db) async {
+      final res =
+          db.select('SELECT count(*) AS count FROM items;').first['count'];
+      return res as int;
+    });
+
+    expect(count, 1);
+  });
+
+  test(
+      'plain sqlite3 connections hit a read-then-write lock on the same file',
       () {
     final dir = Directory.systemTemp.createTempSync('venera-sqlite-lock-');
     addTearDown(() {
@@ -65,38 +89,5 @@ void main() {
         ),
       ),
     );
-  });
-
-  test('openSqliteDatabase avoids the same read-then-write lock on the file',
-      () {
-    final dir = Directory.systemTemp.createTempSync('venera-sqlite-lock-');
-    addTearDown(() {
-      if (dir.existsSync()) {
-        dir.deleteSync(recursive: true);
-      }
-    });
-
-    final dbPath = '${dir.path}/lock.db';
-    _initializeDatabase(dbPath);
-
-    final reader = openSqliteDatabase(dbPath);
-    final writer = openSqliteDatabase(dbPath);
-    addTearDown(reader.dispose);
-    addTearDown(writer.dispose);
-
-    reader.execute('BEGIN;');
-    reader.select('SELECT * FROM items;');
-
-    expect(() => writer.execute('INSERT INTO items (value) VALUES ("ok");'),
-        returnsNormally);
-    expect(writer.select('SELECT count(*) AS count FROM items;').first['count'],
-        2);
-  });
-
-  test('configureSqliteConnection rejects databases that cannot use WAL', () {
-    final db = sqlite3.openInMemory();
-    addTearDown(db.dispose);
-
-    expect(() => configureSqliteConnection(db), throwsStateError);
   });
 }

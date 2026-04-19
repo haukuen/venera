@@ -2,20 +2,19 @@ import 'package:sqlite3/sqlite3.dart';
 
 Database openSqliteDatabase(String path) {
   final db = sqlite3.open(path);
-  try {
-    configureSqliteConnection(db);
-    return db;
-  } catch (_) {
-    db.dispose();
-    rethrow;
-  }
+  db.execute('PRAGMA journal_mode = DELETE;');
+  db.execute('PRAGMA synchronous = NORMAL;');
+  db.execute('PRAGMA busy_timeout = 5000;');
+  return db;
 }
 
-void configureSqliteConnection(Database db) {
-  db.execute('PRAGMA journal_mode = WAL;');
-  final journalMode = db.select('PRAGMA journal_mode;').first['journal_mode'];
-  if (journalMode is! String || journalMode.toLowerCase() != 'wal') {
-    throw StateError('Failed to enable WAL mode.');
+/// Execute a function with a temporary database connection, ensuring cleanup.
+/// Use this in Isolate operations to avoid manual open/dispose boilerplate.
+Future<T> withDatabase<T>(String path, Future<T> Function(Database db) fn) async {
+  final db = openSqliteDatabase(path);
+  try {
+    return await fn(db);
+  } finally {
+    db.dispose();
   }
-  db.execute('PRAGMA synchronous = NORMAL;');
 }
