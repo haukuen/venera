@@ -10,10 +10,6 @@ class _ReaderGestureDetector extends StatefulWidget {
 }
 
 class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDetector> {
-  late TapGestureRecognizer _tapGestureRecognizer;
-
-  static const _kDoubleTapMaxTime = Duration(milliseconds: 200);
-
   static const _kLongPressMinTime = Duration(milliseconds: 250);
 
   static const _kDoubleTapMaxDistanceSquared = 20.0 * 20.0;
@@ -22,30 +18,41 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
 
   final _dragListeners = <_DragListener>[];
 
-  int fingers = 0;
-
   late _ReaderState reader;
 
-  bool ignoreNextTag = false;
+  bool _ignoreNextTap = false;
+
+  Timer? _longPressTimer;
+
+  bool _longPressInProgress = false;
+
+  bool _dragInProgress = false;
+
+  bool _preventNextTap = false;
+
+  Offset? _initialPosition;
+
+  Offset? _lastTapLocation;
 
   void ignoreNextTap() {
-    ignoreNextTag = true;
+    _ignoreNextTap = true;
   }
 
   void clearIgnoreNextTap() {
-    ignoreNextTag = false;
+    _ignoreNextTap = false;
   }
 
   @override
   void initState() {
-    _tapGestureRecognizer = TapGestureRecognizer()
-      ..onTapUp = onTapUp
-      ..onSecondaryTapUp = (details) {
-        onSecondaryTapUp(details.globalPosition);
-      };
     super.initState();
     context.readerScaffold._gestureDetectorState = this;
     reader = context.reader;
+  }
+
+  @override
+  void dispose() {
+    _longPressTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -54,82 +61,122 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
       behavior: HitTestBehavior.translucent,
       onPointerDown: (event) {
         if (event.position == Offset.zero) {
-          _previousEvent = null;
           return;
         }
-        fingers++;
-        if (ignoreNextTag) {
-          ignoreNextTag = false;
+        if (_ignoreNextTap) {
+          // 不要在这里清除标志，让 onTap 来处理
           return;
         }
-        _lastTapPointer = event.pointer;
-        _lastTapMoveDistance = Offset.zero;
-        _tapGestureRecognizer.addPointer(event);
+        _initialPosition = event.position;
+        _preventNextTap = false;
         if (_dragInProgress) {
-          for (var dragListener in _dragListeners) {
-            dragListener.onStart?.call(event.position);
+          // 结束当前拖拽
+          for (var dragListener in List<_DragListener>.from(_dragListeners)) {
+            dragListener.onEnd?.call();
           }
           _dragInProgress = false;
         }
-        Future.delayed(_kLongPressMinTime, () {
-          if (_lastTapPointer == event.pointer && fingers == 1) {
-            if (_lastTapMoveDistance!.distanceSquared < 20.0 * 20.0) {
-              onLongPressedDown(event.position);
-              _longPressInProgress = true;
-            } else {
-              _dragInProgress = true;
-              for (var dragListener in _dragListeners) {
-                dragListener.onStart?.call(event.position);
-                dragListener.onMove?.call(_lastTapMoveDistance!);
-              }
-            }
+        // 用 Timer 替代 Future.delayed，便于取消
+        _longPressTimer?.cancel();
+        _longPressTimer = Timer(_kLongPressMinTime, () {
+          if (!mounted) return;
+          if (_dragInProgress) return;
+          _longPressInProgress = true;
+          if (_initialPosition != null) {
+            onLongPressedDown(_initialPosition!);
           }
         });
       },
       onPointerMove: (event) {
-        if (event.pointer == _lastTapPointer) {
-          _lastTapMoveDistance = event.delta + _lastTapMoveDistance!;
+        if (_longPressTimer?.isActive ?? false) {
+          if (_initialPosition != null) {
+            final distance = (event.position - _initialPosition!).distanceSquared;
+            if (distance > _kDoubleTapMaxDistanceSquared) {
+              // 移动超过阈值，取消长按，转为拖拽
+              _longPressTimer?.cancel();
+              _dragInProgress = true;
+              for (var dragListener in List<_DragListener>.from(_dragListeners)) {
+                dragListener.onStart?.call(event.position);
+              }
+            }
+          }
         }
         if (_dragInProgress) {
-          for (var dragListener in _dragListeners) {
+          for (var dragListener in List<_DragListener>.from(_dragListeners)) {
             dragListener.onMove?.call(event.delta);
           }
         }
       },
       onPointerUp: (event) {
-        fingers--;
         if (_longPressInProgress) {
+          _preventNextTap = true;
           onLongPressedUp(event.position);
+          _longPressInProgress = false;
         }
         if (_dragInProgress) {
-          for (var dragListener in _dragListeners) {
+          for (var dragListener in List<_DragListener>.from(_dragListeners)) {
             dragListener.onEnd?.call();
           }
           _dragInProgress = false;
         }
-        _lastTapPointer = null;
-        _lastTapMoveDistance = null;
+        _longPressTimer?.cancel();
+        _initialPosition = null;
       },
       onPointerCancel: (event) {
-        fingers--;
+        _longPressTimer?.cancel();
         if (_longPressInProgress) {
           onLongPressedUp(event.position);
+          _longPressInProgress = false;
         }
         if (_dragInProgress) {
-          for (var dragListener in _dragListeners) {
+          for (var dragListener in List<_DragListener>.from(_dragListeners)) {
             dragListener.onEnd?.call();
           }
           _dragInProgress = false;
         }
-        _lastTapPointer = null;
-        _lastTapMoveDistance = null;
+        _initialPosition = null;
       },
       onPointerSignal: (event) {
         if (event is PointerScrollEvent) {
           onMouseWheel(event.scrollDelta.dy > 0);
         }
       },
-      child: widget.child,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapDown: (details) {
+          _lastTapLocation = details.globalPosition;
+        },
+        onSecondaryTapDown: (details) {
+          onSecondaryTapUp(details.globalPosition);
+        },
+        onTap: () {
+          if (_ignoreNextTap) {
+            _ignoreNextTap = false;
+            return;
+          }
+          if (_preventNextTap) {
+            _preventNextTap = false;
+            return;
+          }
+          if (_longPressInProgress) {
+            _longPressInProgress = false;
+            return;
+          }
+          if (!_dragInProgress && _lastTapLocation != null) {
+            onTap(_lastTapLocation!);
+          }
+        },
+        onDoubleTap: _enableDoubleTapToZoom ? () {
+          if (_ignoreNextTap) {
+            _ignoreNextTap = false;
+            return;
+          }
+          if (_lastTapLocation != null) {
+            onDoubleTap(_lastTapLocation!);
+          }
+        } : null,
+        child: widget.child,
+      ),
     );
   }
 
@@ -150,53 +197,8 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
     }
   }
 
-  TapUpDetails? _previousEvent;
-
-  int? _lastTapPointer;
-
-  Offset? _lastTapMoveDistance;
-
-  bool _longPressInProgress = false;
-
-  bool _dragInProgress = false;
-
   bool get _enableDoubleTapToZoom =>
       appdata.settings.getReaderSetting(reader.cid, reader.type.sourceKey, 'enableDoubleTapToZoom');
-
-  void onTapUp(TapUpDetails event) {
-    if (event.globalPosition == Offset.zero &&
-        event.localPosition == Offset.zero) {
-      _previousEvent = null;
-      return;
-    }
-    if (_longPressInProgress) {
-      _longPressInProgress = false;
-      return;
-    }
-    final location = event.globalPosition;
-    if (!_enableDoubleTapToZoom) {
-      onTap(location);
-      return;
-    }
-    final previousLocation = _previousEvent?.globalPosition;
-    if (previousLocation != null) {
-      if ((location - previousLocation).distanceSquared <
-          _kDoubleTapMaxDistanceSquared) {
-        onDoubleTap(location);
-        _previousEvent = null;
-        return;
-      } else {
-        onTap(previousLocation);
-      }
-    }
-    _previousEvent = event;
-    Future.delayed(_kDoubleTapMaxTime, () {
-      if (_previousEvent == event) {
-        onTap(location);
-        _previousEvent = null;
-      }
-    });
-  }
 
   void onTap(Offset location) {
     if (reader._imageViewController!.handleOnTap(location)) {
@@ -243,6 +245,7 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
             } else {
               isCenter = true;
             }
+            break;
           case ReaderMode.galleryRightToLeft:
           case ReaderMode.continuousRightToLeft:
             if (isLeft) {
@@ -252,6 +255,7 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
             } else {
               isCenter = true;
             }
+            break;
           case ReaderMode.galleryTopToBottom:
           case ReaderMode.continuousTopToBottom:
             if (isTop) {
@@ -261,6 +265,7 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
             } else {
               isCenter = true;
             }
+            break;
         }
         if (!isCenter) {
           return;
