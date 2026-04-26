@@ -64,7 +64,7 @@ class _ReaderGestureDetectorState extends AutomaticGlobalState<_ReaderGestureDet
           return;
         }
         if (_ignoreNextTap) {
-          _ignoreNextTap = false;
+          // 不要在这里清除标志，让 onTap 来处理
           return;
         }
         _initialPosition = event.position;
