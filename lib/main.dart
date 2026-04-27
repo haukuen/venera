@@ -146,6 +146,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final context = App.rootContext;
       if (!context.mounted) return;
 
+      if (_isViewingComic(id, sourceKey)) return;
+
       if (source != null) {
         showConfirmDialog(
           context: context,
@@ -169,6 +171,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         );
       }
     } catch (_) {}
+  }
+
+  bool _isViewingComic(String id, String sourceKey) {
+    final navContext = App.mainNavigatorKey?.currentContext;
+    if (navContext == null) return false;
+    ComicPage? found;
+    void visitor(Element el) {
+      if (found != null) return;
+      if (el.widget is ComicPage) {
+        found = el.widget as ComicPage;
+        return;
+      }
+      el.visitChildren(visitor);
+    }
+    (navContext as Element).visitChildren(visitor);
+    return found?.id == id && found?.sourceKey == sourceKey;
   }
 
   void forceRebuild() {
