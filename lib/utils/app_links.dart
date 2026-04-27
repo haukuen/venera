@@ -4,6 +4,16 @@ import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/pages/aggregated_search_page.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 
+final _veneraLinkRegex = RegExp(r'venera://comic\?[^\s]+');
+
+/// Try to parse a venera://comic link from [text].
+/// Returns the parsed Uri if found, otherwise null.
+Uri? parseVeneraLink(String text) {
+  final match = _veneraLinkRegex.firstMatch(text);
+  if (match == null) return null;
+  return Uri.tryParse(match.group(0)!);
+}
+
 void handleLinks() {
   final appLinks = AppLinks();
   appLinks.uriLinkStream.listen((uri) {

@@ -5,10 +5,15 @@ import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/auth_page.dart';
+import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/main_page.dart';
+import 'package:venera/pages/aggregated_search_page.dart';
+import 'package:venera/utils/app_links.dart';
 import 'package:venera/utils/io.dart';
+import 'package:venera/utils/translations.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/components.dart';
 import 'components/window_frame.dart';
@@ -78,8 +83,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   OverlayEntry? hideContentOverlay;
 
+  String? _lastHandledClipboard;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && App.isMobile) {
+      _checkClipboardForVeneraLink();
+    }
     if (!App.isMobile || !appdata.settings['authorizationRequired']) {
       return;
     }
@@ -115,6 +125,50 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
     super.didChangeAppLifecycleState(state);
+  }
+
+  void _checkClipboardForVeneraLink() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (data?.text == null) return;
+      final text = data!.text!;
+
+      final uri = parseVeneraLink(text);
+      if (uri == null || text == _lastHandledClipboard) return;
+      _lastHandledClipboard = text;
+
+      final id = uri.queryParameters['id'];
+      final sourceKey = uri.queryParameters['source'];
+      final title = uri.queryParameters['title'] ?? '';
+      if (id == null || sourceKey == null) return;
+
+      final source = ComicSource.find(sourceKey);
+      final context = App.rootContext;
+      if (!context.mounted) return;
+
+      if (source != null) {
+        showConfirmDialog(
+          context: context,
+          title: 'Open Comic'.tl,
+          content: '${'Open comic: '.tl}$title?',
+          onConfirm: () {
+            App.mainNavigatorKey?.currentContext?.to(() {
+              return ComicPage(id: id, sourceKey: sourceKey);
+            });
+          },
+        );
+      } else {
+        showConfirmDialog(
+          context: context,
+          title: 'Search'.tl,
+          content: '${'Comic source not found: '.tl}$sourceKey\n'
+              '${'Search for: '.tl}$title?',
+          onConfirm: () {
+            context.to(() => AggregatedSearchPage(keyword: title));
+          },
+        );
+      }
+    } catch (_) {}
   }
 
   void forceRebuild() {
