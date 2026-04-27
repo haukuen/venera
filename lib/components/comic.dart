@@ -51,8 +51,12 @@ class _TapScaleBuilderState extends State<_TapScaleBuilder> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      onLongPressStart: (_) => setState(() => _pressed = true),
-      onLongPressEnd: (_) => setState(() => _pressed = false),
+      onLongPressStart: widget.onLongPress != null
+          ? (_) => setState(() => _pressed = true)
+          : null,
+      onLongPressEnd: widget.onLongPress != null
+          ? (_) => setState(() => _pressed = false)
+          : null,
       child: AnimatedScale(
         scale: _pressed ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 100),
