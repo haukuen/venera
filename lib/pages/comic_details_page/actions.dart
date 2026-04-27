@@ -87,11 +87,16 @@ abstract mixin class _ComicPageActions {
   }
 
   void share() {
-    var text = comic.title;
-    if (comic.url != null) {
-      text += '\n${comic.url}';
-    }
-    Share.shareText(text);
+    final uri = Uri(
+      scheme: 'venera',
+      host: 'comic',
+      queryParameters: {
+        'id': comic.id,
+        'source': comic.sourceKey,
+        'title': comic.title,
+      },
+    );
+    Share.shareText('${comic.title}\n$uri');
   }
 
   /// read the comic

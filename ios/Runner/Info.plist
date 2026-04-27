@@ -55,5 +55,16 @@
   <string>Ensure that the operation is being performed by the user themselves.</string>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.books</string>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.venera.app</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>venera</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>
