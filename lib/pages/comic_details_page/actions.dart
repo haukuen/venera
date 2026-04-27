@@ -89,12 +89,8 @@ abstract mixin class _ComicPageActions {
   void share() {
     final uri = Uri(
       scheme: 'venera',
-      host: 'comic',
-      queryParameters: {
-        'id': comic.id,
-        'source': comic.sourceKey,
-        'title': comic.title,
-      },
+      host: 'c',
+      pathSegments: [comic.sourceKey, comic.id],
     );
     Share.shareText('${comic.title}\n$uri');
   }

@@ -76,6 +76,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
     checkUpdates();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkClipboardForVeneraLink();
+    });
     super.initState();
   }
 
@@ -137,36 +140,39 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (uri == null || text == _lastHandledClipboard) return;
       _lastHandledClipboard = text;
 
-      final id = uri.queryParameters['id'];
-      final sourceKey = uri.queryParameters['source'];
-      final title = uri.queryParameters['title'] ?? '';
+      // Parse id and sourceKey from both short and legacy formats
+      String? id;
+      String? sourceKey;
+      if (uri.host == 'c' && uri.pathSegments.length >= 2) {
+        sourceKey = uri.pathSegments[0];
+        id = uri.pathSegments[1];
+      } else if (uri.host == 'comic') {
+        id = uri.queryParameters['id'];
+        sourceKey = uri.queryParameters['source'];
+      }
       if (id == null || sourceKey == null) return;
+
+      if (_isViewingComic(id, sourceKey)) return;
+
+      // Extract title from the text line before the URL
+      final uriMatch = RegExp(r'venera://\S+').firstMatch(text);
+      final beforeUrl = text.substring(0, uriMatch?.start ?? 0).trim();
+      final title = beforeUrl.isNotEmpty ? beforeUrl : null;
 
       final source = ComicSource.find(sourceKey);
       final context = App.rootContext;
       if (!context.mounted) return;
 
-      if (_isViewingComic(id, sourceKey)) return;
-
+      final displayName = title ?? id;
       if (source != null) {
         showConfirmDialog(
           context: context,
           title: 'Open Comic'.tl,
-          content: '${'Open comic: '.tl}$title?',
+          content: '${'Open comic'.tl}: $displayName',
           onConfirm: () {
             App.mainNavigatorKey?.currentContext?.to(() {
-              return ComicPage(id: id, sourceKey: sourceKey);
+              return ComicPage(id: id!, sourceKey: sourceKey!);
             });
-          },
-        );
-      } else {
-        showConfirmDialog(
-          context: context,
-          title: 'Search'.tl,
-          content: '${'Comic source not found: '.tl}$sourceKey\n'
-              '${'Search for: '.tl}$title?',
-          onConfirm: () {
-            context.to(() => AggregatedSearchPage(keyword: title));
           },
         );
       }
