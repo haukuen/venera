@@ -13,6 +13,7 @@ import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/image_provider/image_favorites_provider.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/sqlite_connection.dart';
+import 'package:venera/utils/async_mutex.dart';
 import 'package:venera/utils/channel.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/translations.dart';
@@ -290,20 +291,11 @@ class HistoryManager with ChangeNotifier {
     });
   }
 
-  bool _haveAsyncTask = false;
+  final _historyMutex = AsyncMutex();
 
   /// Create a isolate to add history to prevent blocking the UI thread.
   Future<void> addHistoryAsync(History newItem) async {
-    while (_haveAsyncTask) {
-      await Future.delayed(Duration(milliseconds: 20));
-    }
-
-    _haveAsyncTask = true;
-    try {
-      await _addHistoryAsync(_dbPath, newItem);
-    } finally {
-      _haveAsyncTask = false;
-    }
+    await _historyMutex.run(() => _addHistoryAsync(_dbPath, newItem));
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {

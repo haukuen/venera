@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/utils/async_mutex.dart';
 import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/init.dart';
 import 'package:venera/utils/io.dart';
@@ -16,14 +17,10 @@ class Appdata with Init {
 
   var searchHistory = <String>[];
 
-  bool _isSavingData = false;
+  final _saveMutex = AsyncMutex();
 
   Future<void> saveData([bool sync = true]) async {
-    while (_isSavingData) {
-      await Future.delayed(const Duration(milliseconds: 20));
-    }
-    _isSavingData = true;
-    try {
+    await _saveMutex.run(() async {
       var futures = <Future>[];
       var json = toJson();
       var data = jsonEncode(json);
@@ -43,9 +40,7 @@ class Appdata with Init {
       }
 
       await Future.wait(futures);
-    } finally {
-      _isSavingData = false;
-    }
+    });
     if (sync) {
       DataSync().uploadData();
     }
@@ -118,16 +113,10 @@ class Appdata with Init {
   var implicitData = <String, dynamic>{};
 
   void writeImplicitData() async {
-    while (_isSavingData) {
-      await Future.delayed(const Duration(milliseconds: 20));
-    }
-    _isSavingData = true;
-    try {
+    await _saveMutex.run(() async {
       var file = File(FilePath.join(App.dataPath, 'implicitData.json'));
       await file.writeAsString(jsonEncode(implicitData));
-    } finally {
-      _isSavingData = false;
-    }
+    });
   }
 
   @override

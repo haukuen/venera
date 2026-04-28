@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:lodepng_flutter/lodepng_flutter.dart' as lodepng;
+import 'package:venera/utils/async_mutex.dart' show AsyncSemaphore;
 
 class Image {
   final Uint32List _data;
@@ -291,14 +292,10 @@ class JsEngine {
   }
 }
 
-var _tasksCount = 0;
+final _modifyImageSemaphore = AsyncSemaphore(3);
 
 Future<Uint8List> modifyImageWithScript(Uint8List data, String script) async {
-  while (_tasksCount > 3) {
-    await Future.delayed(const Duration(milliseconds: 200));
-  }
-  _tasksCount++;
-  try {
+  return _modifyImageSemaphore.run(() async {
     var image = await Image.decodeImage(data);
     var initJs = await rootBundle.loadString('assets/init.js');
     return await Isolate.run(() {
@@ -318,7 +315,5 @@ Future<Uint8List> modifyImageWithScript(Uint8List data, String script) async {
       var data = newImage!.encodePng();
       return Uint8List.fromList(data);
     });
-  } finally {
-    _tasksCount--;
-  }
+  });
 }
