@@ -76,17 +76,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
     checkUpdates();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkClipboardForVeneraLink();
-    });
+    if (App.isMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkClipboardForVeneraLink();
+      });
+    }
     super.initState();
   }
 
   bool isAuthPageActive = false;
 
   OverlayEntry? hideContentOverlay;
-
-  String? _lastHandledClipboard;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -137,8 +137,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final text = data!.text!;
 
       final uri = parseVeneraLink(text);
-      if (uri == null || text == _lastHandledClipboard) return;
-      _lastHandledClipboard = text;
+      if (uri == null) return;
+
+      final lastHandled = appdata.implicitData['lastHandledClipboard'] as String?;
+      if (text == lastHandled) return;
+      appdata.implicitData['lastHandledClipboard'] = text;
+      appdata.writeImplicitData();
 
       // Parse id and sourceKey from both short and legacy formats
       String? id;
