@@ -229,7 +229,7 @@ class Settings with ChangeNotifier {
     'limitImageWidth': true,
     'webdav': [], // empty means not configured
     'webdavProxyEnabled': true,
-    "disableSyncFields": "", // "field1, field2, ..."
+    "disableSyncFields": "", // TODO: remove, UI entry has been deleted
     'dataVersion': 0,
     'lastSyncTime': 0,
     'quickFavorite': null,
