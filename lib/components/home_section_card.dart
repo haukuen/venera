@@ -33,6 +33,7 @@ class HomeSectionCard extends StatelessWidget {
         onTap: onTap,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTitleRow(context),
             if (content != null) content!,
