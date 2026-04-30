@@ -109,7 +109,7 @@ class _AppSettingsState extends State<AppSettings> {
                 if (file.name.endsWith('picadata')) {
                   await importPicaData(cacheFile);
                 } else {
-                  await importAppData(cacheFile);
+                  await importAppData(cacheFile, isLocalRestore: true);
                 }
               } catch (e, s) {
                 Log.error("Import data", e.toString(), s);

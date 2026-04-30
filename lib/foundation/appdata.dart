@@ -84,6 +84,29 @@ class Appdata with Init {
         .toList();
   }
 
+  /// Fields that should not be restored from a local backup.
+  static const _disableRestore = [
+    "deviceId",
+    "lastSyncTime",
+    "disableSyncFields",
+    "authorizationRequired",
+  ];
+
+  /// Restore data from a local backup file.
+  /// Unlike [syncData], this restores most settings including webdav config.
+  void restoreFromBackup(Map<String, dynamic> data) {
+    if (data['settings'] is Map) {
+      var settings = data['settings'] as Map<String, dynamic>;
+      for (var key in settings.keys) {
+        if (!_disableRestore.contains(key) && settings[key] != null) {
+          this.settings[key] = settings[key];
+        }
+      }
+    }
+    searchHistory = List.from(data['searchHistory'] ?? []);
+    saveData();
+  }
+
   /// Following fields are related to device-specific data and should not be synced.
   static const _disableSync = [
     "proxy",
@@ -206,7 +229,7 @@ class Settings with ChangeNotifier {
     'limitImageWidth': true,
     'webdav': [], // empty means not configured
     'webdavProxyEnabled': true,
-    "disableSyncFields": "", // "field1, field2, ..."
+    "disableSyncFields": "", // TODO: remove, UI entry has been deleted
     'dataVersion': 0,
     'lastSyncTime': 0,
     'quickFavorite': null,

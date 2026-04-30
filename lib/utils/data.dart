@@ -80,7 +80,7 @@ Future<File> exportAppData([bool sync = true]) async {
   return cacheFile;
 }
 
-Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async {
+Future<void> importAppData(File file, {bool skipDataVersionCheck = false, bool isLocalRestore = false}) async {
   var cacheDirPath = FilePath.join(App.cachePath, 'temp_data');
   var cacheDir = Directory(cacheDirPath);
   if (cacheDir.existsSync()) {
@@ -141,7 +141,11 @@ Future<void> importAppData(File file, {bool skipDataVersionCheck = false}) async
       await ReadLaterManager().init();
     }
     if (appdataContent != null) {
-      appdata.syncData(appdataContent);
+      if (isLocalRestore) {
+        appdata.restoreFromBackup(appdataContent);
+      } else {
+        appdata.syncData(appdataContent);
+      }
     }
     if (await cacheDir.joinFile("cookie.db").exists()) {
       SingleInstanceCookieJar.instance?.dispose();
