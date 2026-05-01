@@ -15,6 +15,29 @@ Uri? parseVeneraLink(String text) {
   return Uri.tryParse(match.group(0)!);
 }
 
+/// Parse comic id, sourceKey, and optional title from a venera:// URI.
+/// Returns null if the URI is not a valid comic link.
+({String id, String sourceKey, String? title})? parseComicFromUri(Uri uri) {
+  if (uri.scheme != 'venera') return null;
+  if (uri.host == 'c' && uri.pathSegments.length >= 2) {
+    return (
+      id: uri.pathSegments[1],
+      sourceKey: uri.pathSegments[0],
+      title: null,
+    );
+  } else if (uri.host == 'comic') {
+    final id = uri.queryParameters['id'];
+    final sourceKey = uri.queryParameters['source'];
+    if (id == null || sourceKey == null) return null;
+    return (
+      id: id,
+      sourceKey: sourceKey,
+      title: uri.queryParameters['title'],
+    );
+  }
+  return null;
+}
+
 void handleLinks() {
   final appLinks = AppLinks();
   appLinks.uriLinkStream.listen((uri) {
@@ -24,26 +47,10 @@ void handleLinks() {
 
 Future<bool> handleAppLink(Uri uri) async {
   if (uri.scheme == 'venera') {
-    String? id;
-    String? sourceKey;
-    String? title;
-
-    if (uri.host == 'c' && uri.pathSegments.length >= 2) {
-      // Short format: venera://c/{source}/{id}
-      sourceKey = uri.pathSegments[0];
-      id = uri.pathSegments[1];
-    } else if (uri.host == 'comic') {
-      // Legacy format: venera://comic?id=xxx&source=xxx&title=xxx
-      id = uri.queryParameters['id'];
-      sourceKey = uri.queryParameters['source'];
-      title = uri.queryParameters['title'];
-    }
-
-    if (id == null || sourceKey == null) {
-      // Not a valid comic link, fall through to other handlers
-    } else {
-      final comicId = id;
-      final comicSource = sourceKey;
+    final comic = parseComicFromUri(uri);
+    if (comic != null) {
+      final comicId = comic.id;
+      final comicSource = comic.sourceKey;
       if (App.mainNavigatorKey == null) {
         await Future.delayed(const Duration(milliseconds: 200));
       }
@@ -53,8 +60,8 @@ Future<bool> handleAppLink(Uri uri) async {
         App.mainNavigatorKey!.currentContext?.to(() {
           return ComicPage(id: comicId, sourceKey: comicSource);
         });
-      } else if (title != null && title.isNotEmpty) {
-        final keyword = title;
+      } else if (comic.title != null && comic.title!.isNotEmpty) {
+        final keyword = comic.title!;
         App.rootContext.showMessage(
           message: 'Comic source not found: @s'.tlParams({'s': comicSource}),
         );

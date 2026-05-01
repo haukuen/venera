@@ -153,30 +153,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       appdata.implicitData['lastHandledClipboard'] = uri.toString();
       await appdata.writeImplicitData();
 
-      // Parse id and sourceKey from both short and legacy formats
-      String? id;
-      String? sourceKey;
-      if (uri.host == 'c' && uri.pathSegments.length >= 2) {
-        sourceKey = uri.pathSegments[0];
-        id = uri.pathSegments[1];
-      } else if (uri.host == 'comic') {
-        id = uri.queryParameters['id'];
-        sourceKey = uri.queryParameters['source'];
-      }
-      if (id == null || sourceKey == null) return;
+      final comic = parseComicFromUri(uri);
+      if (comic == null) return;
 
-      if (_isViewingComic(id, sourceKey)) return;
+      if (_isViewingComic(comic.id, comic.sourceKey)) return;
 
       // Extract title from the text line before the URL
       final uriMatch = RegExp(r'venera://\S+').firstMatch(text);
       final beforeUrl = text.substring(0, uriMatch?.start ?? 0).trim();
       final title = beforeUrl.isNotEmpty ? beforeUrl : null;
 
-      final source = ComicSource.find(sourceKey);
+      final source = ComicSource.find(comic.sourceKey);
       final context = App.rootContext;
       if (!context.mounted) return;
 
-      final displayName = title ?? id;
+      final displayName = title ?? comic.id;
       if (source != null) {
         showConfirmDialog(
           context: context,
@@ -184,7 +175,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           content: '${'Open comic'.tl}: $displayName',
           onConfirm: () {
             App.mainNavigatorKey?.currentContext?.to(() {
-              return ComicPage(id: id!, sourceKey: sourceKey!);
+              return ComicPage(id: comic.id, sourceKey: comic.sourceKey);
             });
           },
         );
