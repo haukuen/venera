@@ -55,7 +55,7 @@ Future<bool> handleAppLink(Uri uri) async {
       } else if (title != null && title.isNotEmpty) {
         final keyword = title;
         App.rootContext.showMessage(
-          message: 'Comic source not found: $comicSource',
+          message: 'Comic source not found: @s'.tlParams({'s': comicSource}),
         );
         App.rootContext.to(() => AggregatedSearchPage(keyword: keyword));
       }

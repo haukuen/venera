@@ -171,7 +171,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (source != null) {
         showConfirmDialog(
           context: context,
-          title: 'Open Comic'.tl,
+          title: 'Open comic'.tl,
           content: '${'Open comic'.tl}: $displayName',
           onConfirm: () {
             App.mainNavigatorKey?.currentContext?.to(() {
