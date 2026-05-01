@@ -132,17 +132,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   void _checkClipboardForVeneraLink() async {
     try {
-      final data = await Clipboard.getData(Clipboard.kTextPlain);
-      if (data?.text == null) return;
-      final text = data!.text!;
+      String? text;
+
+      if (Platform.isIOS) {
+        // On iOS, use native method to check and read clipboard in one call.
+        // This avoids triggering the system paste notification for non-venera URLs.
+        text = await const MethodChannel('venera/method_channel')
+            .invokeMethod<String>('getVeneraClipboardLink');
+        if (text == null) return;
+      } else {
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        if (data?.text == null) return;
+        text = data!.text!;
+      }
 
       final uri = parseVeneraLink(text);
       if (uri == null) return;
 
       final lastHandled = appdata.implicitData['lastHandledClipboard'] as String?;
-      if (text == lastHandled) return;
-      appdata.implicitData['lastHandledClipboard'] = text;
-      appdata.writeImplicitData();
+      if (uri.toString() == lastHandled) return;
+      appdata.implicitData['lastHandledClipboard'] = uri.toString();
+      await appdata.writeImplicitData();
 
       // Parse id and sourceKey from both short and legacy formats
       String? id;

@@ -49,6 +49,28 @@ import Foundation // 添加此行
       } else if call.method == "selectDirectory" {
         self.directoryPicker = DirectoryPicker()
         self.directoryPicker?.selectDirectory(result: result)
+      } else if call.method == "getVeneraClipboardLink" {
+        if #available(iOS 16.0, *) {
+          UIPasteboard.general.detectPatterns(for: [UTType.url.identifier]) { patterns, error in
+            if let patterns = patterns, !patterns.isEmpty {
+              let text = UIPasteboard.general.string ?? ""
+              if text.contains("venera://") {
+                result(text)
+              } else {
+                result(nil)
+              }
+            } else {
+              result(nil)
+            }
+          }
+        } else {
+          let text = UIPasteboard.general.string ?? ""
+          if text.contains("venera://") {
+            result(text)
+          } else {
+            result(nil)
+          }
+        }
       } else {
         result(FlutterMethodNotImplemented)
       }

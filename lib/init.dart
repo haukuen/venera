@@ -55,13 +55,15 @@ Future<void> init() async {
   CacheManager().setLimitSize(appdata.settings['cacheSize']);
   _checkOldConfigs();
   if (App.isAndroid) {
-    handleLinks();
     handleTextShare();
     try {
       await FlutterDisplayMode.setHighRefreshRate();
     } catch(e) {
       Log.error("Display Mode", "Failed to set high refresh rate: $e");
     }
+  }
+  if (App.isMobile) {
+    handleLinks();
   }
   FlutterError.onError = (details) {
     Log.error("Unhandled Exception", "${details.exception}\n${details.stack}");

@@ -3,6 +3,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/pages/aggregated_search_page.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
+import 'package:venera/utils/translations.dart';
 
 final _veneraLinkRegex = RegExp(r'venera://\S+');
 
