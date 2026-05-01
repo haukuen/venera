@@ -10,7 +10,6 @@ import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/auth_page.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/main_page.dart';
-import 'package:venera/pages/aggregated_search_page.dart';
 import 'package:venera/utils/app_links.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
