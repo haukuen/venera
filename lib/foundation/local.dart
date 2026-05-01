@@ -64,16 +64,16 @@ class LocalComic with HistoryMixin implements Comic {
   });
 
   LocalComic.fromRow(Row row)
-    : id = row[0] as String,
-      title = row[1] as String,
-      subtitle = row[2] as String,
-      tags = List.from(jsonDecode(row[3] as String)),
-      directory = row[4] as String,
-      chapters = ComicChapters.fromJsonOrNull(jsonDecode(row[5] as String)),
-      cover = row[6] as String,
-      comicType = ComicType(row[7] as int),
-      downloadedChapters = List.from(jsonDecode(row[8] as String)),
-      createdAt = DateTime.fromMillisecondsSinceEpoch(row[9] as int);
+    : id = row['id'] as String,
+      title = row['title'] as String,
+      subtitle = row['subtitle'] as String,
+      tags = List.from(jsonDecode(row['tags'] as String)),
+      directory = row['directory'] as String,
+      chapters = ComicChapters.fromJsonOrNull(jsonDecode(row['chapters'] as String)),
+      cover = row['cover'] as String,
+      comicType = ComicType(row['comic_type'] as int),
+      downloadedChapters = List.from(jsonDecode(row['downloadedChapters'] as String)),
+      createdAt = DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int);
 
   File get coverFile => File(FilePath.join(baseDir, cover));
 
@@ -301,7 +301,7 @@ class LocalManager with ChangeNotifier {
     if (res.isEmpty) {
       return '1';
     }
-    return (int.parse((res.first[0])) + 1).toString();
+    return (int.parse((res.first['id'])) + 1).toString();
   }
 
   Future<void> add(LocalComic comic, [String? id]) async {
@@ -382,7 +382,7 @@ class LocalManager with ChangeNotifier {
     final res = _db.select('''
       SELECT COUNT(*) FROM comics;
     ''');
-    return res.first[0] as int;
+    return res.first['count(*)'] as int;
   }
 
   LocalComic? findByName(String name) {

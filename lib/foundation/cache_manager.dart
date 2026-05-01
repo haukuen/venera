@@ -141,9 +141,9 @@ class CacheManager {
       return null;
     }
     var row = res.first;
-    var dir = row[1] as String;
-    var name = row[2] as String;
-    var expires = row[3] as int;
+    var dir = row['dir'] as String;
+    var name = row['name'] as String;
+    var expires = row['expires'] as int;
     var file = File('$cachePath/$dir/$name');
     var now = DateTime.now().millisecondsSinceEpoch;
     if (expires < now) {
@@ -210,8 +210,8 @@ class CacheManager {
       [DateTime.now().millisecondsSinceEpoch],
     );
     for (var row in res) {
-      var dir = row[1] as String;
-      var name = row[2] as String;
+      var dir = row['dir'] as String;
+      var name = row['name'] as String;
       var file = File('$cachePath/$dir/$name');
       if (await file.exists()) {
         var size = await file.length();
@@ -243,9 +243,9 @@ class CacheManager {
         break;
       }
       for (var row in res) {
-        var key = row[0] as String;
-        var dir = row[1] as String;
-        var name = row[2] as String;
+        var key = row['key'] as String;
+        var dir = row['dir'] as String;
+        var name = row['name'] as String;
         var file = File('$cachePath/$dir/$name');
         if (await file.exists()) {
           var size = await file.length();
@@ -288,8 +288,8 @@ class CacheManager {
       return;
     }
     var row = res.first;
-    var dir = row[1] as String;
-    var name = row[2] as String;
+    var dir = row['dir'] as String;
+    var name = row['name'] as String;
     var file = File('$cachePath/$dir/$name');
     var fileSize = 0;
     if (await file.exists()) {

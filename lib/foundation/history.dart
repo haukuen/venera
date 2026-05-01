@@ -187,7 +187,7 @@ class HistoryManager with ChangeNotifier {
 
   late String _dbPath;
 
-  int get length => _db.select("select count(*) from history;").first[0] as int;
+  int get length => _db.select("select count(*) from history;").first['count(*)'] as int;
 
   /// Cache of history ids. Improve the performance of find operation.
   Set<String>? _cachedHistoryIds;
@@ -453,7 +453,7 @@ class HistoryManager with ChangeNotifier {
     var res = _db.select("""
       select count(*) from history;
     """);
-    return res.first[0] as int;
+    return res.first['count(*)'] as int;
   }
 
   void close() {
