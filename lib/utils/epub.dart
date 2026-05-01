@@ -74,7 +74,7 @@ Future<File> createEpubComic(
       images.add('images/img$imgIndex.$ext');
       var mime = FileType.fromExtension(ext).mime;
       manifestStrBuilder.writeln(
-          '        <item id="img$imgIndex" href="OEBPS/images/img$imgIndex$ext" media-type="$mime"/>');
+          '        <item id="img$imgIndex" href="OEBPS/images/img$imgIndex.$ext" media-type="$mime"/>');
       imgIndex++;
     }
     var html =
