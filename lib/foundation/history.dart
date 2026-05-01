@@ -188,7 +188,7 @@ class HistoryManager with ChangeNotifier {
   late String _dbPath;
 
   int get length =>
-      _db.select("select count(*) from history;").first['count(*)'] as int;
+      _db.select("SELECT COUNT(*) AS cnt FROM history;").first['cnt'] as int;
 
   /// Cache of history ids. Improve the performance of find operation.
   Set<String>? _cachedHistoryIds;
@@ -452,9 +452,9 @@ class HistoryManager with ChangeNotifier {
   /// 获取历史记录的数量
   int count() {
     var res = _db.select("""
-      select count(*) from history;
+      SELECT COUNT(*) AS cnt FROM history;
     """);
-    return res.first['count(*)'] as int;
+    return res.first['cnt'] as int;
   }
 
   void close() {

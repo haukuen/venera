@@ -384,9 +384,9 @@ class LocalManager with ChangeNotifier {
 
   int get count {
     final res = _db.select('''
-      SELECT COUNT(*) FROM comics;
+      SELECT COUNT(*) AS cnt FROM comics;
     ''');
-    return res.first['count(*)'] as int;
+    return res.first['cnt'] as int;
   }
 
   LocalComic? findByName(String name) {

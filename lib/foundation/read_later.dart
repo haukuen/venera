@@ -118,8 +118,8 @@ class ReadLaterManager with ChangeNotifier {
 
   int get count {
     if (!isInitialized) return 0;
-    var res = _db.select("SELECT count(*) FROM read_later;");
-    return res.first['count(*)'] as int;
+    var res = _db.select("SELECT COUNT(*) AS cnt FROM read_later;");
+    return res.first['cnt'] as int;
   }
 
   Future<void> init() async {
