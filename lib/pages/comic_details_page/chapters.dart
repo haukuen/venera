@@ -107,7 +107,9 @@ class _NormalComicChaptersState extends State<_NormalComicChapters> {
                 }
                 var key = chapters.ids.elementAt(i);
                 var value = chapters[key]!;
-                bool visited = (history?.readEpisode ?? {}).contains((i + 1).toString());
+                bool visited = (history?.readEpisode ?? {}).contains(
+                  (i + 1).toString(),
+                );
                 return Padding(
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
                   child: Material(

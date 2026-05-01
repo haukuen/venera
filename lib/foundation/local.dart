@@ -69,10 +69,14 @@ class LocalComic with HistoryMixin implements Comic {
       subtitle = row['subtitle'] as String,
       tags = List.from(jsonDecode(row['tags'] as String)),
       directory = row['directory'] as String,
-      chapters = ComicChapters.fromJsonOrNull(jsonDecode(row['chapters'] as String)),
+      chapters = ComicChapters.fromJsonOrNull(
+        jsonDecode(row['chapters'] as String),
+      ),
       cover = row['cover'] as String,
       comicType = ComicType(row['comic_type'] as int),
-      downloadedChapters = List.from(jsonDecode(row['downloadedChapters'] as String)),
+      downloadedChapters = List.from(
+        jsonDecode(row['downloadedChapters'] as String),
+      ),
       createdAt = DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int);
 
   File get coverFile => File(FilePath.join(baseDir, cover));
