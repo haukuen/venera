@@ -5,10 +5,14 @@ import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/auth_page.dart';
+import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/main_page.dart';
+import 'package:venera/utils/app_links.dart';
 import 'package:venera/utils/io.dart';
+import 'package:venera/utils/translations.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/components.dart';
 import 'components/window_frame.dart';
@@ -71,6 +75,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
     checkUpdates();
+    if (App.isMobile) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkClipboardForVeneraLink();
+      });
+    }
     super.initState();
   }
 
@@ -80,6 +89,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && App.isMobile) {
+      _checkClipboardForVeneraLink();
+    }
     if (!App.isMobile || !appdata.settings['authorizationRequired']) {
       return;
     }
@@ -115,6 +127,76 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
     super.didChangeAppLifecycleState(state);
+  }
+
+  void _checkClipboardForVeneraLink() async {
+    try {
+      String? text;
+
+      if (Platform.isIOS) {
+        // On iOS, use native method to check and read clipboard in one call.
+        // This avoids triggering the system paste notification for non-venera URLs.
+        text = await const MethodChannel('venera/method_channel')
+            .invokeMethod<String>('getVeneraClipboardLink');
+        if (text == null) return;
+      } else {
+        final data = await Clipboard.getData(Clipboard.kTextPlain);
+        if (data?.text == null) return;
+        text = data!.text!;
+      }
+
+      final uri = parseVeneraLink(text);
+      if (uri == null) return;
+
+      final lastHandled = appdata.implicitData['lastHandledClipboard'] as String?;
+      if (uri.toString() == lastHandled) return;
+      appdata.implicitData['lastHandledClipboard'] = uri.toString();
+      await appdata.writeImplicitData();
+
+      final comic = parseComicFromUri(uri);
+      if (comic == null) return;
+
+      if (_isViewingComic(comic.id, comic.sourceKey)) return;
+
+      // Extract title from the text line before the URL
+      final uriMatch = RegExp(r'venera://\S+').firstMatch(text);
+      final beforeUrl = text.substring(0, uriMatch?.start ?? 0).trim();
+      final title = beforeUrl.isNotEmpty ? beforeUrl : null;
+
+      final source = ComicSource.find(comic.sourceKey);
+      final context = App.rootContext;
+      if (!context.mounted) return;
+
+      final displayName = title ?? comic.id;
+      if (source != null) {
+        showConfirmDialog(
+          context: context,
+          title: 'Open comic'.tl,
+          content: '${'Open comic'.tl}: $displayName',
+          onConfirm: () {
+            App.mainNavigatorKey?.currentContext?.to(() {
+              return ComicPage(id: comic.id, sourceKey: comic.sourceKey);
+            });
+          },
+        );
+      }
+    } catch (_) {}
+  }
+
+  bool _isViewingComic(String id, String sourceKey) {
+    final navContext = App.mainNavigatorKey?.currentContext;
+    if (navContext == null) return false;
+    ComicPage? found;
+    void visitor(Element el) {
+      if (found != null) return;
+      if (el.widget is ComicPage) {
+        found = el.widget as ComicPage;
+        return;
+      }
+      el.visitChildren(visitor);
+    }
+    (navContext as Element).visitChildren(visitor);
+    return found?.id == id && found?.sourceKey == sourceKey;
   }
 
   void forceRebuild() {
