@@ -31,19 +31,20 @@ class ReadLaterItem implements Comic {
   });
 
   ReadLaterItem.fromRow(Row row)
-      : id = row["id"],
-        type = ComicType(row["type"]),
-        title = row["title"],
-        subtitle = row["subtitle"],
-        cover = row["cover"],
-        sourceKey = row["source_key"],
-        addedTime = DateTime.fromMillisecondsSinceEpoch(row["added_time"]);
+    : id = row["id"],
+      type = ComicType(row["type"]),
+      title = row["title"],
+      subtitle = row["subtitle"],
+      cover = row["cover"],
+      sourceKey = row["source_key"],
+      addedTime = DateTime.fromMillisecondsSinceEpoch(row["added_time"]);
 
   factory ReadLaterItem.fromComic(Comic comic) {
     return ReadLaterItem(
       id: comic.id,
       type: ComicType(
-          comic.sourceKey == 'local' ? 0 : comic.sourceKey.hashCode),
+        comic.sourceKey == 'local' ? 0 : comic.sourceKey.hashCode,
+      ),
       title: comic.title,
       subtitle: comic.subtitle,
       cover: comic.cover,
@@ -52,10 +53,7 @@ class ReadLaterItem implements Comic {
     );
   }
 
-  factory ReadLaterItem.fromComicDetails(
-    ComicDetails comic,
-    String sourceKey,
-  ) {
+  factory ReadLaterItem.fromComicDetails(ComicDetails comic, String sourceKey) {
     return ReadLaterItem(
       id: comic.comicId,
       type: ComicType.fromKey(sourceKey),
@@ -111,8 +109,7 @@ class ReadLaterManager with ChangeNotifier {
 
   ReadLaterManager._create();
 
-  factory ReadLaterManager() =>
-      _cache ?? (_cache = ReadLaterManager._create());
+  factory ReadLaterManager() => _cache ?? (_cache = ReadLaterManager._create());
 
   late Database _db;
   late String _dbPath;
@@ -169,10 +166,10 @@ class ReadLaterManager with ChangeNotifier {
   }
 
   void _removeFromDb(String id, ComicType type) {
-    _db.execute(
-      "DELETE FROM read_later WHERE id = ? AND type = ?;",
-      [id, type.value],
-    );
+    _db.execute("DELETE FROM read_later WHERE id = ? AND type = ?;", [
+      id,
+      type.value,
+    ]);
   }
 
   void add(ReadLaterItem item) {
@@ -206,9 +203,7 @@ class ReadLaterManager with ChangeNotifier {
   }
 
   List<ReadLaterItem> getAll() {
-    var res = _db.select(
-      "SELECT * FROM read_later ORDER BY added_time DESC;",
-    );
+    var res = _db.select("SELECT * FROM read_later ORDER BY added_time DESC;");
     return res.map((row) => ReadLaterItem.fromRow(row)).toList();
   }
 

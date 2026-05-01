@@ -13,10 +13,7 @@ class _AppSettingsState extends State<AppSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("App".tl)),
-        _SettingPartTitle(
-          title: "Data".tl,
-          icon: Icons.storage,
-        ),
+        _SettingPartTitle(title: "Data".tl, icon: Icons.storage),
         ListTile(
           title: Text("Storage Path for local comics".tl),
           subtitle: Text(LocalManager().path, softWrap: false),
@@ -102,8 +99,9 @@ class _AppSettingsState extends State<AppSettings> {
             var controller = showLoadingDialog(context);
             var file = await selectFile(ext: ['venera', 'picadata']);
             if (file != null) {
-              var cacheFile =
-                  File(FilePath.join(App.cachePath, "import_data_temp"));
+              var cacheFile = File(
+                FilePath.join(App.cachePath, "import_data_temp"),
+              );
               await file.saveTo(cacheFile.path);
               try {
                 if (file.name.endsWith('picadata')) {
@@ -130,10 +128,7 @@ class _AppSettingsState extends State<AppSettings> {
           },
           actionTitle: 'Set'.tl,
         ).toSliver(),
-        _SettingPartTitle(
-          title: "User".tl,
-          icon: Icons.person_outline,
-        ),
+        _SettingPartTitle(title: "User".tl, icon: Icons.person_outline),
         SelectSetting(
           title: "Language".tl,
           settingKey: "language",
@@ -167,7 +162,8 @@ class _AppSettingsState extends State<AppSettings> {
                 final auth = LocalAuthentication();
                 final bool canAuthenticateWithBiometrics =
                     await auth.canCheckBiometrics;
-                final bool canAuthenticate = canAuthenticateWithBiometrics ||
+                final bool canAuthenticate =
+                    canAuthenticateWithBiometrics ||
                     await auth.isDeviceSupported();
                 if (!canAuthenticate) {
                   context.showMessage(message: "Biometrics not supported".tl);
@@ -205,62 +201,72 @@ class _LogsPageState extends State<LogsPage> {
         title: Text("Logs".tl),
         actions: [
           IconButton(
-              onPressed: () => setState(() {
-                    final RelativeRect position = RelativeRect.fromLTRB(
-                      MediaQuery.of(context).size.width,
-                      MediaQuery.of(context).padding.top + kToolbarHeight,
-                      0.0,
-                      0.0,
-                    );
-                    showMenu(context: context, position: position, items: [
-                      PopupMenuItem(
-                          child: Text("all"),
-                          onTap: () => setState(() => logLevelToShow = "all")
-                      ),
-                      PopupMenuItem(
-                          child: Text("info"),
-                          onTap: () => setState(() => logLevelToShow = "info")
-                      ),
-                      PopupMenuItem(
-                          child: Text("warning"),
-                          onTap: () => setState(() => logLevelToShow = "warning")
-                      ),
-                      PopupMenuItem(
-                          child: Text("error"),
-                          onTap: () => setState(() => logLevelToShow = "error")
-                      ),
-                    ]);
-              }),
-              icon: const Icon(Icons.filter_list_outlined)
+            onPressed: () => setState(() {
+              final RelativeRect position = RelativeRect.fromLTRB(
+                MediaQuery.of(context).size.width,
+                MediaQuery.of(context).padding.top + kToolbarHeight,
+                0.0,
+                0.0,
+              );
+              showMenu(
+                context: context,
+                position: position,
+                items: [
+                  PopupMenuItem(
+                    child: Text("all"),
+                    onTap: () => setState(() => logLevelToShow = "all"),
+                  ),
+                  PopupMenuItem(
+                    child: Text("info"),
+                    onTap: () => setState(() => logLevelToShow = "info"),
+                  ),
+                  PopupMenuItem(
+                    child: Text("warning"),
+                    onTap: () => setState(() => logLevelToShow = "warning"),
+                  ),
+                  PopupMenuItem(
+                    child: Text("error"),
+                    onTap: () => setState(() => logLevelToShow = "error"),
+                  ),
+                ],
+              );
+            }),
+            icon: const Icon(Icons.filter_list_outlined),
           ),
           IconButton(
-              onPressed: () => setState(() {
-                    final RelativeRect position = RelativeRect.fromLTRB(
-                      MediaQuery.of(context).size.width,
-                      MediaQuery.of(context).padding.top + kToolbarHeight,
-                      0.0,
-                      0.0,
-                    );
-                    showMenu(context: context, position: position, items: [
-                      PopupMenuItem(
-                        child: Text("Clear".tl),
-                        onTap: () => setState(() => Log.clear()),
-                      ),
-                      PopupMenuItem(
-                        child: Text("Disable Length Limitation".tl),
-                        onTap: () {
-                          Log.ignoreLimitation = true;
-                          context.showMessage(
-                              message: "Only valid for this run".tl);
-                        },
-                      ),
-                      PopupMenuItem(
-                        child: Text("Export".tl),
-                        onTap: () => saveLog(Log().toString()),
-                      ),
-                    ]);
-                  }),
-              icon: const Icon(Icons.more_horiz))
+            onPressed: () => setState(() {
+              final RelativeRect position = RelativeRect.fromLTRB(
+                MediaQuery.of(context).size.width,
+                MediaQuery.of(context).padding.top + kToolbarHeight,
+                0.0,
+                0.0,
+              );
+              showMenu(
+                context: context,
+                position: position,
+                items: [
+                  PopupMenuItem(
+                    child: Text("Clear".tl),
+                    onTap: () => setState(() => Log.clear()),
+                  ),
+                  PopupMenuItem(
+                    child: Text("Disable Length Limitation".tl),
+                    onTap: () {
+                      Log.ignoreLimitation = true;
+                      context.showMessage(
+                        message: "Only valid for this run".tl,
+                      );
+                    },
+                  ),
+                  PopupMenuItem(
+                    child: Text("Export".tl),
+                    onTap: () => saveLog(Log().toString()),
+                  ),
+                ],
+              );
+            }),
+            icon: const Icon(Icons.more_horiz),
+          ),
         ],
       ),
       body: ListView.builder(
@@ -279,51 +285,56 @@ class _LogsPageState extends State<LogsPage> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(16)),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(16),
+                          ),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(5, 0, 5, 1),
                           child: Text(logToShow[index].title),
                         ),
                       ),
-                      const SizedBox(
-                        width: 3,
-                      ),
+                      const SizedBox(width: 3),
                       Container(
                         decoration: BoxDecoration(
                           color: [
                             Theme.of(context).colorScheme.error,
                             Theme.of(context).colorScheme.errorContainer,
-                            Theme.of(context).colorScheme.primaryContainer
+                            Theme.of(context).colorScheme.primaryContainer,
                           ][logToShow[index].level.index],
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(16)),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(16),
+                          ),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(5, 0, 5, 1),
                           child: Text(
                             logToShow[index].level.name,
                             style: TextStyle(
-                                color: logToShow[index].level.index == 0
-                                    ? Colors.white
-                                    : Colors.black),
+                              color: logToShow[index].level.index == 0
+                                  ? Colors.white
+                                  : Colors.black,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                   Text(logToShow[index].content),
-                  Text(logToShow[index].time
-                      .toString()
-                      .replaceAll(RegExp(r"\.\w+"), "")),
+                  Text(
+                    logToShow[index].time.toString().replaceAll(
+                      RegExp(r"\.\w+"),
+                      "",
+                    ),
+                  ),
                   TextButton(
                     onPressed: () {
                       Clipboard.setData(
-                          ClipboardData(text: logToShow[index].content));
+                        ClipboardData(text: logToShow[index].content),
+                      );
                     },
                     child: Text("Copy".tl),
                   ),
@@ -423,10 +434,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
               leading: Icon(Icons.sync),
               title: Text("Auto Sync Data".tl),
               contentPadding: EdgeInsets.zero,
-              trailing: Switch(
-                value: autoSync,
-                onChanged: onAutoSyncChanged,
-              ),
+              trailing: Switch(value: autoSync, onChanged: onAutoSyncChanged),
             ),
             const SizedBox(height: 12),
             RadioGroup<bool>(
@@ -439,13 +447,9 @@ class _WebdavSettingState extends State<_WebdavSetting> {
               child: Row(
                 children: [
                   Text("Operation".tl),
-                  Radio<bool>(
-                    value: true,
-                  ),
+                  Radio<bool>(value: true),
                   Text("Upload".tl),
-                  Radio<bool>(
-                    value: false,
-                  ),
+                  Radio<bool>(value: false),
                   Text("Download".tl),
                 ],
               ),
@@ -466,8 +470,9 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                                "Once the operation is successful, app will automatically sync data with the server."
-                                    .tl),
+                              "Once the operation is successful, app will automatically sync data with the server."
+                                  .tl,
+                            ),
                           ),
                         ],
                       ),
@@ -529,7 +534,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                 },
                 child: Text("Continue".tl),
               ),
-            )
+            ),
           ],
         ).paddingHorizontal(16),
       ),

@@ -19,20 +19,21 @@ class ComicMetaData {
   final List<ComicChapter>? chapters;
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'author': author,
-        'tags': tags,
-        'chapters': chapters?.map((e) => e.toJson()).toList()
-      };
+    'title': title,
+    'author': author,
+    'tags': tags,
+    'chapters': chapters?.map((e) => e.toJson()).toList(),
+  };
 
   ComicMetaData.fromJson(Map<String, dynamic> json)
-      : title = json['title'],
-        author = json['author'],
-        tags = List<String>.from(json['tags']),
-        chapters = json['chapters'] == null
-            ? null
-            : List<ComicChapter>.from(
-                json['chapters'].map((e) => ComicChapter.fromJson(e)));
+    : title = json['title'],
+      author = json['author'],
+      tags = List<String>.from(json['tags']),
+      chapters = json['chapters'] == null
+          ? null
+          : List<ComicChapter>.from(
+              json['chapters'].map((e) => ComicChapter.fromJson(e)),
+            );
 
   ComicMetaData({
     required this.title,
@@ -52,9 +53,9 @@ class ComicChapter {
   Map<String, dynamic> toJson() => {'title': title, 'start': start, 'end': end};
 
   ComicChapter.fromJson(Map<String, dynamic> json)
-      : title = json['title'],
-        start = json['start'],
-        end = json['end'];
+    : title = json['title'],
+      start = json['start'],
+      end = json['end'];
 
   ComicChapter({required this.title, required this.start, required this.end});
 }
@@ -94,8 +95,9 @@ abstract class CBZ {
     ComicMetaData? metaData;
     if (metaDataFile.existsSync()) {
       try {
-        metaData =
-            ComicMetaData.fromJson(jsonDecode(metaDataFile.readAsStringSync()));
+        metaData = ComicMetaData.fromJson(
+          jsonDecode(metaDataFile.readAsStringSync()),
+        );
       } catch (_) {}
     }
     metaData ??= ComicMetaData(
@@ -146,7 +148,8 @@ abstract class CBZ {
       for (var i = 0; i < files.length; i++) {
         var src = files[i];
         var dst = File(
-            FilePath.join(dest.path, '${i + 1}.${src.path.split('.').last}'));
+          FilePath.join(dest.path, '${i + 1}.${src.path.split('.').last}'),
+        );
         await src.copyMem(dst.path);
       }
     } else {
@@ -163,8 +166,12 @@ abstract class CBZ {
         chapterDir.createSync();
         for (var j = 0; j < chapter.value.length; j++) {
           var src = chapter.value[j];
-          var dst = File(FilePath.join(
-              chapterDir.path, '${j + 1}.${src.path.split('.').last}'));
+          var dst = File(
+            FilePath.join(
+              chapterDir.path,
+              '${j + 1}.${src.path.split('.').last}',
+            ),
+          );
           await src.copyMem(dst.path);
         }
         i++;
@@ -234,19 +241,20 @@ abstract class CBZ {
     }
     var cover = comic.coverFile;
     await cover.copyMem(
-        FilePath.join(cache.path, 'cover.${cover.path.split('.').last}'));
+      FilePath.join(cache.path, 'cover.${cover.path.split('.').last}'),
+    );
     final metaData = ComicMetaData(
       title: comic.title,
       author: comic.subtitle,
       tags: comic.tags,
       chapters: chapters,
     );
-    await File(FilePath.join(cache.path, 'metadata.json')).writeAsString(
-      jsonEncode(metaData),
-    );
-    await File(FilePath.join(cache.path, 'ComicInfo.xml')).writeAsString(
-      _buildComicInfoXml(metaData),
-    );
+    await File(
+      FilePath.join(cache.path, 'metadata.json'),
+    ).writeAsString(jsonEncode(metaData));
+    await File(
+      FilePath.join(cache.path, 'ComicInfo.xml'),
+    ).writeAsString(_buildComicInfoXml(metaData));
     var cbz = File(outFilePath);
     if (cbz.existsSync()) cbz.deleteSync();
     await _compress(cache.path, cbz.path);
@@ -257,7 +265,9 @@ abstract class CBZ {
   static String _buildComicInfoXml(ComicMetaData data) {
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="utf-8"?>');
-    buffer.writeln('<ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">');
+    buffer.writeln(
+      '<ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
+    );
 
     buffer.writeln('  <Title>${_escapeXml(data.title)}</Title>');
     buffer.writeln('  <Series>${_escapeXml(data.title)}</Series>');
@@ -275,9 +285,12 @@ abstract class CBZ {
     }
 
     if (data.chapters != null && data.chapters!.isNotEmpty) {
-      final chaptersInfo = data.chapters!.map((chapter) =>
-        '${_escapeXml(chapter.title)}: ${chapter.start}-${chapter.end}'
-      ).join('; ');
+      final chaptersInfo = data.chapters!
+          .map(
+            (chapter) =>
+                '${_escapeXml(chapter.title)}: ${chapter.start}-${chapter.end}',
+          )
+          .join('; ');
       buffer.writeln('  <Notes>Chapters: $chaptersInfo</Notes>');
     }
 
@@ -293,15 +306,14 @@ abstract class CBZ {
 
   static String _escapeXml(String text) {
     return text
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&apos;');
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&apos;');
   }
 
   static _compress(String src, String dst) async {
     await ZipFile.compressFolderAsync(src, dst, 4);
   }
 }
-

@@ -108,8 +108,7 @@ class DataSync with ChangeNotifier {
     'appdata.json',
   ];
 
-  String get _backupDir =>
-      FilePath.join(App.cachePath, 'sync_backup');
+  String get _backupDir => FilePath.join(App.cachePath, 'sync_backup');
 
   Future<void> _backupLocalData() async {
     var backupDir = Directory(_backupDir);
@@ -185,9 +184,9 @@ class DataSync with ChangeNotifier {
     await HistoryManager().init();
     await LocalFavoritesManager().init();
     await ReadLaterManager().init();
-    SingleInstanceCookieJar.instance =
-        SingleInstanceCookieJar(FilePath.join(App.dataPath, "cookie.db"))
-          ..init();
+    SingleInstanceCookieJar.instance = SingleInstanceCookieJar(
+      FilePath.join(App.dataPath, "cookie.db"),
+    )..init();
 
     // Reload in-memory appdata from the restored appdata.json
     var restoredAppdata = File(FilePath.join(App.dataPath, 'appdata.json'));
@@ -268,7 +267,8 @@ class DataSync with ChangeNotifier {
       try {
         var disableFields = appdata.settings['disableSyncFields'];
         var data = await exportAppData(
-            disableFields != null && disableFields.toString().isNotEmpty);
+          disableFields != null && disableFields.toString().isNotEmpty,
+        );
         var now = DateTime.now().millisecondsSinceEpoch;
         var filename = '$now.venera';
         var files = await client.readDir('/');
@@ -302,7 +302,8 @@ class DataSync with ChangeNotifier {
 
         // Clean up old format files ({days}-{version}.venera)
         for (var f in files) {
-          if (f.name!.contains('-') && !f.name!.startsWith('${now ~/ 86400000}-')) {
+          if (f.name!.contains('-') &&
+              !f.name!.startsWith('${now ~/ 86400000}-')) {
             var part = f.name!.replaceAll('.venera', '');
             var parts = part.split('-');
             if (parts.length == 2 &&
@@ -370,15 +371,18 @@ class DataSync with ChangeNotifier {
         }
 
         var remoteFile = files.first;
-        var remoteTimestamp =
-            int.tryParse(remoteFile.name!.replaceAll('.venera', ''));
+        var remoteTimestamp = int.tryParse(
+          remoteFile.name!.replaceAll('.venera', ''),
+        );
         var lastSyncTime = (appdata.settings['lastSyncTime'] as int?) ?? 0;
 
         // If remote file is old format ({days}-{version}.venera), always download
         // Old format files contain a dash, new format is pure timestamp
         var isOldFormat = remoteFile.name!.contains('-');
 
-        if (!isOldFormat && remoteTimestamp != null && remoteTimestamp <= lastSyncTime) {
+        if (!isOldFormat &&
+            remoteTimestamp != null &&
+            remoteTimestamp <= lastSyncTime) {
           Log.info("Data Sync", 'No new data to download');
           return const Res(true);
         }

@@ -426,10 +426,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                     manager.remove(comic.comicId, type);
                   } else {
                     manager.add(
-                      ReadLaterItem.fromComicDetails(
-                        comic,
-                        widget.sourceKey,
-                      ),
+                      ReadLaterItem.fromComicDetails(comic, widget.sourceKey),
                     );
                   }
                 },

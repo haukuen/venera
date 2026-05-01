@@ -98,12 +98,10 @@ class FlyoutState extends State<Flyout> {
   void show() {
     var renderBox = context.findRenderObject() as RenderBox;
     var rect = renderBox.localToGlobal(Offset.zero) & renderBox.size;
-    var navigator = widget.navigator ??
-        Navigator.of(
-          context,
-          rootNavigator: true,
-        );
-    navigator.push(PageRouteBuilder(
+    var navigator =
+        widget.navigator ?? Navigator.of(context, rootNavigator: true);
+    navigator.push(
+      PageRouteBuilder(
         fullscreenDialog: true,
         barrierDismissible: true,
         opaque: false,
@@ -120,8 +118,12 @@ class FlyoutState extends State<Flyout> {
             top = MediaQuery.of(context).size.height - minFlyoutHeight;
           }
 
-          Widget transition(BuildContext context, Animation<double> animation,
-              Animation<double> secondaryAnimation, Widget flyout) {
+          Widget transition(
+            BuildContext context,
+            Animation<double> animation,
+            Animation<double> secondaryAnimation,
+            Widget flyout,
+          ) {
             return SlideTransition(
               position: Tween<Offset>(
                 begin: const Offset(0, -0.05),
@@ -153,23 +155,30 @@ class FlyoutState extends State<Flyout> {
                 top: top,
                 bottom: 0,
                 child: transition(
-                    context,
-                    animation,
-                    secondaryAnimation,
-                    Align(
-                      alignment: Alignment.topLeft,
-                      child: widget.flyoutBuilder(context),
-                    )),
-              )
+                  context,
+                  animation,
+                  secondaryAnimation,
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: widget.flyoutBuilder(context),
+                  ),
+                ),
+              ),
             ],
           );
-        }));
+        },
+      ),
+    );
   }
 }
 
 class FlyoutContent extends StatelessWidget {
-  const FlyoutContent(
-      {super.key, required this.title, required this.actions, this.content});
+  const FlyoutContent({
+    super.key,
+    required this.title,
+    required this.actions,
+    this.content,
+  });
 
   final String title;
 
@@ -187,9 +196,7 @@ class FlyoutContent extends StatelessWidget {
           type: MaterialType.card,
           color: context.colorScheme.surface.toOpacity(0.82),
           child: Container(
-            constraints: const BoxConstraints(
-              minWidth: minFlyoutWidth,
-            ),
+            constraints: const BoxConstraints(minWidth: minFlyoutWidth),
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
@@ -201,13 +208,15 @@ class FlyoutContent extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                if (content != null) content!,
-                const SizedBox(
-                  height: 12,
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
+                if (content != null) content!,
+                const SizedBox(height: 12),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.end,

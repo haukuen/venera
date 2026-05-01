@@ -32,7 +32,7 @@ extension AppTranslation on String {
     var data = await rootBundle.load("assets/translation.json");
     var json = jsonDecode(utf8.decode(data.buffer.asUint8List()));
     translations = {
-      for (var e in json.entries) e.key: Map<String, String>.from(e.value)
+      for (var e in json.entries) e.key: Map<String, String>.from(e.value),
     };
   }
 

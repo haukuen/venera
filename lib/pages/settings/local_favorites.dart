@@ -24,10 +24,7 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
         SelectSetting(
           title: "Add new favorite to".tl,
           settingKey: "newFavoriteAddTo",
-          optionTranslation: {
-            "start": "Start".tl,
-            "end": "End".tl,
-          },
+          optionTranslation: {"start": "Start".tl, "end": "End".tl},
         ).toSliver(),
         SelectSetting(
           title: "Move favorite after reading".tl,
@@ -45,7 +42,7 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
               "Long press on the favorite button to quickly add to this folder"
                   .tl,
           optionTranslation: {
-            for (var e in LocalFavoritesManager().folderNames) e: e
+            for (var e in LocalFavoritesManager().folderNames) e: e,
           },
         ).toSliver(),
         _CallbackSetting(
@@ -55,7 +52,8 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
             var count = await LocalFavoritesManager().removeInvalid();
             controller.close();
             context.showMessage(
-                message: "Deleted @a favorite items".tlParams({'a': count}));
+              message: "Deleted @a favorite items".tlParams({'a': count}),
+            );
           },
           actionTitle: 'Delete'.tl,
         ).toSliver(),

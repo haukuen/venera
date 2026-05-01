@@ -14,11 +14,11 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-
   @override
   void initState() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if(SchedulerBinding.instance.lifecycleState != AppLifecycleState.paused) {
+      if (SchedulerBinding.instance.lifecycleState !=
+          AppLifecycleState.paused) {
         auth();
       }
     });
@@ -43,10 +43,7 @@ class _AuthPageState extends State<AuthPage> {
               const SizedBox(height: 16),
               Text("Authentication Required".tl),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: auth,
-                child: Text("Continue".tl),
-              ),
+              FilledButton(onPressed: auth, child: Text("Continue".tl)),
             ],
           ),
         ),

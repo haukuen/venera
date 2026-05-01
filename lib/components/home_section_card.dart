@@ -23,9 +23,7 @@ class HomeSectionCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(AppSpace.sm),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: context.colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: context.colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: InkWell(
@@ -49,9 +47,7 @@ class HomeSectionCard extends StatelessWidget {
       height: 56,
       child: Row(
         children: [
-          Center(
-            child: Text(title, style: ts.s18),
-          ),
+          Center(child: Text(title, style: ts.s18)),
           if (count != null)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
@@ -100,9 +96,7 @@ class ComicHorizontalList extends StatelessWidget {
           return SimpleComicTile(
             comic: comic,
             heroID: heroID,
-            onTap: onItemTap != null
-                ? () => onItemTap!(comic, heroID)
-                : null,
+            onTap: onItemTap != null ? () => onItemTap!(comic, heroID) : null,
           ).paddingHorizontal(AppSpace.sm).paddingVertical(2);
         },
       ),

@@ -73,8 +73,10 @@ class FileDownloader {
 
     if (File("$savePath.download").existsSync()) {
       await _readStatus();
-      _currentBytes = _blocks.fold<int>(0,
-          (previousValue, element) => previousValue + element.downloadedBytes);
+      _currentBytes = _blocks.fold<int>(
+        0,
+        (previousValue, element) => previousValue + element.downloadedBytes,
+      );
     } else {
       if (_fileSize > 1024 * 1024 * 1024) {
         _kChunkSize = 64 * 1024 * 1024;
@@ -135,8 +137,13 @@ class FileDownloader {
           timer.cancel();
           return;
         }
-        resultStream.add(DownloadingStatus(
-            _currentBytes, _fileSize, _currentBytes - _lastBytes));
+        resultStream.add(
+          DownloadingStatus(
+            _currentBytes,
+            _fileSize,
+            _currentBytes - _lastBytes,
+          ),
+        );
         _lastBytes = _currentBytes;
       });
 
@@ -152,9 +159,12 @@ class FileDownloader {
 
       // check if download is finished
       if (_currentBytes < _fileSize) {
-        resultStream
-            .addError(Exception("Download failed: Expected $_fileSize bytes, "
-                "but only $_currentBytes bytes downloaded."));
+        resultStream.addError(
+          Exception(
+            "Download failed: Expected $_fileSize bytes, "
+            "but only $_currentBytes bytes downloaded.",
+          ),
+        );
         resultStream.close();
       }
 
@@ -175,18 +185,23 @@ class FileDownloader {
       if (tasks.length >= maxConcurrent) {
         await Future.any(tasks);
       }
-      final block = _blocks.firstWhereOrNull((element) =>
-          !element.downloading &&
-          element.end - element.start > element.downloadedBytes);
+      final block = _blocks.firstWhereOrNull(
+        (element) =>
+            !element.downloading &&
+            element.end - element.start > element.downloadedBytes,
+      );
       if (block == null) {
         break;
       }
       block.downloading = true;
       var task = _fetchBlock(block);
-      task.then((value) => tasks.remove(task), onError: (e) {
-        if(_canceled) return;
-        throw e;
-      });
+      task.then(
+        (value) => tasks.remove(task),
+        onError: (e) {
+          if (_canceled) return;
+          throw e;
+        },
+      );
       tasks.add(task);
     }
     await Future.wait(tasks);
@@ -275,8 +290,11 @@ class DownloadingStatus {
   final int bytesPerSecond;
 
   const DownloadingStatus(
-      this.downloadedBytes, this.totalBytes, this.bytesPerSecond,
-      [this.isFinished = false]);
+    this.downloadedBytes,
+    this.totalBytes,
+    this.bytesPerSecond, [
+    this.isFinished = false,
+  ]);
 
   @override
   String toString() {
@@ -298,8 +316,8 @@ class _DownloadBlock {
   }
 
   _DownloadBlock.fromString(String str)
-      : start = int.parse(str.split("-")[0]),
-        end = int.parse(str.split("-")[1]),
-        downloadedBytes = int.parse(str.split("-")[2]),
-        downloading = false;
+    : start = int.parse(str.split("-")[0]),
+      end = int.parse(str.split("-")[1]),
+      downloadedBytes = int.parse(str.split("-")[2]),
+      downloading = false;
 }

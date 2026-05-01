@@ -1,38 +1,38 @@
-extension ListExt<T> on List<T>{
+extension ListExt<T> on List<T> {
   /// Remove all blank value and return the list.
-  List<T> getNoBlankList(){
+  List<T> getNoBlankList() {
     List<T> newList = [];
-    for(var value in this){
-      if(value.toString() != ""){
+    for (var value in this) {
+      if (value.toString() != "") {
         newList.add(value);
       }
     }
     return newList;
   }
 
-  T? firstWhereOrNull(bool Function(T element) test){
-    for(var element in this){
-      if(test(element)){
+  T? firstWhereOrNull(bool Function(T element) test) {
+    for (var element in this) {
+      if (test(element)) {
         return element;
       }
     }
     return null;
   }
 
-  void addIfNotNull(T? value){
-    if(value != null){
+  void addIfNotNull(T? value) {
+    if (value != null) {
       add(value);
     }
   }
 
   /// Compare every element of this list with another list.
   /// Return true if all elements are equal.
-  bool isEqualTo(List<T> list){
-    if(length != list.length){
+  bool isEqualTo(List<T> list) {
+    if (length != list.length) {
       return false;
     }
-    for(int i=0; i<length; i++){
-      if(this[i] != list[i]){
+    for (int i = 0; i < length; i++) {
+      if (this[i] != list[i]) {
         return false;
       }
     }
@@ -40,29 +40,30 @@ extension ListExt<T> on List<T>{
   }
 }
 
-extension StringExt on String{
+extension StringExt on String {
   ///Remove all value that would display blank on the screen.
-  String get removeAllBlank => replaceAll("\n", "").replaceAll(" ", "").replaceAll("\t", "");
+  String get removeAllBlank =>
+      replaceAll("\n", "").replaceAll(" ", "").replaceAll("\t", "");
 
   /// convert this to a one-element list.
   List<String> toList() => [this];
 
-  String _nums(){
+  String _nums() {
     String res = "";
-    for(int i=0; i<length; i++){
-      res += this[i].isNum?this[i]:"";
+    for (int i = 0; i < length; i++) {
+      res += this[i].isNum ? this[i] : "";
     }
     return res;
   }
 
   String get nums => _nums();
 
-  String setValueAt(String value, int index){
-    return replaceRange(index, index+1, value);
+  String setValueAt(String value, int index) {
+    return replaceRange(index, index + 1, value);
   }
 
-  String? subStringOrNull(int start, [int? end]){
-    if(start < 0 || (end != null && end > length)){
+  String? subStringOrNull(int start, [int? end]) {
+    if (start < 0 || (end != null && end > length)) {
       return null;
     }
     return substring(start, end);
@@ -83,10 +84,11 @@ extension StringExt on String{
     return '$before$to$after';
   }
 
-  bool _isURL(){
+  bool _isURL() {
     final regex = RegExp(
-        r'^((http|https|ftp)://)[\w-]+(\.[\w-]+)+([\w.,@?^=%&:/~+#-|]*[\w@?^=%&/~+#-])?$',
-        caseSensitive: false);
+      r'^((http|https|ftp)://)[\w-]+(\.[\w-]+)+([\w.,@?^=%&:/~+#-|]*[\w@?^=%&/~+#-])?$',
+      caseSensitive: false,
+    );
     return regex.hasMatch(this);
   }
 
@@ -97,25 +99,22 @@ extension StringExt on String{
   bool get isInt => int.tryParse(this) != null;
 }
 
-abstract class ListOrNull{
-  static List<T>? from<T>(Iterable<dynamic>? i){
+abstract class ListOrNull {
+  static List<T>? from<T>(Iterable<dynamic>? i) {
     return i == null ? null : List.from(i);
   }
 }
 
-abstract class MapOrNull{
-  static Map<K, V>? from<K, V>(Map<dynamic, dynamic>? i){
+abstract class MapOrNull {
+  static Map<K, V>? from<K, V>(Map<dynamic, dynamic>? i) {
     return i == null ? null : Map<K, V>.from(i);
   }
 }
 
-extension FutureExt<T> on Future<T>{
+extension FutureExt<T> on Future<T> {
   /// Wrap the future to make sure it will return at least the duration.
   Future<T> minTime(Duration duration) async {
-    var res = await Future.wait([
-      this,
-      Future.delayed(duration),
-    ]);
+    var res = await Future.wait([this, Future.delayed(duration)]);
     return res[0];
   }
 }

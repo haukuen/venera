@@ -92,8 +92,10 @@ class ImageFavoritesProvider
   }
 
   Future<Uint8List?> getImageFromLocal() async {
-    var localComic =
-        LocalManager().find(sourceKey, ComicType.fromKey(sourceKey));
+    var localComic = LocalManager().find(
+      sourceKey,
+      ComicType.fromKey(sourceKey),
+    );
     if (localComic == null) {
       return null;
     }
@@ -115,14 +117,20 @@ class ImageFavoritesProvider
     StreamController<ImageChunkEvent>? chunkEvents,
     void Function()? checkStop,
   ) async {
-    await for (var progress
-        in ImageDownloader.loadComicImage(imageKey, sourceKey, cid, eid)) {
+    await for (var progress in ImageDownloader.loadComicImage(
+      imageKey,
+      sourceKey,
+      cid,
+      eid,
+    )) {
       checkStop?.call();
       if (chunkEvents != null) {
-        chunkEvents.add(ImageChunkEvent(
-          cumulativeBytesLoaded: progress.currentBytes,
-          expectedTotalBytes: progress.totalBytes,
-        ));
+        chunkEvents.add(
+          ImageChunkEvent(
+            cumulativeBytesLoaded: progress.currentBytes,
+            expectedTotalBytes: progress.totalBytes,
+          ),
+        );
       }
       if (progress.imageBytes != null) {
         return progress.imageBytes!;

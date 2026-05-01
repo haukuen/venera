@@ -27,7 +27,10 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
     // resize if too large
     if (width * height > maxImagePixel) {
       final ratio = sqrt(maxImagePixel / (width * height));
-      return TargetImageSize(width: (width * ratio).round(), height: (height * ratio).round());
+      return TargetImageSize(
+        width: (width * ratio).round(),
+        height: (height * ratio).round(),
+      );
     }
     return TargetImageSize(width: width, height: height);
   }
@@ -113,8 +116,9 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
         if (data.length < 2 * 1024) {
           // data is too short, it's likely that the data is text, not image
           try {
-            var text =
-                const Utf8Codec(allowMalformed: false).decoder.convert(data);
+            var text = const Utf8Codec(
+              allowMalformed: false,
+            ).decoder.convert(data);
             throw Exception("Expected image data, but got text: $text");
           } catch (e) {
             // ignore

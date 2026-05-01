@@ -63,7 +63,10 @@ class IsolateJsEngine {
   IsolateJsEngine(Uint8List jsInit) {
     _receivePort = ReceivePort();
     _receivePort!.listen(_onMessage);
-    Isolate.spawn(_run, _IsolateJsEngineInitParam(_receivePort!.sendPort, jsInit));
+    Isolate.spawn(
+      _run,
+      _IsolateJsEngineInitParam(_receivePort!.sendPort, jsInit),
+    );
   }
 
   void _onMessage(dynamic message) {
@@ -96,8 +99,7 @@ class IsolateJsEngine {
     try {
       JsEngine.cacheJsInit(params.jsInit);
       await engine.init();
-    }
-    catch(e, s) {
+    } catch (e, s) {
       sendPort.send(Exception("Failed to initialize JS engine: $e\n$s"));
       return;
     }
@@ -106,7 +108,9 @@ class IsolateJsEngine {
         try {
           final jsFunc = engine.runCode(message.jsFunction);
           if (jsFunc is! JSInvokable) {
-            throw Exception("The provided code does not evaluate to a function.");
+            throw Exception(
+              "The provided code does not evaluate to a function.",
+            );
           }
           final result = jsFunc.invoke(message.args);
           jsFunc.free();

@@ -13,10 +13,7 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("Appearance".tl)),
-        _SettingPartTitle(
-          title: "Theme".tl,
-          icon: Icons.palette,
-        ),
+        _SettingPartTitle(title: "Theme".tl, icon: Icons.palette),
         SelectSetting(
           title: "Theme Mode".tl,
           settingKey: "theme_mode",
@@ -46,17 +43,11 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
             App.forceRebuild();
           },
         ).toSliver(),
-        _SettingPartTitle(
-          title: "Comic Display".tl,
-          icon: Icons.grid_view,
-        ),
+        _SettingPartTitle(title: "Comic Display".tl, icon: Icons.grid_view),
         SelectSetting(
           title: "Display mode of comic tile".tl,
           settingKey: "comicDisplayMode",
-          optionTranslation: {
-            "detailed": "Detailed".tl,
-            "brief": "Brief".tl,
-          },
+          optionTranslation: {"detailed": "Detailed".tl, "brief": "Brief".tl},
         ).toSliver(),
         _SliderSetting(
           title: "Size of comic tile".tl,

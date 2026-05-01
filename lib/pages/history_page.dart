@@ -88,15 +88,9 @@ class _HistoryPageState extends State<HistoryPage> {
         ComicType(int.parse(comic.sourceKey.split(':')[1])),
       );
     } else if (comic.sourceKey == 'local') {
-      HistoryManager().remove(
-        comic.id,
-        ComicType.local,
-      );
+      HistoryManager().remove(comic.id, ComicType.local);
     } else {
-      HistoryManager().remove(
-        comic.id,
-        ComicType(comic.sourceKey.hashCode),
-      );
+      HistoryManager().remove(comic.id, ComicType(comic.sourceKey.hashCode));
     }
   }
 
@@ -131,8 +125,7 @@ class _HistoryPageState extends State<HistoryPage> {
     int failed = 0;
     int skipped = 0;
 
-    await for (var progress
-        in HistoryManager().refreshAllHistoriesStream()) {
+    await for (var progress in HistoryManager().refreshAllHistoriesStream()) {
       if (isCanceled) {
         return;
       }
@@ -151,10 +144,10 @@ class _HistoryPageState extends State<HistoryPage> {
         message:
             "Refresh Completed: Success @success, Failed @failed, Skipped @skipped"
                 .tlParams({
-          'success': success,
-          'failed': failed,
-          'skipped': skipped,
-        }),
+                  'success': success,
+                  'failed': failed,
+                  'skipped': skipped,
+                }),
       );
     }
   }
@@ -202,78 +195,80 @@ class _HistoryPageState extends State<HistoryPage> {
       final items = groups[group];
       if (items == null || items.isEmpty) continue;
 
-      slivers.add(SliverToBoxAdapter(
-        child: Container(
-          padding: const EdgeInsets.only(
-            left: 16,
-            top: 16,
-            bottom: 4,
-          ),
-          child: Text(
-            group.label.tl,
-            style: ts.s14.copyWith(
-              fontWeight: FontWeight.w600,
-              color: context.colorScheme.onSurfaceVariant,
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Container(
+            padding: const EdgeInsets.only(left: 16, top: 16, bottom: 4),
+            child: Text(
+              group.label.tl,
+              style: ts.s14.copyWith(
+                fontWeight: FontWeight.w600,
+                color: context.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         ),
-      ));
+      );
 
-      slivers.add(_SliverGridComicsNoListener(
-        comics: items,
-        selections: selectedComics,
-        onLongPressed: null,
-        onTap: multiSelectMode
-            ? (c, heroID) {
-                setState(() {
-                  if (selectedComics.containsKey(c as History)) {
-                    selectedComics.remove(c);
-                  } else {
-                    selectedComics[c] = true;
-                  }
-                  if (selectedComics.isEmpty) {
-                    multiSelectMode = false;
-                  }
-                });
-              }
-            : null,
-        badgeBuilder: (c) {
-          return ComicSource.find(c.sourceKey)?.name;
-        },
-        menuBuilder: (c) {
-          return [
-            MenuEntry(
-              icon: Icons.refresh,
-              text: 'Refresh Info'.tl,
-              onClick: () {
-                _refreshHistory(c as History);
-              },
-            ),
-            MenuEntry(
-              icon: Icons.remove,
-              text: 'Remove'.tl,
-              color: context.colorScheme.error,
-              onClick: () {
-                _removeHistory(c as History);
-              },
-            ),
-          ];
-        },
-      ));
+      slivers.add(
+        _SliverGridComicsNoListener(
+          comics: items,
+          selections: selectedComics,
+          onLongPressed: null,
+          onTap: multiSelectMode
+              ? (c, heroID) {
+                  setState(() {
+                    if (selectedComics.containsKey(c as History)) {
+                      selectedComics.remove(c);
+                    } else {
+                      selectedComics[c] = true;
+                    }
+                    if (selectedComics.isEmpty) {
+                      multiSelectMode = false;
+                    }
+                  });
+                }
+              : null,
+          badgeBuilder: (c) {
+            return ComicSource.find(c.sourceKey)?.name;
+          },
+          menuBuilder: (c) {
+            return [
+              MenuEntry(
+                icon: Icons.refresh,
+                text: 'Refresh Info'.tl,
+                onClick: () {
+                  _refreshHistory(c as History);
+                },
+              ),
+              MenuEntry(
+                icon: Icons.remove,
+                text: 'Remove'.tl,
+                color: context.colorScheme.error,
+                onClick: () {
+                  _removeHistory(c as History);
+                },
+              ),
+            ];
+          },
+        ),
+      );
     }
 
     if (filtered.isEmpty) {
-      slivers.add(SliverToBoxAdapter(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 64),
-          child: Center(
-            child: Text(
-              _searchQuery.isEmpty ? 'No history'.tl : 'No results'.tl,
-              style: ts.withColor(context.colorScheme.onSurfaceVariant),
+      slivers.add(
+        SliverToBoxAdapter(
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 64),
+            child: Center(
+              child: Text(
+                _searchQuery.isEmpty ? 'No history'.tl : 'No results'.tl,
+                style: ts.withColor(context.colorScheme.onSurfaceVariant),
+              ),
             ),
           ),
         ),
-      ));
+      );
     }
 
     return slivers;
@@ -283,19 +278,19 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget build(BuildContext context) {
     List<Widget> selectActions = [
       IconButton(
-          icon: const Icon(Icons.select_all),
-          tooltip: "Select All".tl,
-          onPressed: selectAll
+        icon: const Icon(Icons.select_all),
+        tooltip: "Select All".tl,
+        onPressed: selectAll,
       ),
       IconButton(
-          icon: const Icon(Icons.deselect),
-          tooltip: "Deselect".tl,
-          onPressed: deSelect
+        icon: const Icon(Icons.deselect),
+        tooltip: "Deselect".tl,
+        onPressed: deSelect,
       ),
       IconButton(
-          icon: const Icon(Icons.flip),
-          tooltip: "Invert Selection".tl,
-          onPressed: invertSelection
+        icon: const Icon(Icons.flip),
+        tooltip: "Invert Selection".tl,
+        onPressed: invertSelection,
       ),
       IconButton(
         icon: const Icon(Icons.delete),
@@ -401,8 +396,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 message: multiSelectMode
                     ? "Cancel".tl
                     : _isSearchMode
-                        ? "Cancel".tl
-                        : "Back".tl,
+                    ? "Cancel".tl
+                    : "Back".tl,
                 child: IconButton(
                   onPressed: () {
                     if (multiSelectMode) {
@@ -427,39 +422,39 @@ class _HistoryPageState extends State<HistoryPage> {
               title: multiSelectMode
                   ? Text(selectedComics.length.toString())
                   : _isSearchMode
-                      ? SizedBox(
-                          height: 40,
-                          child: TextField(
-                            autofocus: true,
-                            style: ts.s16,
-                            decoration: InputDecoration(
-                              hintText: 'Search History'.tl,
-                              border: InputBorder.none,
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = value;
-                              });
-                            },
-                          ),
-                        )
-                      : Text('History'.tl),
+                  ? SizedBox(
+                      height: 40,
+                      child: TextField(
+                        autofocus: true,
+                        style: ts.s16,
+                        decoration: InputDecoration(
+                          hintText: 'Search History'.tl,
+                          border: InputBorder.none,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                    )
+                  : Text('History'.tl),
               actions: multiSelectMode
                   ? selectActions
                   : _isSearchMode
-                      ? [
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            tooltip: 'Cancel'.tl,
-                            onPressed: () {
-                              setState(() {
-                                _isSearchMode = false;
-                                _searchQuery = '';
-                              });
-                            },
-                          ),
-                        ]
-                      : normalActions,
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Cancel'.tl,
+                        onPressed: () {
+                          setState(() {
+                            _isSearchMode = false;
+                            _searchQuery = '';
+                          });
+                        },
+                      ),
+                    ]
+                  : normalActions,
             ),
             ..._buildGroupedSlivers(context),
           ],
@@ -471,17 +466,13 @@ class _HistoryPageState extends State<HistoryPage> {
   String getDescription(History h) {
     var res = "";
     if (h.ep >= 1) {
-      res += "Chapter @ep".tlParams({
-        "ep": h.ep,
-      });
+      res += "Chapter @ep".tlParams({"ep": h.ep});
     }
     if (h.page >= 1) {
       if (h.ep >= 1) {
         res += " - ";
       }
-      res += "Page @page".tlParams({
-        "page": h.page,
-      });
+      res += "Page @page".tlParams({"page": h.page});
     }
     return res;
   }
@@ -611,10 +602,9 @@ class _SliverGridComicsNoListenerState
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             color: isSelected
-                ? Theme.of(context)
-                    .colorScheme
-                    .secondaryContainer
-                    .toOpacity(0.72)
+                ? Theme.of(
+                    context,
+                  ).colorScheme.secondaryContainer.toOpacity(0.72)
                 : null,
             borderRadius: BorderRadius.circular(12),
           ),

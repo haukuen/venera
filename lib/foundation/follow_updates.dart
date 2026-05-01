@@ -12,7 +12,9 @@ class ComicUpdateResult {
 }
 
 Future<ComicUpdateResult> updateComic(
-    FavoriteItemWithUpdateInfo c, String folder) async {
+  FavoriteItemWithUpdateInfo c,
+  String folder,
+) async {
   int retries = 3;
   while (true) {
     try {
@@ -38,9 +40,8 @@ Future<ComicUpdateResult> updateComic(
         id: c.id,
         name: newInfo.title,
         coverPath: newInfo.cover,
-        author: newInfo.subTitle ??
-            newInfo.tags['author']?.firstOrNull ??
-            c.author,
+        author:
+            newInfo.subTitle ?? newInfo.tags['author']?.firstOrNull ?? c.author,
         type: c.type,
         tags: newTags,
       );
@@ -80,8 +81,14 @@ class UpdateProgress {
   final FavoriteItemWithUpdateInfo? comic;
   final String? errorMessage;
 
-  UpdateProgress(this.total, this.current, this.errors, this.updated,
-      [this.comic, this.errorMessage]);
+  UpdateProgress(
+    this.total,
+    this.current,
+    this.errors,
+    this.updated, [
+    this.comic,
+    this.errorMessage,
+  ]);
 }
 
 void updateFolderBase(
@@ -153,7 +160,16 @@ void updateFolderBase(
         if (result.errorMessage != null) {
           errors++;
         }
-        stream.add(UpdateProgress(total, current, errors, updated, comic, result.errorMessage));
+        stream.add(
+          UpdateProgress(
+            total,
+            current,
+            errors,
+            updated,
+            comic,
+            result.errorMessage,
+          ),
+        );
       }
     }();
     updateFutures.add(f);
@@ -168,7 +184,6 @@ void updateFolderBase(
   stream.close();
 }
 
-
 Stream<UpdateProgress> updateFolder(String folder, bool ignoreCheckTime) {
   var stream = StreamController<UpdateProgress>();
   updateFolderBase(folder, stream, ignoreCheckTime);
@@ -178,14 +193,18 @@ Stream<UpdateProgress> updateFolder(String folder, bool ignoreCheckTime) {
 Future<String> getUpdatedComicsAsJson(String folder) async {
   var comics = LocalFavoritesManager().getComicsWithUpdatesInfo(folder);
   var updatedComics = comics.where((c) => c.hasNewUpdate).toList();
-  var jsonList = updatedComics.map((c) => {
-    'id': c.id,
-    'name': c.name,
-    'coverUrl': c.coverPath,
-    'author': c.author,
-    'type': c.type.sourceKey,
-    'updateTime': c.updateTime,
-    'tags': c.tags,
-  }).toList();
+  var jsonList = updatedComics
+      .map(
+        (c) => {
+          'id': c.id,
+          'name': c.name,
+          'coverUrl': c.coverPath,
+          'author': c.author,
+          'type': c.type.sourceKey,
+          'updateTime': c.updateTime,
+          'tags': c.tags,
+        },
+      )
+      .toList();
   return jsonEncode(jsonList);
 }

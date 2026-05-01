@@ -3,12 +3,13 @@ part of 'favorites_page.dart';
 /// Open a dialog to create a new favorite folder.
 Future<void> newFolder() async {
   return showDialog(
-      context: App.rootContext,
-      builder: (context) {
-        var controller = TextEditingController();
-        String? error;
+    context: App.rootContext,
+    builder: (context) {
+      var controller = TextEditingController();
+      String? error;
 
-        return StatefulBuilder(builder: (context, setState) {
+      return StatefulBuilder(
+        builder: (context, setState) {
           return ContentDialog(
             title: "New Folder".tl,
             content: Column(
@@ -61,8 +62,10 @@ Future<void> newFolder() async {
               ),
             ],
           );
-        });
-      });
+        },
+      );
+    },
+  );
 }
 
 String? validateFolderName(String newFolderName) {
@@ -85,49 +88,53 @@ void addFavorite(List<Comic> comics) {
     builder: (context) {
       String? selectedFolder = appdata.settings['quickFavorite'];
 
-      return StatefulBuilder(builder: (context, setState) {
-        return ContentDialog(
-          title: "Select a folder".tl,
-          content: ListTile(
-            title: Text("Folder".tl),
-            trailing: Select(
-              current: selectedFolder,
-              values: folders,
-              minWidth: 112,
-              onTap: (v) {
-                setState(() {
-                  selectedFolder = folders[v];
-                });
-              },
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return ContentDialog(
+            title: "Select a folder".tl,
+            content: ListTile(
+              title: Text("Folder".tl),
+              trailing: Select(
+                current: selectedFolder,
+                values: folders,
+                minWidth: 112,
+                onTap: (v) {
+                  setState(() {
+                    selectedFolder = folders[v];
+                  });
+                },
+              ),
             ),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                if (selectedFolder != null) {
-                  for (var comic in comics) {
-                    LocalFavoritesManager().addComic(
-                      selectedFolder!,
-                      FavoriteItem(
-                        id: comic.id,
-                        name: comic.title,
-                        coverPath: comic.cover,
-                        author: comic.subtitle ?? '',
-                        type: ComicType((comic.sourceKey == 'local'
-                            ? 0
-                            : comic.sourceKey.hashCode)),
-                        tags: comic.tags ?? [],
-                      ),
-                    );
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  if (selectedFolder != null) {
+                    for (var comic in comics) {
+                      LocalFavoritesManager().addComic(
+                        selectedFolder!,
+                        FavoriteItem(
+                          id: comic.id,
+                          name: comic.title,
+                          coverPath: comic.cover,
+                          author: comic.subtitle ?? '',
+                          type: ComicType(
+                            (comic.sourceKey == 'local'
+                                ? 0
+                                : comic.sourceKey.hashCode),
+                          ),
+                          tags: comic.tags ?? [],
+                        ),
+                      );
+                    }
+                    context.pop();
                   }
-                  context.pop();
-                }
-              },
-              child: Text("Confirm".tl),
-            ),
-          ],
-        );
-      });
+                },
+                child: Text("Confirm".tl),
+              ),
+            ],
+          );
+        },
+      );
     },
   );
 }
@@ -162,7 +169,8 @@ Future<List<FavoriteItem>> updateComicsInfo(String folder) async {
           id: c.id,
           name: newInfo.title,
           coverPath: newInfo.cover,
-          author: newInfo.subTitle ??
+          author:
+              newInfo.subTitle ??
               newInfo.tags['author']?.firstOrNull ??
               c.author,
           type: c.type,
@@ -203,9 +211,7 @@ Future<List<FavoriteItem>> updateComicsInfo(String folder) async {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: value / comics.length,
-                ),
+                LinearProgressIndicator(value: value / comics.length),
                 const SizedBox(height: 4),
                 Text("$value/${comics.length}"),
                 const SizedBox(height: 4),
@@ -240,12 +246,17 @@ Future<List<FavoriteItem>> updateComicsInfo(String folder) async {
 
     for (var i = 0; i < maxConcurrency; i++) {
       if (index + i >= comics.length) break;
-      futures.add(updateSingleComic(index + i).then((v) {
-        finished.value++;
-      }, onError: (_) {
-        errors++;
-        finished.value++;
-      }));
+      futures.add(
+        updateSingleComic(index + i).then(
+          (v) {
+            finished.value++;
+          },
+          onError: (_) {
+            errors++;
+            finished.value++;
+          },
+        ),
+      );
     }
 
     await Future.wait(futures);
@@ -260,44 +271,46 @@ Future<void> sortFolders() async {
 
   await showPopUpWidget(
     App.rootContext,
-    StatefulBuilder(builder: (context, setState) {
-      return PopUpWidgetScaffold(
-        title: "Sort".tl,
-        tailing: [
-          Tooltip(
-            message: "Help".tl,
-            child: IconButton(
-              icon: const Icon(Icons.help_outline),
-              onPressed: () {
-                showInfoDialog(
-                  context: context,
-                  title: "Reorder".tl,
-                  content: "Long press and drag to reorder.".tl,
-                );
-              },
+    StatefulBuilder(
+      builder: (context, setState) {
+        return PopUpWidgetScaffold(
+          title: "Sort".tl,
+          tailing: [
+            Tooltip(
+              message: "Help".tl,
+              child: IconButton(
+                icon: const Icon(Icons.help_outline),
+                onPressed: () {
+                  showInfoDialog(
+                    context: context,
+                    title: "Reorder".tl,
+                    content: "Long press and drag to reorder.".tl,
+                  );
+                },
+              ),
             ),
-          )
-        ],
-        body: ReorderableListView.builder(
-          onReorder: (oldIndex, newIndex) {
-            if (oldIndex < newIndex) {
-              newIndex--;
-            }
-            setState(() {
-              var item = folders.removeAt(oldIndex);
-              folders.insert(newIndex, item);
-            });
-          },
-          itemCount: folders.length,
-          itemBuilder: (context, index) {
-            return ListTile(
-              key: ValueKey(folders[index]),
-              title: Text(folders[index]),
-            );
-          },
-        ),
-      );
-    }),
+          ],
+          body: ReorderableListView.builder(
+            onReorder: (oldIndex, newIndex) {
+              if (oldIndex < newIndex) {
+                newIndex--;
+              }
+              setState(() {
+                var item = folders.removeAt(oldIndex);
+                folders.insert(newIndex, item);
+              });
+            },
+            itemCount: folders.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                key: ValueKey(folders[index]),
+                title: Text(folders[index]),
+              );
+            },
+          ),
+        );
+      },
+    ),
   );
 
   LocalFavoritesManager().updateOrder(folders);
@@ -319,8 +332,11 @@ Future<void> importNetworkFolder(
   var resultName = folder ?? comicSource.name;
   var exists = LocalFavoritesManager().existsFolder(resultName);
   if (exists) {
-    if (!LocalFavoritesManager()
-        .isLinkedToNetworkFolder(resultName, source, folderID ?? "")) {
+    if (!LocalFavoritesManager().isLinkedToNetworkFolder(
+      resultName,
+      source,
+      folderID ?? "",
+    )) {
       App.rootContext.showMessage(message: "Folder already exists".tl);
       return;
     }
@@ -352,24 +368,30 @@ Future<void> importNetworkFolder(
       try {
         if (comicSource.favoriteData?.loadComic != null) {
           // 从旧到新的情况下, 假设有10页, 更新3页, 则从第8页开始, 8, 9, 10 三页
-          next ??=
-              isOldToNewSort ? (maxPage - updatePageNum + 1).toString() : '1';
+          next ??= isOldToNewSort
+              ? (maxPage - updatePageNum + 1).toString()
+              : '1';
           var page = int.parse(next!);
           var res = await comicSource.favoriteData!.loadComic!(page, folderID);
           var count = 0;
           receivedComics += res.data.length;
           for (var c in res.data) {
-            if (!LocalFavoritesManager()
-                .comicExists(resultName, c.id, ComicType(source.hashCode))) {
+            if (!LocalFavoritesManager().comicExists(
+              resultName,
+              c.id,
+              ComicType(source.hashCode),
+            )) {
               count++;
-              comics.add(FavoriteItem(
-                id: c.id,
-                name: c.title,
-                coverPath: c.cover,
-                type: ComicType(source.hashCode),
-                author: c.subtitle ?? '',
-                tags: c.tags ?? [],
-              ));
+              comics.add(
+                FavoriteItem(
+                  id: c.id,
+                  name: c.title,
+                  coverPath: c.cover,
+                  type: ComicType(source.hashCode),
+                  author: c.subtitle ?? '',
+                  tags: c.tags ?? [],
+                ),
+              );
             }
           }
           requestCount++;
@@ -385,17 +407,22 @@ Future<void> importNetworkFolder(
           var count = 0;
           receivedComics += res.data.length;
           for (var c in res.data) {
-            if (!LocalFavoritesManager()
-                .comicExists(resultName, c.id, ComicType(source.hashCode))) {
+            if (!LocalFavoritesManager().comicExists(
+              resultName,
+              c.id,
+              ComicType(source.hashCode),
+            )) {
               count++;
-              comics.add(FavoriteItem(
-                id: c.id,
-                name: c.title,
-                coverPath: c.cover,
-                type: ComicType(source.hashCode),
-                author: c.subtitle ?? '',
-                tags: c.tags ?? [],
-              ));
+              comics.add(
+                FavoriteItem(
+                  id: c.id,
+                  name: c.title,
+                  coverPath: c.cover,
+                  type: ComicType(source.hashCode),
+                  author: c.subtitle ?? '',
+                  tags: c.tags ?? [],
+                ),
+              );
             }
           }
           requestCount++;
@@ -440,23 +467,23 @@ Future<void> importNetworkFolder(
             title: isFinished
                 ? "Finished".tl
                 : isErrored()
-                    ? "Error".tl
-                    : "Importing".tl,
+                ? "Error".tl
+                : "Importing".tl,
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                LinearProgressIndicator(
-                  value: isFinished ? 1 : null,
-                ),
+                LinearProgressIndicator(value: isFinished ? 1 : null),
                 const SizedBox(height: 4),
-                Text("Imported @a comics, loaded @b pages, received @c comics"
-                    .tlParams({
-                  "a": current,
-                  "b": requestCount,
-                  "c": receivedComics,
-                })),
+                Text(
+                  "Imported @a comics, loaded @b pages, received @c comics"
+                      .tlParams({
+                        "a": current,
+                        "b": requestCount,
+                        "c": receivedComics,
+                      }),
+                ),
                 const SizedBox(height: 4),
                 if (isErrored()) Text("Error: $errorMsg"),
               ],

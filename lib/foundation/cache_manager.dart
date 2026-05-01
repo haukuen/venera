@@ -35,10 +35,13 @@ class CacheManager {
           var segments = file.uri.pathSegments;
           var name = segments.last;
           var dir = segments.elementAtOrNull(segments.length - 2) ?? "*";
-          var res = db.select('''
+          var res = db.select(
+            '''
             SELECT * FROM cache
             WHERE dir = ? AND name = ?
-          ''', [dir, name]);
+          ''',
+            [dir, name],
+          );
           if (res.isEmpty) {
             unmanagedFiles.add(file.path);
           } else {
@@ -46,10 +49,7 @@ class CacheManager {
           }
         }
       }
-      return {
-        'totalSize': totalSize,
-        'unmanagedFiles': unmanagedFiles,
-      };
+      return {'totalSize': totalSize, 'unmanagedFiles': unmanagedFiles};
     });
     // delete unmanaged files
     // Only modify the database in the main isolate to avoid deadlock
@@ -61,10 +61,13 @@ class CacheManager {
       var segments = file.uri.pathSegments;
       var name = segments.last;
       var dir = segments.elementAtOrNull(segments.length - 2) ?? "*";
-      CacheManager()._db.execute('''
+      CacheManager()._db.execute(
+        '''
         DELETE FROM cache
         WHERE dir = ? AND name = ?
-      ''', [dir, name]);
+      ''',
+        [dir, name],
+      );
     }
     return res['totalSize'] as int;
   }
@@ -96,8 +99,11 @@ class CacheManager {
   }
 
   /// Write cache to disk.
-  Future<void> writeCache(String key, List<int> data,
-      [int duration = 7 * 24 * 60 * 60 * 1000]) async {
+  Future<void> writeCache(
+    String key,
+    List<int> data, [
+    int duration = 7 * 24 * 60 * 60 * 1000,
+  ]) async {
     await delete(key);
     this.dir++;
     this.dir %= 100;
@@ -107,9 +113,12 @@ class CacheManager {
     await file.create(recursive: true);
     await file.writeAsBytes(data);
     var expires = DateTime.now().millisecondsSinceEpoch + duration;
-    _db.execute('''
+    _db.execute(
+      '''
       INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
-    ''', [key, dir.toString(), name, expires]);
+    ''',
+      [key, dir.toString(), name, expires],
+    );
     if (_currentSize != null) {
       _currentSize = _currentSize! + data.length;
     }
@@ -121,10 +130,13 @@ class CacheManager {
   /// If cache is not found, it will return null.
   /// If cache is found, it will return the file, and update the expires time.
   Future<File?> findCache(String key) async {
-    var res = _db.select('''
+    var res = _db.select(
+      '''
       SELECT * FROM cache
       WHERE key = ?
-    ''', [key]);
+    ''',
+      [key],
+    );
     if (res.isEmpty) {
       return null;
     }
@@ -136,10 +148,13 @@ class CacheManager {
     var now = DateTime.now().millisecondsSinceEpoch;
     if (expires < now) {
       // expired
-      _db.execute('''
+      _db.execute(
+        '''
         DELETE FROM cache
         WHERE key = ?
-      ''', [key]);
+      ''',
+        [key],
+      );
       if (await file.exists()) {
         await file.delete();
       }
@@ -148,17 +163,23 @@ class CacheManager {
     if (await file.exists()) {
       // update time
       var expires = now + 7 * 24 * 60 * 60 * 1000;
-      _db.execute('''
+      _db.execute(
+        '''
         UPDATE cache
         SET expires = ?
         WHERE key = ?
-      ''', [expires, key]);
+      ''',
+        [expires, key],
+      );
       return file;
     } else {
-      _db.execute('''
+      _db.execute(
+        '''
         DELETE FROM cache
         WHERE key = ?
-      ''', [key]);
+      ''',
+        [key],
+      );
     }
     return null;
   }
@@ -181,10 +202,13 @@ class CacheManager {
       return;
     }
     _isChecking = true;
-    var res = _db.select('''
+    var res = _db.select(
+      '''
       SELECT * FROM cache
       WHERE expires < ?
-    ''', [DateTime.now().millisecondsSinceEpoch]);
+    ''',
+      [DateTime.now().millisecondsSinceEpoch],
+    );
     for (var row in res) {
       var dir = row[1] as String;
       var name = row[2] as String;
@@ -196,10 +220,13 @@ class CacheManager {
       }
     }
     if (res.isNotEmpty) {
-      _db.execute('''
+      _db.execute(
+        '''
       DELETE FROM cache
       WHERE expires < ?
-    ''', [DateTime.now().millisecondsSinceEpoch]);
+    ''',
+        [DateTime.now().millisecondsSinceEpoch],
+      );
     }
 
     while (_currentSize != null && _currentSize! > _limitSize) {
@@ -223,19 +250,25 @@ class CacheManager {
         if (await file.exists()) {
           var size = await file.length();
           await file.delete();
-          _db.execute('''
+          _db.execute(
+            '''
             DELETE FROM cache
             WHERE key = ?
-          ''', [key]);
+          ''',
+            [key],
+          );
           _currentSize = _currentSize! - size;
           if (_currentSize! <= _limitSize) {
             break;
           }
         } else {
-          _db.execute('''
+          _db.execute(
+            '''
             DELETE FROM cache
             WHERE key = ?
-          ''', [key]);
+          ''',
+            [key],
+          );
         }
       }
     }
@@ -244,10 +277,13 @@ class CacheManager {
 
   /// Delete cache by key.
   Future<void> delete(String key) async {
-    var res = _db.select('''
+    var res = _db.select(
+      '''
       SELECT * FROM cache
       WHERE key = ?
-    ''', [key]);
+    ''',
+      [key],
+    );
     if (res.isEmpty) {
       return;
     }
@@ -260,10 +296,13 @@ class CacheManager {
       fileSize = await file.length();
       await file.delete();
     }
-    _db.execute('''
+    _db.execute(
+      '''
       DELETE FROM cache
       WHERE key = ?
-    ''', [key]);
+    ''',
+      [key],
+    );
     if (_currentSize != null) {
       _currentSize = _currentSize! - fileSize;
     }

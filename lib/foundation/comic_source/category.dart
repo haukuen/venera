@@ -28,10 +28,7 @@ class CategoryButtonData {
 
   final void Function() onTap;
 
-  const CategoryButtonData({
-    required this.label,
-    required this.onTap,
-  });
+  const CategoryButtonData({required this.label, required this.onTap});
 }
 
 class CategoryItem {
@@ -90,11 +87,7 @@ class RandomCategoryPart extends BaseCategoryPart {
   List<CategoryItem> get categories => _categories();
 
   /// A [BaseCategoryPart] that show a part of random tags on category page.
-  const RandomCategoryPart(
-    this.title,
-    this.all,
-    this.randomNumber,
-  );
+  const RandomCategoryPart(this.title, this.all, this.randomNumber);
 }
 
 class DynamicCategoryPart extends BaseCategoryPart {

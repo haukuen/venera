@@ -5,25 +5,30 @@ https://github.com/EhTagTranslation/Database/tree/master/database
 繁体中文由 @NeKoOuO (https://github.com/NeKoOuO) 提供
 */
 
-
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/opencc.dart';
 
-extension TagsTranslation on String{
+extension TagsTranslation on String {
   static final Map<String, Map<String, String>> _data = {};
 
-  static Future<void> readData() async{
+  static Future<void> readData() async {
     var fileName = App.locale.countryCode == 'TW'
         ? "assets/tags_tw.json"
         : "assets/tags.json";
     var data = await rootBundle.load(fileName);
-    List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-    const JsonDecoder().convert(const Utf8Decoder().convert(bytes)).forEach((key, value){
+    List<int> bytes = data.buffer.asUint8List(
+      data.offsetInBytes,
+      data.lengthInBytes,
+    );
+    const JsonDecoder().convert(const Utf8Decoder().convert(bytes)).forEach((
+      key,
+      value,
+    ) {
       _data[key] = {};
-      value.forEach((key1, value1){
+      value.forEach((key1, value1) {
         _data[key]?[key1] = value1;
       });
     });
@@ -45,16 +50,17 @@ extension TagsTranslation on String{
   }
 
   /// 对tag进行处理后进行翻译: 代表'或'的分割符'|', namespace.
-  static String _translateTags(String tag){
+  static String _translateTags(String tag) {
     if (tag.contains('|')) {
       var splits = tag.split('|');
-      var result = enTagsTranslations[splits[0].trim()]
-          ?? enTagsTranslations[splits[1].trim()];
+      var result =
+          enTagsTranslations[splits[0].trim()] ??
+          enTagsTranslations[splits[1].trim()];
       if (result != null) return result;
       return convertIfNeeded(tag);
-    } else if(tag.contains(':')) {
+    } else if (tag.contains(':')) {
       var splits = tag.split(':');
-      if(_haveNamespace(splits[0])) {
+      if (_haveNamespace(splits[0])) {
         return translationTagWithNamespace(splits[1], splits[0]);
       } else {
         return convertIfNeeded(tag);
@@ -77,7 +83,7 @@ extension TagsTranslation on String{
   }
 
   static String translateTag(String tag) {
-    if(tag.contains(':') && tag.indexOf(':') == tag.lastIndexOf(':')) {
+    if (tag.contains(':') && tag.indexOf(':') == tag.lastIndexOf(':')) {
       var [namespace, text] = tag.split(':');
       return translationTagWithNamespace(text, namespace);
     } else {
@@ -85,12 +91,12 @@ extension TagsTranslation on String{
     }
   }
 
-  static String translationTagWithNamespace(String text, String namespace){
+  static String translationTagWithNamespace(String text, String namespace) {
     text = text.toLowerCase();
-    if(text != "reclass" && text.endsWith('s')){
+    if (text != "reclass" && text.endsWith('s')) {
       text.replaceLast('s', '');
     }
-    var result = switch(namespace){
+    var result = switch (namespace) {
       "male" => maleTags[text],
       "female" => femaleTags[text],
       "mixed" => mixedTags[text],
@@ -102,27 +108,28 @@ extension TagsTranslation on String{
       "reclass" => reclassTags[text],
       "language" => languageTranslations[text],
       "artist" => artistTags[text],
-      _ => text.translateTagsToCN
+      _ => text.translateTagsToCN,
     };
     return result ?? convertIfNeeded(text);
   }
 
-  String _categoryTextDynamic(String c){
-    if(App.locale.languageCode == "zh"){
+  String _categoryTextDynamic(String c) {
+    if (App.locale.languageCode == "zh") {
       return translateTagsCategoryToCN;
-    }else{
+    } else {
       return this;
     }
   }
 
   String get categoryTextDynamic => _categoryTextDynamic(this);
 
-  String get translateTagsCategoryToCN => tagsCategoryTranslations[this]??this;
+  String get translateTagsCategoryToCN =>
+      tagsCategoryTranslations[this] ?? this;
 
-  get tagsCategoryTranslations => switch(App.locale.countryCode){
+  get tagsCategoryTranslations => switch (App.locale.countryCode) {
     "CN" => tagsCategoryTranslationsCN,
     "TW" => tagsCategoryTranslationsTW,
-    _ => tagsCategoryTranslationsCN
+    _ => tagsCategoryTranslationsCN,
   };
 
   static const tagsCategoryTranslationsCN = {
@@ -144,7 +151,7 @@ extension TagsTranslation on String{
     "Tags": "标签",
     "Parodies": "原作",
     "Categories": "分类",
-    "Time": "时间"
+    "Time": "时间",
   };
 
   static const tagsCategoryTranslationsTW = {
@@ -166,30 +173,34 @@ extension TagsTranslation on String{
     "Tags": "標籤",
     "Parodies": "原作",
     "Categories": "分類",
-    "Time": "時間"
+    "Time": "時間",
   };
 
   static Map<String, String> get maleTags => _data["male"] ?? const {};
 
   static Map<String, String> get femaleTags => _data["female"] ?? const {};
 
-  static Map<String, String> get languageTranslations => _data["language"] ?? const {};
+  static Map<String, String> get languageTranslations =>
+      _data["language"] ?? const {};
 
   static Map<String, String> get parodyTags => _data["parody"] ?? const {};
 
-  static Map<String, String> get characterTranslations => _data["character"] ?? const {};
+  static Map<String, String> get characterTranslations =>
+      _data["character"] ?? const {};
 
   static Map<String, String> get otherTags => _data["other"] ?? const {};
 
   static Map<String, String> get mixedTags => _data["mixed"] ?? const {};
 
-  static Map<String, String> get characterTags => _data["character"] ?? const {};
+  static Map<String, String> get characterTags =>
+      _data["character"] ?? const {};
 
   static Map<String, String> get artistTags => _data["artist"] ?? const {};
 
   static Map<String, String> get groupTags => _data["group"] ?? const {};
 
-  static Map<String, String> get cosplayerTags => _data["cosplayer"] ?? const {};
+  static Map<String, String> get cosplayerTags =>
+      _data["cosplayer"] ?? const {};
 
   static Map<String, String> get reclassTags => _data["reclass"] ?? const {};
 
@@ -197,25 +208,39 @@ extension TagsTranslation on String{
   ///
   /// Not include artists and group
   static MultipleMap<String, String> get enTagsTranslations => MultipleMap([
-    maleTags, femaleTags, languageTranslations, parodyTags, characterTranslations,
-    otherTags, mixedTags
+    maleTags,
+    femaleTags,
+    languageTranslations,
+    parodyTags,
+    characterTranslations,
+    otherTags,
+    mixedTags,
   ]);
 }
 
-enum TranslationType{
-  female, male, mixed, language, other, group, artist, cosplayer, parody,
-  character, reclass
+enum TranslationType {
+  female,
+  male,
+  mixed,
+  language,
+  other,
+  group,
+  artist,
+  cosplayer,
+  parody,
+  character,
+  reclass,
 }
 
-class MultipleMap<S, T>{
+class MultipleMap<S, T> {
   final List<Map<S, T>> maps;
 
   MultipleMap(this.maps);
 
-  T? operator[](S key) {
-    for (var map in maps){
+  T? operator [](S key) {
+    for (var map in maps) {
       var value = map[key];
-      if(value != null){
+      if (value != null) {
         return value;
       }
     }

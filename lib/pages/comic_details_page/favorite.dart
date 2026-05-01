@@ -177,7 +177,10 @@ class _NetworkSectionState extends State<_NetworkSection> {
   void initState() {
     super.initState();
     localIsFavorite = widget.isFavorite;
-    _skeletonWidths = List.generate(3, (_) => 0.3 + math.Random().nextDouble() * 0.5);
+    _skeletonWidths = List.generate(
+      3,
+      (_) => 0.3 + math.Random().nextDouble() * 0.5,
+    );
     if (widget.comicSource.favoriteData!.loadFolders != null) {
       loadFolders();
     } else {
@@ -371,9 +374,12 @@ class _NetworkSectionState extends State<_NetworkSection> {
           var id = entry.key;
           var isAdded = addedFolders.contains(id);
           // When `singleFolderForSingleComic` is `false`, all add and remove buttons are clickable.
-          // When `singleFolderForSingleComic` is `true`, the remove button is always clickable, 
+          // When `singleFolderForSingleComic` is `true`, the remove button is always clickable,
           // while the add button is only clickable if the comic has not been added to any list.
-          var enabled = !(widget.comicSource.favoriteData!.singleFolderForSingleComic && addedFolders.isNotEmpty && !isAdded);
+          var enabled =
+              !(widget.comicSource.favoriteData!.singleFolderForSingleComic &&
+                  addedFolders.isNotEmpty &&
+                  !isAdded);
 
           return ListTile(
             title: Row(
@@ -426,7 +432,8 @@ class _NetworkSectionState extends State<_NetworkSection> {
                         // notify parent so page state updates when closing and reopening panel
                         widget.onFavorite(addedFolders.isNotEmpty);
                         context.showMessage(message: "Success".tl);
-                        if (appdata.settings['autoCloseFavoritePanel'] ?? false) {
+                        if (appdata.settings['autoCloseFavoritePanel'] ??
+                            false) {
                           context.pop();
                         }
                       } else {
@@ -594,7 +601,7 @@ class _HoverButtonState extends State<_HoverButton> {
     final removeHoverColor = Color.lerp(removeColor, Colors.black, 0.2)!;
     final addColor = context.colorScheme.primary;
     final addHoverColor = Color.lerp(addColor, Colors.black, 0.2)!;
-    
+
     return MouseRegion(
       onEnter: widget.enabled ? (_) => setState(() => isHovered = true) : null,
       onExit: widget.enabled ? (_) => setState(() => isHovered = false) : null,

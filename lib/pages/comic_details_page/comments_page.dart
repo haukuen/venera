@@ -3,7 +3,7 @@ part of 'comic_page.dart';
 bool _shouldBlockComment(Comment comment) {
   var blockedWords = appdata.settings["blockedCommentWords"] as List;
   if (blockedWords.isEmpty) return false;
-  
+
   var content = comment.content.toLowerCase();
   for (var word in blockedWords) {
     if (content.contains(word.toString().toLowerCase())) {
@@ -42,14 +42,20 @@ class _CommentsPageState extends State<CommentsPage> {
 
   void firstLoad() async {
     var res = await widget.source.commentsLoader!(
-        widget.data.comicId, widget.data.subId, 1, widget.replyComment?.id);
+      widget.data.comicId,
+      widget.data.subId,
+      1,
+      widget.replyComment?.id,
+    );
     if (res.error) {
       setState(() {
         _error = res.errorMessage;
         _loading = false;
       });
     } else if (mounted) {
-      var filteredComments = res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments = filteredComments;
         _loading = false;
@@ -68,7 +74,9 @@ class _CommentsPageState extends State<CommentsPage> {
     if (res.error) {
       context.showMessage(message: res.errorMessage ?? "Unknown Error");
     } else {
-      var filteredComments = res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments!.addAll(filteredComments);
         _page++;
@@ -83,10 +91,7 @@ class _CommentsPageState extends State<CommentsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: Appbar(
-        title: Text("Comments".tl),
-        style: AppbarStyle.shadow,
-      ),
+      appBar: Appbar(title: Text("Comments".tl), style: AppbarStyle.shadow),
       body: buildBody(context),
     );
   }
@@ -94,9 +99,7 @@ class _CommentsPageState extends State<CommentsPage> {
   Widget buildBody(BuildContext context) {
     if (_loading) {
       firstLoad();
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     } else if (_error != null) {
       return NetworkError(
         message: _error!,
@@ -148,10 +151,7 @@ class _CommentsPageState extends State<CommentsPage> {
                                   ),
                                 ),
                               ),
-                              child: Text(
-                                "Replies".tl,
-                                style: ts.s18,
-                              ),
+                              child: Text("Replies".tl, style: ts.s18),
                             ),
                           ],
                         );
@@ -181,7 +181,7 @@ class _CommentsPageState extends State<CommentsPage> {
               },
             ),
           ),
-          buildBottom(context)
+          buildBottom(context),
         ],
       );
     }
@@ -189,9 +189,7 @@ class _CommentsPageState extends State<CommentsPage> {
 
   Widget buildBottom(BuildContext context) {
     if (widget.source.sendCommentFunc == null) {
-      return const SizedBox(
-        height: 0,
-      );
+      return const SizedBox(height: 0);
     }
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
@@ -213,9 +211,10 @@ class _CommentsPageState extends State<CommentsPage> {
               child: TextField(
                 controller: controller,
                 decoration: InputDecoration(
-                    border: InputBorder.none,
-                    isCollapsed: true,
-                    hintText: "Comment".tl),
+                  border: InputBorder.none,
+                  isCollapsed: true,
+                  hintText: "Comment".tl,
+                ),
                 minLines: 1,
                 maxLines: 5,
               ),
@@ -226,9 +225,7 @@ class _CommentsPageState extends State<CommentsPage> {
                 child: SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               )
             else
@@ -241,10 +238,11 @@ class _CommentsPageState extends State<CommentsPage> {
                     sending = true;
                   });
                   var b = await widget.source.sendCommentFunc!(
-                      widget.data.comicId,
-                      widget.data.subId,
-                      controller.text,
-                      widget.replyComment?.id);
+                    widget.data.comicId,
+                    widget.data.subId,
+                    controller.text,
+                    widget.replyComment?.id,
+                  );
                   if (!b.error) {
                     controller.text = "";
                     setState(() {
@@ -265,7 +263,7 @@ class _CommentsPageState extends State<CommentsPage> {
                   Icons.send,
                   color: Theme.of(context).colorScheme.secondary,
                 ),
-              )
+              ),
           ],
         ).paddingLeft(16).paddingRight(4),
       ),
@@ -318,8 +316,9 @@ class _CommentTileState extends State<_CommentTile> {
               height: 36,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  color: Theme.of(context).colorScheme.secondaryContainer),
+                borderRadius: BorderRadius.circular(18),
+                color: Theme.of(context).colorScheme.secondaryContainer,
+              ),
               child: widget.comment.avatar == null
                   ? null
                   : AnimatedImage(
@@ -333,10 +332,7 @@ class _CommentTileState extends State<_CommentTile> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.comment.userName,
-                  style: ts.bold,
-                ),
+                Text(widget.comment.userName, style: ts.bold),
                 if (widget.comment.time != null)
                   Text(widget.comment.time!, style: ts.s12),
                 const SizedBox(height: 4),
@@ -344,7 +340,7 @@ class _CommentTileState extends State<_CommentTile> {
                 buildActions(),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

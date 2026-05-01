@@ -40,10 +40,12 @@ class LocalFavoriteImageProvider
     checkStop();
     await for (var progress in ImageDownloader.loadThumbnail(url, sourceKey)) {
       checkStop();
-      chunkEvents.add(ImageChunkEvent(
-        cumulativeBytesLoaded: progress.currentBytes,
-        expectedTotalBytes: progress.totalBytes,
-      ));
+      chunkEvents.add(
+        ImageChunkEvent(
+          cumulativeBytesLoaded: progress.currentBytes,
+          expectedTotalBytes: progress.totalBytes,
+        ),
+      );
       if (progress.imageBytes != null) {
         var data = progress.imageBytes!;
         await file.writeAsBytes(data);
@@ -55,7 +57,8 @@ class LocalFavoriteImageProvider
 
   @override
   Future<LocalFavoriteImageProvider> obtainKey(
-      ImageConfiguration configuration) {
+    ImageConfiguration configuration,
+  ) {
     return SynchronousFuture(this);
   }
 
