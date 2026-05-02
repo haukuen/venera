@@ -310,24 +310,27 @@ class _ReaderState extends State<Reader>
       return;
     }
     if (event is KeyDownEvent) {
-      if (event.logicalKey == LogicalKeyboardKey.home) {
+      final key = event.logicalKey;
+      if (key == LogicalKeyboardKey.home) {
         toPage(1);
-      } else if (event.logicalKey == LogicalKeyboardKey.end) {
+        return;
+      } else if (key == LogicalKeyboardKey.end) {
         toPage(maxPage);
-      } else if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+        return;
+      } else if (key == LogicalKeyboardKey.pageUp) {
         toPrevChapter(toLastPage: true);
-      } else if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+        return;
+      } else if (key == LogicalKeyboardKey.pageDown) {
         toNextChapter();
-      } else if (event.logicalKey == LogicalKeyboardKey.keyB) {
+        return;
+      } else if (key == LogicalKeyboardKey.keyB) {
         if (!isLoading) {
           _scaffoldState?.addImageFavorite();
         }
-      } else {
-        _imageViewController?.handleKeyEvent(event);
+        return;
       }
-    } else {
-      _imageViewController?.handleKeyEvent(event);
     }
+    _imageViewController?.handleKeyEvent(event);
   }
 
   @override
