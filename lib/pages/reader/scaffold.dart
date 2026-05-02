@@ -96,6 +96,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      context.reader._scaffoldState = this;
       final show =
           appdata.settings.getReaderSetting(
             context.reader.cid,
@@ -112,6 +113,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
 
   @override
   void dispose() {
+    context.reader._scaffoldState = null;
     sliderFocus.dispose();
     super.dispose();
   }
