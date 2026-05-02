@@ -12,13 +12,11 @@ Future<void> writeImageToClipboard(Uint8List imageBytes) async {
     await channel.invokeMethod("writeImageToClipboard", {
       "width": frame.image.width,
       "height": frame.image.height,
-      "data": Uint8List.view(data!.buffer)
+      "data": Uint8List.view(data!.buffer),
     });
     image.dispose();
   } else if (Platform.isMacOS) {
-    await channel.invokeMethod("writeImageToClipboard", {
-      "data": imageBytes,
-    });
+    await channel.invokeMethod("writeImageToClipboard", {"data": imageBytes});
   } else {
     throw UnsupportedError("Clipboard image is not supported on this platform");
   }

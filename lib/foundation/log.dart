@@ -63,7 +63,7 @@ class Log {
       case LogLevel.warning:
         printWarning(content);
       case LogLevel.info:
-        if(kDebugMode) {
+        if (kDebugMode) {
           debugPrint(content);
         }
     }
@@ -75,12 +75,13 @@ class Log {
     }
 
     _logs.add(newLog);
-    if(_file != null) {
+    if (_file != null) {
       _file!.write(newLog.toString());
     }
     if (_logs.length > maxLogNumber) {
       var res = _logs.remove(
-          _logs.firstWhereOrNull((element) => element.level == LogLevel.info));
+        _logs.firstWhereOrNull((element) => element.level == LogLevel.info),
+      );
       if (!res) {
         _logs.removeAt(0);
       }
@@ -97,7 +98,7 @@ class Log {
 
   static error(String title, Object content, [Object? stackTrace]) {
     var info = content.toString();
-    if(stackTrace != null) {
+    if (stackTrace != null) {
       info += "\n${stackTrace.toString()}";
     }
     addLog(LogLevel.error, title, info);

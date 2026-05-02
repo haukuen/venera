@@ -1,10 +1,7 @@
 part of 'comic_page.dart';
 
 class _CommentsPart extends StatefulWidget {
-  const _CommentsPart({
-    required this.comments,
-    required this.showMore,
-  });
+  const _CommentsPart({required this.comments, required this.showMore});
 
   final List<Comment> comments;
 
@@ -89,9 +86,7 @@ class _CommentsPartState extends State<_CommentsPart> {
             ],
           ),
         ),
-        const SliverToBoxAdapter(
-          child: Divider(),
-        ),
+        const SliverToBoxAdapter(child: Divider()),
       ],
     );
   }

@@ -28,13 +28,14 @@ class CloudflareException implements DioException {
   }
 
   @override
-  DioException copyWith(
-      {RequestOptions? requestOptions,
-      Response<dynamic>? response,
-      DioExceptionType? type,
-      Object? error,
-      StackTrace? stackTrace,
-      String? message}) {
+  DioException copyWith({
+    RequestOptions? requestOptions,
+    Response<dynamic>? response,
+    DioExceptionType? type,
+    Object? error,
+    StackTrace? stackTrace,
+    String? message,
+  }) {
     return this;
   }
 
@@ -112,7 +113,9 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
       uri,
       List<io.Cookie>.generate(cookies.length, (index) {
         var cookie = io.Cookie(
-            cookies.keys.elementAt(index), cookies.values.elementAt(index));
+          cookies.keys.elementAt(index),
+          cookies.values.elementAt(index),
+        );
         cookie.domain = domain;
         return cookie;
       }),
@@ -127,12 +130,13 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
       onTitleChange: (title, controller) async {
         var head =
             await controller.evaluateJavascript("document.head.innerHTML") ??
-                "";
+            "";
         var body =
             await controller.evaluateJavascript("document.body.innerHTML") ??
-                "";
+            "";
         Log.info("Cloudflare", "Checking head: $head");
-        var isChallenging = head.contains('#challenge-success-text') ||
+        var isChallenging =
+            head.contains('#challenge-success-text') ||
             head.contains("#challenge-error-text") ||
             head.contains("#challenge-form") ||
             body.contains("challenge-platform") ||
@@ -162,12 +166,15 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
   } else {
     bool success = false;
     void check(InAppWebViewController controller) async {
-      var head = await controller.evaluateJavascript(
-          source: "document.head.innerHTML") as String;
-      var body = await controller.evaluateJavascript(
-          source: "document.body.innerHTML") as String;
+      var head =
+          await controller.evaluateJavascript(source: "document.head.innerHTML")
+              as String;
+      var body =
+          await controller.evaluateJavascript(source: "document.body.innerHTML")
+              as String;
       Log.info("Cloudflare", "Checking head: $head");
-      var isChallenging = head.contains('#challenge-success-text') ||
+      var isChallenging =
+          head.contains('#challenge-success-text') ||
           head.contains("#challenge-error-text") ||
           head.contains("#challenge-form") ||
           body.contains("challenge-platform") ||
@@ -184,7 +191,8 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
         }
         var cookies = await controller.getCookies(url) ?? [];
         if (cookies.firstWhereOrNull(
-                (element) => element.name == 'cf_clearance') ==
+              (element) => element.name == 'cf_clearance',
+            ) ==
             null) {
           return;
         }

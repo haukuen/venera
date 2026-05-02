@@ -212,10 +212,7 @@ class NaviPaneState extends State<NaviPane>
             ],
           );
           if (sideInsets != EdgeInsets.zero) {
-            content = Padding(
-              padding: sideInsets,
-              child: content,
-            );
+            content = Padding(padding: sideInsets, child: content);
           }
           return content;
         },
@@ -343,9 +340,7 @@ class NaviPaneState extends State<NaviPane>
         child: Column(
           children: [
             DragToMoveArea(
-              child: SizedBox(
-                height: 16 + MediaQuery.of(context).padding.top,
-              ),
+              child: SizedBox(height: 16 + MediaQuery.of(context).padding.top),
             ),
             ...List<Widget>.generate(
               widget.paneItems.length,

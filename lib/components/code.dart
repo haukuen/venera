@@ -158,7 +158,10 @@ class _CustomScrollBehavior extends MaterialScrollBehavior {
   const _CustomScrollBehavior();
   @override
   Widget buildScrollbar(
-      BuildContext context, Widget child, ScrollableDetails details) {
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
     return child;
   }
 }
@@ -174,14 +177,12 @@ class _CodeTextEditingController extends TextEditingController {
   }
 
   @override
-  TextSpan buildTextSpan(
-      {required BuildContext context,
-      TextStyle? style,
-      required bool withComposing}) {
-    var highlighter = Highlighter(
-      language: 'js',
-      theme: _theme!,
-    );
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    var highlighter = Highlighter(language: 'js', theme: _theme!);
     var result = highlighter.highlight(text);
     style = TextStyle(
       height: 1.5,

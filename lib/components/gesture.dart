@@ -1,8 +1,11 @@
 part of 'components.dart';
 
 class MouseBackDetector extends StatelessWidget {
-  const MouseBackDetector(
-      {super.key, required this.onTapDown, required this.child});
+  const MouseBackDetector({
+    super.key,
+    required this.onTapDown,
+    required this.child,
+  });
 
   final Widget child;
 

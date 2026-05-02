@@ -79,7 +79,8 @@ class _AppbarState extends State<Appbar> {
   Widget build(BuildContext context) {
     var content = Container(
       decoration: BoxDecoration(
-        color: widget.backgroundColor ??
+        color:
+            widget.backgroundColor ??
             context.colorScheme.surface.toOpacity(0.86),
       ),
       height: _kAppBarHeight + context.padding.top,
@@ -94,9 +95,7 @@ class _AppbarState extends State<Appbar> {
                   onPressed: () => Navigator.maybePop(context),
                 ),
               ),
-          const SizedBox(
-            width: 16,
-          ),
+          const SizedBox(width: 16),
           Expanded(
             child: DefaultTextStyle(
               style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
@@ -106,9 +105,7 @@ class _AppbarState extends State<Appbar> {
             ),
           ),
           ...?widget.actions,
-          const SizedBox(
-            width: 8,
-          )
+          const SizedBox(width: 8),
         ],
       ).paddingTop(context.padding.top),
     );
@@ -119,18 +116,12 @@ class _AppbarState extends State<Appbar> {
         child: content,
       );
     } else {
-      return BlurEffect(
-        blur: _scrolledUnder ? 15 : 0,
-        child: content,
-      );
+      return BlurEffect(blur: _scrolledUnder ? 15 : 0, child: content);
     }
   }
 }
 
-enum AppbarStyle {
-  blur,
-  shadow,
-}
+enum AppbarStyle { blur, shadow }
 
 class SliverAppbar extends StatelessWidget {
   const SliverAppbar({
@@ -194,7 +185,10 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     var body = Row(
       children: [
         const SizedBox(width: 8),
@@ -208,9 +202,7 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
                     ),
                   )
                 : const SizedBox()),
-        const SizedBox(
-          width: 16,
-        ),
+        const SizedBox(width: 16),
         Expanded(
           child: DefaultTextStyle(
             style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
@@ -220,9 +212,7 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
           ),
         ),
         ...?actions,
-        const SizedBox(
-          width: 8,
-        )
+        const SizedBox(width: 8),
       ],
     ).paddingTop(topPadding);
 
@@ -463,11 +453,11 @@ class _AppTabBarState extends State<AppTabBar> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: DefaultTextStyle(
             style: DefaultTextStyle.of(context).style.copyWith(
-                  color: i == _controller.animation?.value.round()
-                      ? context.colorScheme.primary
-                      : context.colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: i == _controller.animation?.value.round()
+                  ? context.colorScheme.primary
+                  : context.colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
             child: widget.tabs[i],
           ),
         ),
@@ -476,10 +466,8 @@ class _AppTabBarState extends State<AppTabBar> {
   }
 }
 
-typedef _TabRenderCallback = void Function(
-  List<double> offsets,
-  double itemHeight,
-);
+typedef _TabRenderCallback =
+    void Function(List<double> offsets, double itemHeight);
 
 class _TabRow extends Row {
   const _TabRow({required this.callback, required super.children});
@@ -489,13 +477,14 @@ class _TabRow extends Row {
   @override
   RenderFlex createRenderObject(BuildContext context) {
     return _RenderTabFlex(
-        direction: Axis.horizontal,
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        textDirection: Directionality.of(context),
-        verticalDirection: VerticalDirection.down,
-        callback: callback);
+      direction: Axis.horizontal,
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      textDirection: Directionality.of(context),
+      verticalDirection: VerticalDirection.down,
+      callback: callback,
+    );
   }
 
   @override
@@ -592,8 +581,11 @@ class _IndicatorPainter extends CustomPainter {
     final Rect toRect = indicatorRect(size, to);
     _currentRect = Rect.lerp(fromRect, toRect, (value - from).abs());
     final Paint paint = Paint()..color = color;
-    final RRect rrect = RRect.fromRectAndCorners(_currentRect!,
-        topLeft: Radius.circular(radius), topRight: Radius.circular(radius));
+    final RRect rrect = RRect.fromRectAndCorners(
+      _currentRect!,
+      topLeft: Radius.circular(radius),
+      topRight: Radius.circular(radius),
+    );
     canvas.drawRRect(rrect, paint);
   }
 
@@ -761,7 +753,10 @@ class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       height: _kAppBarHeight + topPadding,
       width: double.infinity,

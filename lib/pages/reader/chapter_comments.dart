@@ -3,7 +3,7 @@ part of 'reader.dart';
 bool _shouldBlockComment(Comment comment) {
   var blockedWords = appdata.settings["blockedCommentWords"] as List;
   if (blockedWords.isEmpty) return false;
-  
+
   var content = comment.content.toLowerCase();
   for (var word in blockedWords) {
     if (content.contains(word.toString().toLowerCase())) {
@@ -57,7 +57,9 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
         _loading = false;
       });
     } else if (mounted) {
-      var filteredComments = res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments = filteredComments;
         _loading = false;
@@ -74,9 +76,12 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
       widget.replyComment?.id,
     );
     if (res.error) {
+      if (!mounted) return;
       context.showMessage(message: res.errorMessage ?? "Unknown Error");
     } else {
-      var filteredComments = res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments!.addAll(filteredComments);
         _page++;
@@ -265,6 +270,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
                       maxPage = null;
                     });
                   } else {
+                    if (!context.mounted) return;
                     context.showMessage(message: b.errorMessage ?? "Error");
                     setState(() {
                       sending = false;
@@ -375,7 +381,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
               widget.source.likeCommentFunc != null)
             buildLike(),
           // Only show reply button if comment has both id and replyCount
-          if (widget.comment.replyCount != null && widget.comment.id != null) 
+          if (widget.comment.replyCount != null && widget.comment.id != null)
             buildReply(),
         ],
       ),
@@ -396,7 +402,8 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
         borderRadius: BorderRadius.circular(16),
         onTap: () {
           // Get the parent page's widget to access comicTitle and chapterTitle
-          var parentState = context.findAncestorStateOfType<_ChapterCommentsPageState>();
+          var parentState = context
+              .findAncestorStateOfType<_ChapterCommentsPageState>();
           showSideBar(
             context,
             ChapterCommentsPage(
@@ -453,6 +460,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
             isLiked = !isLiked;
             likes += isLiked ? 1 : -1;
           } else {
+            if (!mounted) return;
             context.showMessage(message: res.errorMessage ?? "Error");
           }
           setState(() {
@@ -518,6 +526,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
       widget.comment.voteStatus = voteStatus;
       widget.comment.score = res.data ?? widget.comment.score;
     } else {
+      if (!mounted) return;
       context.showMessage(message: res.errorMessage ?? "Error");
     }
     setState(() {
@@ -638,8 +647,9 @@ class _EmbeddedChapterCommentsPageState
         });
       }
     } else if (mounted) {
-      var filteredComments =
-          res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments = filteredComments;
         _loading = false;
@@ -660,8 +670,9 @@ class _EmbeddedChapterCommentsPageState
         context.showMessage(message: res.errorMessage ?? "Unknown Error");
       }
     } else if (mounted) {
-      var filteredComments =
-          res.data.where((c) => !_shouldBlockComment(c)).toList();
+      var filteredComments = res.data
+          .where((c) => !_shouldBlockComment(c))
+          .toList();
       setState(() {
         _comments!.addAll(filteredComments);
         _page++;
@@ -744,9 +755,7 @@ class _EmbeddedChapterCommentsPageState
         withAppbar: false,
       );
     } else if (_comments == null || _comments!.isEmpty) {
-      return Center(
-        child: Text("No comments yet".tl, style: ts.s14),
-      );
+      return Center(child: Text("No comments yet".tl, style: ts.s14));
     } else {
       var showAvatar = _comments!.any((e) => e.avatar != null);
       return _buildCommentsList(showAvatar);
@@ -754,10 +763,11 @@ class _EmbeddedChapterCommentsPageState
   }
 
   Widget _buildCommentsList(bool showAvatar) {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final crossAxisCount = isLandscape ? 2 : 1;
     final scrollController = ScrollController();
-    
+
     return Scrollbar(
       controller: scrollController,
       thumbVisibility: true,

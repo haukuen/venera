@@ -15,28 +15,30 @@ void _initializeDatabase(String path) {
 }
 
 void main() {
-  test('openSqliteDatabase sets DELETE journal mode, NORMAL synchronous, and busy_timeout', () {
-    final dir = Directory.systemTemp.createTempSync('venera-sqlite-helper-');
-    addTearDown(() {
-      if (dir.existsSync()) {
-        dir.deleteSync(recursive: true);
-      }
-    });
+  test(
+    'openSqliteDatabase sets DELETE journal mode, NORMAL synchronous, and busy_timeout',
+    () {
+      final dir = Directory.systemTemp.createTempSync('venera-sqlite-helper-');
+      addTearDown(() {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
 
-    final db = openSqliteDatabase('${dir.path}/helper.db');
-    addTearDown(db.dispose);
+      final db = openSqliteDatabase('${dir.path}/helper.db');
+      addTearDown(db.dispose);
 
-    final journalMode =
-        db.select('PRAGMA journal_mode;').first['journal_mode'];
-    final synchronous =
-        db.select('PRAGMA synchronous;').first['synchronous'];
-    final busyTimeout =
-        db.select('PRAGMA busy_timeout;').first['timeout'];
+      final journalMode = db
+          .select('PRAGMA journal_mode;')
+          .first['journal_mode'];
+      final synchronous = db.select('PRAGMA synchronous;').first['synchronous'];
+      final busyTimeout = db.select('PRAGMA busy_timeout;').first['timeout'];
 
-    expect((journalMode as String).toLowerCase(), 'delete');
-    expect(synchronous, 1);
-    expect(busyTimeout, 5000);
-  });
+      expect((journalMode as String).toLowerCase(), 'delete');
+      expect(synchronous, 1);
+      expect(busyTimeout, 5000);
+    },
+  );
 
   test('withDatabase opens, executes, and disposes', () async {
     final dir = Directory.systemTemp.createTempSync('venera-sqlite-withdb-');
@@ -50,8 +52,9 @@ void main() {
     _initializeDatabase(dbPath);
 
     final count = await withDatabase<int>(dbPath, (db) async {
-      final res =
-          db.select('SELECT count(*) AS count FROM items;').first['count'];
+      final res = db
+          .select('SELECT count(*) AS count FROM items;')
+          .first['count'];
       return res as int;
     });
 
@@ -59,35 +62,36 @@ void main() {
   });
 
   test(
-      'plain sqlite3 connections hit a read-then-write lock on the same file',
-      () {
-    final dir = Directory.systemTemp.createTempSync('venera-sqlite-lock-');
-    addTearDown(() {
-      if (dir.existsSync()) {
-        dir.deleteSync(recursive: true);
-      }
-    });
+    'plain sqlite3 connections hit a read-then-write lock on the same file',
+    () {
+      final dir = Directory.systemTemp.createTempSync('venera-sqlite-lock-');
+      addTearDown(() {
+        if (dir.existsSync()) {
+          dir.deleteSync(recursive: true);
+        }
+      });
 
-    final dbPath = '${dir.path}/lock.db';
-    _initializeDatabase(dbPath);
+      final dbPath = '${dir.path}/lock.db';
+      _initializeDatabase(dbPath);
 
-    final reader = sqlite3.open(dbPath);
-    final writer = sqlite3.open(dbPath);
-    addTearDown(reader.dispose);
-    addTearDown(writer.dispose);
+      final reader = sqlite3.open(dbPath);
+      final writer = sqlite3.open(dbPath);
+      addTearDown(reader.dispose);
+      addTearDown(writer.dispose);
 
-    reader.execute('BEGIN;');
-    reader.select('SELECT * FROM items;');
+      reader.execute('BEGIN;');
+      reader.select('SELECT * FROM items;');
 
-    expect(
-      () => writer.execute('INSERT INTO items (value) VALUES ("locked");'),
-      throwsA(
-        isA<SqliteException>().having(
-          (error) => error.resultCode,
-          'resultCode',
-          5,
+      expect(
+        () => writer.execute('INSERT INTO items (value) VALUES ("locked");'),
+        throwsA(
+          isA<SqliteException>().having(
+            (error) => error.resultCode,
+            'resultCode',
+            5,
+          ),
         ),
-      ),
-    );
-  });
+      );
+    },
+  );
 }

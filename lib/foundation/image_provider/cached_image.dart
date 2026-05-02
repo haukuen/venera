@@ -13,7 +13,8 @@ class CachedImageProvider
   /// Image provider for normal image.
   ///
   /// [url] is the url of the image. Local file path is also supported.
-  const CachedImageProvider(this.url, {
+  const CachedImageProvider(
+    this.url, {
     this.headers,
     this.sourceKey,
     this.cid,
@@ -37,29 +38,34 @@ class CachedImageProvider
 
   @override
   Future<Uint8List> load(chunkEvents, checkStop) async {
-    while(loadingCount > _kMaxLoadingCount) {
+    while (loadingCount > _kMaxLoadingCount) {
       await Future.delayed(const Duration(milliseconds: 100));
       checkStop();
     }
     loadingCount++;
     try {
-      if(url.startsWith("file://")) {
+      if (url.startsWith("file://")) {
         var file = File(url.substring(7));
         return file.readAsBytes();
       }
-      await for (var progress in ImageDownloader.loadThumbnail(url, sourceKey, cid)) {
+      await for (var progress in ImageDownloader.loadThumbnail(
+        url,
+        sourceKey,
+        cid,
+      )) {
         checkStop();
-        chunkEvents.add(ImageChunkEvent(
-          cumulativeBytesLoaded: progress.currentBytes,
-          expectedTotalBytes: progress.totalBytes,
-        ));
-        if(progress.imageBytes != null) {
+        chunkEvents.add(
+          ImageChunkEvent(
+            cumulativeBytesLoaded: progress.currentBytes,
+            expectedTotalBytes: progress.totalBytes,
+          ),
+        );
+        if (progress.imageBytes != null) {
           return progress.imageBytes!;
         }
       }
       throw "Error: Empty response body.";
-    }
-    catch(e) {
+    } catch (e) {
       if (fallbackToLocalCover && sourceKey != null && cid != null) {
         final localComic = LocalManager().find(
           cid!,
@@ -76,8 +82,7 @@ class CachedImageProvider
         }
       }
       rethrow;
-    }
-    finally {
+    } finally {
       loadingCount--;
     }
   }

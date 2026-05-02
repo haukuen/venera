@@ -38,10 +38,12 @@ class HistoryImageProvider
       history.id,
     )) {
       checkStop();
-      chunkEvents.add(ImageChunkEvent(
-        cumulativeBytesLoaded: progress.currentBytes,
-        expectedTotalBytes: progress.totalBytes,
-      ));
+      chunkEvents.add(
+        ImageChunkEvent(
+          cumulativeBytesLoaded: progress.currentBytes,
+          expectedTotalBytes: progress.totalBytes,
+        ),
+      );
       if (progress.imageBytes != null) {
         return progress.imageBytes!;
       }

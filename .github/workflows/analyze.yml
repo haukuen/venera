@@ -9,11 +9,13 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: "stable"
           flutter-version-file: pubspec.yaml
-          architecture: x64
+          cache: true
       - run: flutter pub get
-      - uses: invertase/github-action-dart-analyzer@v1
+      - run: dart format --set-exit-if-changed .
+      - run: flutter analyze --fatal-infos
+      - run: flutter test

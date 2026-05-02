@@ -29,11 +29,7 @@ Uri? parseVeneraLink(String text) {
     final id = uri.queryParameters['id'];
     final sourceKey = uri.queryParameters['source'];
     if (id == null || sourceKey == null) return null;
-    return (
-      id: id,
-      sourceKey: sourceKey,
-      title: uri.queryParameters['title'],
-    );
+    return (id: id, sourceKey: sourceKey, title: uri.queryParameters['title']);
   }
   return null;
 }
@@ -62,6 +58,7 @@ Future<bool> handleAppLink(Uri uri) async {
         });
       } else if (comic.title != null && comic.title!.isNotEmpty) {
         final keyword = comic.title!;
+        if (!App.rootContext.mounted) return true;
         App.rootContext.showMessage(
           message: 'Comic source not found: @s'.tlParams({'s': comicSource}),
         );
@@ -71,12 +68,12 @@ Future<bool> handleAppLink(Uri uri) async {
     }
   }
 
-  for(var source in ComicSource.all()) {
-    if(source.linkHandler != null) {
-      if(source.linkHandler!.domains.contains(uri.host)) {
+  for (var source in ComicSource.all()) {
+    if (source.linkHandler != null) {
+      if (source.linkHandler!.domains.contains(uri.host)) {
         var id = source.linkHandler!.linkToId(uri.toString());
-        if(id != null) {
-          if(App.mainNavigatorKey == null) {
+        if (id != null) {
+          if (App.mainNavigatorKey == null) {
             await Future.delayed(const Duration(milliseconds: 200));
           }
           App.mainNavigatorKey!.currentContext?.to(() {

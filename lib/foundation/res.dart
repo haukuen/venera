@@ -23,14 +23,14 @@ class Res<T> {
   String toString() => _data.toString();
 
   Res.fromErrorRes(Res another, {this.subData})
-      : _data = null,
-        errorMessage = another.errorMessage;
+    : _data = null,
+      errorMessage = another.errorMessage;
 
   /// network result
   const Res(this._data, {this.errorMessage, this.subData});
 
   const Res.error(String err)
-      : _data = null,
-        subData = null,
-        errorMessage = err;
+    : _data = null,
+      subData = null,
+      errorMessage = err;
 }

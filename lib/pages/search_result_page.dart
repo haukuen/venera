@@ -74,9 +74,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
             right: 0,
             bottom: 0,
             child: Material(
-              child: _Suggestions(
-                controller: suggestionsController,
-              ),
+              child: _Suggestions(controller: suggestionsController),
             ),
           );
         },
@@ -100,10 +98,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
     }
     var searchSource = sourceKey;
     // TODO: Move it to a better place
-    const enabledSources = [
-      'nhentai',
-      'ehentai',
-    ];
+    const enabledSources = ['nhentai', 'ehentai'];
     if (!enabledSources.contains(searchSource)) {
       return text;
     }
@@ -117,10 +112,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
   void initState() {
     sourceKey = widget.sourceKey;
     text = checkAutoLanguage(widget.text);
-    controller = SearchBarController(
-      currentText: text,
-      onSearch: search,
-    );
+    controller = SearchBarController(currentText: text, onSearch: search);
     options = widget.options ?? const [];
     validateOptions();
     appdata.addSearchHistory(text);
@@ -147,10 +139,7 @@ class _SearchResultPageState extends State<SearchResultPage> {
     var source = ComicSource.find(sourceKey);
     return ComicList(
       key: Key(text + options.toString() + sourceKey),
-      errorLeading: AppSearchBar(
-        controller: controller,
-        action: buildAction(),
-      ),
+      errorLeading: AppSearchBar(controller: controller, action: buildAction()),
       leadingSliver: SliverSearchBar(
         controller: controller,
         onChanged: onChanged,
@@ -159,20 +148,12 @@ class _SearchResultPageState extends State<SearchResultPage> {
       loadPage: source!.searchPageData!.loadPage == null
           ? null
           : (i) {
-              return source.searchPageData!.loadPage!(
-                text,
-                i,
-                options,
-              );
+              return source.searchPageData!.loadPage!(text, i, options);
             },
       loadNext: source.searchPageData!.loadNext == null
           ? null
           : (i) {
-              return source.searchPageData!.loadNext!(
-                text,
-                i,
-                options,
-              );
+              return source.searchPageData!.loadNext!(text, i, options);
             },
     );
   }
@@ -315,34 +296,27 @@ class _SuggestionsState extends State<_Suggestions> {
 
     Widget buildItem(Pair<String, TranslationType> value) {
       var subTitle = TagsTranslation.translationTagWithNamespace(
-          value.left, value.right.name);
+        value.left,
+        value.right.name,
+      );
       return ListTile(
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Text(
-                value.left,
-                maxLines: 2,
-              ),
-            ),
-            if (!showMethod)
-              const SizedBox(
-                width: 12,
-              ),
+            Expanded(child: Text(value.left, maxLines: 2)),
+            if (!showMethod) const SizedBox(width: 12),
             if (!showMethod && showTranslation)
               Text(
                 subTitle,
                 style: TextStyle(
-                    fontSize: 14, color: Theme.of(context).colorScheme.outline),
-              )
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
           ],
         ),
         subtitle: (showMethod && showTranslation) ? Text(subTitle) : null,
-        trailing: Text(
-          value.right.name,
-          style: const TextStyle(fontSize: 13),
-        ),
+        trailing: Text(value.right.name, style: const TextStyle(fontSize: 13)),
         onTap: () => onSelected(value.left, value.right),
       );
     }
@@ -370,7 +344,7 @@ class _SuggestionsState extends State<_Suggestions> {
             itemBuilder: (context, index) =>
                 buildItem(widget.controller.suggestions[index]),
           ),
-        )
+        ),
       ],
     );
   }
@@ -394,13 +368,20 @@ class _SuggestionsState extends State<_Suggestions> {
     var controller = widget.controller.controller;
     var words = controller.text.split(" ");
     if (words.length >= 2 &&
-        check("${words[words.length - 2]} ${words[words.length - 1]}", text,
-            text.translateTagsToCN)) {
+        check(
+          "${words[words.length - 2]} ${words[words.length - 1]}",
+          text,
+          text.translateTagsToCN,
+        )) {
       controller.text = controller.text.replaceLast(
-          "${words[words.length - 2]} ${words[words.length - 1]}", "");
+        "${words[words.length - 2]} ${words[words.length - 1]}",
+        "",
+      );
     } else {
-      controller.text =
-          controller.text.replaceLast(words[words.length - 1], "");
+      controller.text = controller.text.replaceLast(
+        words[words.length - 1],
+        "",
+      );
     }
     final source = ComicSource.find(widget.controller.sourceKey);
     String insert;
@@ -469,9 +450,10 @@ class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
                   setState(() {
                     searchTarget = e.key;
                     options.clear();
-                    final searchOptions = ComicSource.find(searchTarget)!
-                            .searchPageData!
-                            .searchOptions ??
+                    final searchOptions =
+                        ComicSource.find(
+                          searchTarget,
+                        )!.searchPageData!.searchOptions ??
                         <SearchOptions>[];
                     options = searchOptions.map((e) => e.defaultValue).toList();
                     onChanged();
@@ -498,7 +480,7 @@ class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
 
     final searchOptions =
         ComicSource.find(searchTarget)!.searchPageData!.searchOptions ??
-            <SearchOptions>[];
+        <SearchOptions>[];
     if (searchOptions.length != options.length) {
       options = searchOptions.map((e) => e.defaultValue).toList();
     }
@@ -507,16 +489,18 @@ class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
     }
     for (int i = 0; i < searchOptions.length; i++) {
       final option = searchOptions[i];
-      children.add(SearchOptionWidget(
-        option: option,
-        value: options[i],
-        onChanged: (value) {
-          setState(() {
-            options[i] = value;
-          });
-        },
-        sourceKey: searchTarget,
-      ));
+      children.add(
+        SearchOptionWidget(
+          option: option,
+          value: options[i],
+          onChanged: (value) {
+            setState(() {
+              options[i] = value;
+            });
+          },
+          sourceKey: searchTarget,
+        ),
+      );
     }
 
     return Container(

@@ -12,7 +12,7 @@ class ComicType {
   int get hashCode => value.hashCode;
 
   String get sourceKey {
-    if(this == local) {
+    if (this == local) {
       return "local";
     } else {
       return comicSource!.key;
@@ -20,7 +20,7 @@ class ComicType {
   }
 
   ComicSource? get comicSource {
-    if(this == local) {
+    if (this == local) {
       return null;
     } else {
       return ComicSource.fromIntKey(value);
@@ -30,7 +30,7 @@ class ComicType {
   static const local = ComicType(0);
 
   factory ComicType.fromKey(String key) {
-    if(key == "local") {
+    if (key == "local") {
       return local;
     } else {
       return ComicType(key.hashCode);

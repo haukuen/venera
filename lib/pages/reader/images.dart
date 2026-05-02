@@ -95,8 +95,8 @@ class _ReaderImagesState extends State<_ReaderImages> {
       if (cacheFile != null) {
         try {
           var cacheData = await cacheFile.readAsBytes();
-          var cacheList =
-              (jsonDecode(utf8.decode(cacheData)) as List).cast<String>();
+          var cacheList = (jsonDecode(utf8.decode(cacheData)) as List)
+              .cast<String>();
           if (!mounted) return;
           setState(() {
             reader.images = cacheList;
@@ -256,6 +256,7 @@ class _GalleryModeState extends State<_GalleryMode>
     controller = PageController(initialPage: reader.page);
     reader._imageViewController = this;
     Future.microtask(() {
+      if (!mounted) return;
       context.readerScaffold.setFloatingButton(0);
     });
     super.initState();
@@ -431,7 +432,8 @@ class _GalleryModeState extends State<_GalleryMode>
         },
         onPageChanged: (i) {
           if (i == 0) {
-            if (reader.isFirstChapterOfGroup || !reader.toPrevChapter(toLastPage: true)) {
+            if (reader.isFirstChapterOfGroup ||
+                !reader.toPrevChapter(toLastPage: true)) {
               controller.jumpToPage(1);
             }
           } else if (i == totalPages + 1) {

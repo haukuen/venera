@@ -163,19 +163,15 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     var group = 0;
     for (var optionList in options!) {
       if (optionList.label.isNotEmpty) {
-        children.add(Padding(
-          padding: const EdgeInsets.only(
-            bottom: 8.0,
-            left: 4.0,
-          ),
-          child: Text(
-            optionList.label.ts(sourceKey),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+            child: Text(
+              optionList.label.ts(sourceKey),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
           ),
-        ));
+        );
       }
       if (optionList.options.length <= 8) {
         children.add(
@@ -184,28 +180,25 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
             runSpacing: 8,
             children: [
               for (var option in optionList.options.entries)
-                buildOptionItem(
-                  option.value.tl,
-                  option.key,
-                  group,
-                  context,
-                ),
+                buildOptionItem(option.value.tl, option.key, group, context),
             ],
           ),
         );
       } else {
         var g = group;
-        children.add(Select(
-          current: optionList.options[optionsValue[g]],
-          values: optionList.options.values.toList(),
-          onTap: (i) {
-            var key = optionList.options.keys.elementAt(i);
-            if (key == optionsValue[g]) return;
-            setState(() {
-              optionsValue[g] = key;
-            });
-          },
-        ));
+        children.add(
+          Select(
+            current: optionList.options[optionsValue[g]],
+            values: optionList.options.values.toList(),
+            onTap: (i) {
+              var key = optionList.options.keys.elementAt(i);
+              if (key == optionsValue[g]) return;
+              setState(() {
+                optionsValue[g] = key;
+              });
+            },
+          ),
+        );
       }
       if (options!.last != optionList) {
         children.add(const SizedBox(height: 8));

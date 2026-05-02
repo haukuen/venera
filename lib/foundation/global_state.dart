@@ -27,7 +27,8 @@ abstract class GlobalState {
 
   static void unregister(State state, [Object? key]) {
     _state.removeWhere(
-        (pair) => (key == null || pair.left == key) && pair.right == state);
+      (pair) => (key == null || pair.left == key) && pair.right == state,
+    );
   }
 }
 
@@ -38,8 +39,7 @@ class Pair<K, V> {
   Pair(this.left, this.right);
 }
 
-abstract class AutomaticGlobalState<T extends StatefulWidget>
-    extends State<T> {
+abstract class AutomaticGlobalState<T extends StatefulWidget> extends State<T> {
   @override
   @mustCallSuper
   void initState() {

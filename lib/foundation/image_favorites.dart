@@ -35,14 +35,14 @@ class ImageFavorite {
   }
 
   ImageFavorite.fromJson(Map<String, dynamic> json)
-      : page = json['page'],
-        imageKey = json['imageKey'],
-        isAutoFavorite = json['isAutoFavorite'],
-        eid = json['eid'],
-        id = json['id'],
-        ep = json['ep'],
-        sourceKey = json['sourceKey'],
-        epName = json['epName'];
+    : page = json['page'],
+      imageKey = json['imageKey'],
+      isAutoFavorite = json['isAutoFavorite'],
+      eid = json['eid'],
+      id = json['id'],
+      ep = json['ep'],
+      sourceKey = json['sourceKey'],
+      epName = json['epName'];
 
   ImageFavorite copyWith({
     int? page,
@@ -89,7 +89,12 @@ class ImageFavoritesEp {
   List<ImageFavorite> imageFavorites;
 
   ImageFavoritesEp(
-      this.eid, this.ep, this.imageFavorites, this.epName, this.maxPage);
+    this.eid,
+    this.ep,
+    this.imageFavorites,
+    this.epName,
+    this.maxPage,
+  );
 
   // 是否有封面
   bool get isHasFirstPage {
@@ -143,8 +148,9 @@ class ImageFavoritesComic {
 
   // 是否都有imageKey
   bool get isAllHasImageKey {
-    return imageFavoritesEp
-        .every((e) => e.imageFavorites.every((j) => j.imageKey != ""));
+    return imageFavoritesEp.every(
+      (e) => e.imageFavorites.every((j) => j.imageKey != ""),
+    );
   }
 
   int get maxPageFromEp {
@@ -160,7 +166,7 @@ class ImageFavoritesComic {
     return imageFavoritesEp.every((e) => e.isHasFirstPage);
   }
 
-  Iterable<ImageFavorite> get images sync*{
+  Iterable<ImageFavorite> get images sync* {
     for (var e in imageFavoritesEp) {
       yield* e.imageFavorites;
     }
@@ -182,19 +188,28 @@ class ImageFavoritesComic {
     tempImageFavoritesEp.forEach((i) {
       List<ImageFavorite> temp = [];
       i["imageFavorites"].forEach((j) {
-        temp.add(ImageFavorite(
-          j["page"],
-          j["imageKey"],
-          j["isAutoFavorite"],
-          i["eid"],
-          r["id"],
-          i["ep"],
-          r["source_key"],
-          i["epName"],
-        ));
+        temp.add(
+          ImageFavorite(
+            j["page"],
+            j["imageKey"],
+            j["isAutoFavorite"],
+            i["eid"],
+            r["id"],
+            i["ep"],
+            r["source_key"],
+            i["epName"],
+          ),
+        );
       });
-      finalImageFavoritesEp.add(ImageFavoritesEp(
-          i["eid"], i["ep"], temp, i["epName"], i["maxPage"] ?? 1));
+      finalImageFavoritesEp.add(
+        ImageFavoritesEp(
+          i["eid"],
+          i["ep"],
+          temp,
+          i["epName"],
+          i["maxPage"] ?? 1,
+        ),
+      );
     });
     return ImageFavoritesComic(
       r["id"],
@@ -225,30 +240,35 @@ class ImageFavoriteManager with ChangeNotifier {
 
   /// 检查表image_favorites是否存在, 不存在则创建
   void init() {
-    _db.execute("CREATE TABLE IF NOT EXISTS image_favorites ("
-        "id TEXT,"
-        "title TEXT NOT NULL,"
-        "sub_title TEXT,"
-        "author TEXT,"
-        "tags TEXT,"
-        "translated_tags TEXT,"
-        "time int,"
-        "max_page int,"
-        "source_key TEXT NOT NULL,"
-        "image_favorites_ep TEXT NOT NULL,"
-        "other TEXT NOT NULL,"
-        "PRIMARY KEY (id,source_key)"
-        ");");
+    _db.execute(
+      "CREATE TABLE IF NOT EXISTS image_favorites ("
+      "id TEXT,"
+      "title TEXT NOT NULL,"
+      "sub_title TEXT,"
+      "author TEXT,"
+      "tags TEXT,"
+      "translated_tags TEXT,"
+      "time int,"
+      "max_page int,"
+      "source_key TEXT NOT NULL,"
+      "image_favorites_ep TEXT NOT NULL,"
+      "other TEXT NOT NULL,"
+      "PRIMARY KEY (id,source_key)"
+      ");",
+    );
   }
 
   // 做排序和去重的操作
   void addOrUpdateOrDelete(ImageFavoritesComic favorite, [bool notify = true]) {
     // 没有章节了就删掉
     if (favorite.imageFavoritesEp.isEmpty) {
-      _db.execute("""
+      _db.execute(
+        """
       delete from image_favorites
       where id == ? and source_key == ?;
-    """, [favorite.id, favorite.sourceKey]);
+    """,
+        [favorite.id, favorite.sourceKey],
+      );
     } else {
       // 去重章节
       List<ImageFavoritesEp> tempImageFavoritesEp = [];
@@ -262,21 +282,23 @@ class ImageFavoriteManager with ChangeNotifier {
         }
       }
       tempImageFavoritesEp.sort((a, b) => a.ep.compareTo(b.ep));
-      List<dynamic> finalImageFavoritesEp =
-          jsonDecode(jsonEncode(tempImageFavoritesEp));
+      List<dynamic> finalImageFavoritesEp = jsonDecode(
+        jsonEncode(tempImageFavoritesEp),
+      );
       for (var e in tempImageFavoritesEp) {
         List<Map> finalImageFavorites = [];
         int epIndex = tempImageFavoritesEp.indexOf(e);
         for (ImageFavorite j in e.imageFavorites) {
-          int index =
-              finalImageFavorites.indexWhere((i) => i["page"] == j.page);
+          int index = finalImageFavorites.indexWhere(
+            (i) => i["page"] == j.page,
+          );
           if (index == -1 && j.page > 0) {
             // isAutoFavorite 为 null 不写入数据库, 同时只保留需要的属性, 避免增加太多重复字段在数据库里
             if (j.isAutoFavorite != null) {
               finalImageFavorites.add({
                 "page": j.page,
                 "imageKey": j.imageKey,
-                "isAutoFavorite": j.isAutoFavorite
+                "isAutoFavorite": j.isAutoFavorite,
               });
             } else {
               finalImageFavorites.add({"page": j.page, "imageKey": j.imageKey});
@@ -289,22 +311,25 @@ class ImageFavoriteManager with ChangeNotifier {
       if (tempImageFavoritesEp.isEmpty) {
         throw "Error: No ImageFavoritesEp";
       }
-      _db.execute("""
+      _db.execute(
+        """
       insert or replace into image_favorites(id, title, sub_title, author, tags, translated_tags, time, max_page, source_key, image_favorites_ep, other)
       values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-    """, [
-        favorite.id,
-        favorite.title,
-        favorite.subTitle,
-        favorite.author,
-        favorite.tags.join(","),
-        favorite.translatedTags.join(","),
-        favorite.time.millisecondsSinceEpoch,
-        favorite.maxPage,
-        favorite.sourceKey,
-        jsonEncode(finalImageFavoritesEp),
-        jsonEncode(favorite.other)
-      ]);
+    """,
+        [
+          favorite.id,
+          favorite.title,
+          favorite.subTitle,
+          favorite.author,
+          favorite.tags.join(","),
+          favorite.translatedTags.join(","),
+          favorite.time.millisecondsSinceEpoch,
+          favorite.maxPage,
+          favorite.sourceKey,
+          jsonEncode(finalImageFavoritesEp),
+          jsonEncode(favorite.other),
+        ],
+      );
     }
     if (notify) {
       notifyListeners();
@@ -357,7 +382,8 @@ class ImageFavoriteManager with ChangeNotifier {
     }
     var comics = <ImageFavoritesComic>{};
     for (var i in imageFavoriteList) {
-      var comic = comics
+      var comic =
+          comics
               .where((c) => c.id == i.id && c.sourceKey == i.sourceKey)
               .firstOrNull ??
           find(i.id, i.sourceKey);
@@ -429,7 +455,7 @@ class ImageFavoriteManager with ChangeNotifier {
       'dilf',
       'bbm',
       'uncensored',
-      'full censorship'
+      'full censorship',
     ];
 
     Map<String, int> tagCount = {};
@@ -499,10 +525,13 @@ class ImageFavoriteManager with ChangeNotifier {
   }
 
   ImageFavoritesComic? find(String id, String sourceKey) {
-    var row = _db.select("""
+    var row = _db.select(
+      """
     select * from image_favorites
     where id == ? and source_key == ?;
-    """, [id, sourceKey]);
+    """,
+      [id, sourceKey],
+    );
     if (row.isEmpty) {
       return null;
     }

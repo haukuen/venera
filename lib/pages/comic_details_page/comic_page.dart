@@ -221,6 +221,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
       var history = HistoryManager().find(widget.id, ComicType.local);
       if (isFirst) {
         Future.microtask(() {
+          if (!App.rootContext.mounted) return;
           App.rootContext.to(() {
             return Reader(
               type: ComicType.local,
@@ -426,10 +427,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                     manager.remove(comic.comicId, type);
                   } else {
                     manager.add(
-                      ReadLaterItem.fromComicDetails(
-                        comic,
-                        widget.sourceKey,
-                      ),
+                      ReadLaterItem.fromComicDetails(comic, widget.sourceKey),
                     );
                   }
                 },

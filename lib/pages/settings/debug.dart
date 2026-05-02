@@ -86,9 +86,7 @@ class DebugPageState extends State<DebugPage> {
                   border: Border.all(color: context.colorScheme.outline),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: SingleChildScrollView(
-                  child: Text(result).paddingAll(4),
-                ),
+                child: SingleChildScrollView(child: Text(result).paddingAll(4)),
               ),
             ],
           ),

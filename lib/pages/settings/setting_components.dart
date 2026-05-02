@@ -438,10 +438,7 @@ class _SliderSettingState extends State<_SliderSetting> {
           value,
         );
       } else if (widget.useDeviceSettings) {
-        appdata.settings.setDeviceReaderSetting(
-          widget.settingsIndex,
-          value,
-        );
+        appdata.settings.setDeviceReaderSetting(widget.settingsIndex, value);
       } else {
         appdata.settings[widget.settingsIndex] = value;
       }
@@ -467,8 +464,7 @@ class _SliderSettingState extends State<_SliderSetting> {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.subtitle != null)
-            Text(widget.subtitle!, style: ts.s12),
+          if (widget.subtitle != null) Text(widget.subtitle!, style: ts.s12),
           Slider(
             value: value,
             onChanged: (value) {

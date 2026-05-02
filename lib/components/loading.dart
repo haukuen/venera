@@ -73,8 +73,7 @@ class NetworkError extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  if (action != null)
-                    action!.paddingRight(8),
+                  if (action != null) action!.paddingRight(8),
                   FilledButton(
                     onPressed: retry,
                     child: Text(buttonText ?? 'Retry'.tl),

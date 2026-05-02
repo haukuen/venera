@@ -36,10 +36,7 @@ class _AboutSettingsState extends State<AboutSettings> {
         Column(
           children: [
             const SizedBox(height: 8),
-            Text(
-              "V${App.version}",
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text("V${App.version}", style: const TextStyle(fontSize: 16)),
             Text("Venera is a free and open-source app for comic reading.".tl),
             const SizedBox(height: 8),
           ],
@@ -78,8 +75,9 @@ class _AboutSettingsState extends State<AboutSettings> {
 }
 
 Future<bool> checkUpdate() async {
-  var res = await AppDio()
-      .get("https://raw.githubusercontent.com/haukuen/venera/main/pubspec.yaml");
+  var res = await AppDio().get(
+    "https://raw.githubusercontent.com/haukuen/venera/main/pubspec.yaml",
+  );
   if (res.statusCode == 200) {
     var data = loadYaml(res.data);
     if (data["version"] != null) {
@@ -90,34 +88,39 @@ Future<bool> checkUpdate() async {
   return false;
 }
 
-Future<void> checkUpdateUi([bool showMessageIfNoUpdate = true, bool delay = false]) async {
+Future<void> checkUpdateUi([
+  bool showMessageIfNoUpdate = true,
+  bool delay = false,
+]) async {
   try {
     var value = await checkUpdate();
     if (value) {
       if (delay) {
         await Future.delayed(const Duration(seconds: 2));
       }
+      if (!App.rootContext.mounted) return;
       showDialog(
-          context: App.rootContext,
-          builder: (context) {
-            return ContentDialog(
-              title: "New version available".tl,
-              content: Text(
-                      "A new version is available. Do you want to update now?"
-                          .tl)
-                  .paddingHorizontal(16),
-              actions: [
-                Button.text(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    launchUrlString("https://github.com/haukuen/venera/releases");
-                  },
-                  child: Text("Update".tl),
-                ),
-              ],
-            );
-          });
+        context: App.rootContext,
+        builder: (context) {
+          return ContentDialog(
+            title: "New version available".tl,
+            content: Text(
+              "A new version is available. Do you want to update now?".tl,
+            ).paddingHorizontal(16),
+            actions: [
+              Button.text(
+                onPressed: () {
+                  Navigator.pop(context);
+                  launchUrlString("https://github.com/haukuen/venera/releases");
+                },
+                child: Text("Update".tl),
+              ),
+            ],
+          );
+        },
+      );
     } else if (showMessageIfNoUpdate) {
+      if (!App.rootContext.mounted) return;
       App.rootContext.showMessage(message: "No new version available".tl);
     }
   } catch (e, s) {

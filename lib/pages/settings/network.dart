@@ -128,18 +128,9 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
           },
           child: Column(
             children: [
-              RadioListTile<String>(
-                title: Text("Direct".tl),
-                value: 'direct',
-              ),
-              RadioListTile<String>(
-                title: Text("System".tl),
-                value: 'system',
-              ),
-              RadioListTile(
-                title: Text("Manual".tl),
-                value: 'manual',
-              ),
+              RadioListTile<String>(title: Text("Direct".tl), value: 'direct'),
+              RadioListTile<String>(title: Text("System".tl), value: 'system'),
+              RadioListTile(title: Text("Manual".tl), value: 'manual'),
               if (type == 'manual') buildManualProxy(),
             ],
           ),
@@ -252,7 +243,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
       if (entry.key is String && entry.value is String) {
         overrides.add((
           TextEditingController(text: entry.key),
-          TextEditingController(text: entry.value)
+          TextEditingController(text: entry.value),
         ));
       }
     }
@@ -303,10 +294,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
               title: "Enable DNS Overrides".tl,
               settingKey: "enableDnsOverrides",
             ),
-            _SwitchSetting(
-              title: "Server Name Indication",
-              settingKey: "sni",
-            ),
+            _SwitchSetting(title: "Server Name Indication", settingKey: "sni"),
             const SizedBox(height: 8),
             Container(
               height: 1,
@@ -318,8 +306,10 @@ class __DNSOverridesState extends State<_DNSOverrides> {
             TextButton.icon(
               onPressed: () {
                 setState(() {
-                  overrides
-                      .add((TextEditingController(), TextEditingController()));
+                  overrides.add((
+                    TextEditingController(),
+                    TextEditingController(),
+                  ));
                 });
               },
               icon: const Icon(Icons.add),
@@ -339,15 +329,9 @@ class __DNSOverridesState extends State<_DNSOverrides> {
       margin: EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(
-            color: context.colorScheme.outlineVariant,
-          ),
-          left: BorderSide(
-            color: context.colorScheme.outlineVariant,
-          ),
-          right: BorderSide(
-            color: context.colorScheme.outlineVariant,
-          ),
+          bottom: BorderSide(color: context.colorScheme.outlineVariant),
+          left: BorderSide(color: context.colorScheme.outlineVariant),
+          right: BorderSide(color: context.colorScheme.outlineVariant),
         ),
       ),
       child: Row(
@@ -361,10 +345,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
               controller: entry.$1,
             ).paddingHorizontal(8),
           ),
-          Container(
-            width: 1,
-            color: context.colorScheme.outlineVariant,
-          ),
+          Container(width: 1, color: context.colorScheme.outlineVariant),
           Expanded(
             child: TextField(
               decoration: InputDecoration(
@@ -374,10 +355,7 @@ class __DNSOverridesState extends State<_DNSOverrides> {
               controller: entry.$2,
             ).paddingHorizontal(8),
           ),
-          Container(
-            width: 1,
-            color: context.colorScheme.outlineVariant,
-          ),
+          Container(width: 1, color: context.colorScheme.outlineVariant),
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () {

@@ -37,10 +37,7 @@ class _ExplorePageState extends State<ExplorePage>
     if (!pages.isEqualTo(explorePages)) {
       setState(() {
         pages = explorePages;
-        controller = TabController(
-          length: pages.length,
-          vsync: this,
-        );
+        controller = TabController(length: pages.length, vsync: this);
       });
     }
   }
@@ -67,10 +64,7 @@ class _ExplorePageState extends State<ExplorePage>
         .expand((e) => e.map((e) => e.title))
         .toList();
     pages = pages.where((e) => all.contains(e)).toList();
-    controller = TabController(
-      length: pages.length,
-      vsync: this,
-    );
+    controller = TabController(length: pages.length, vsync: this);
     appdata.settings.addListener(onSettingsChanged);
     NaviPane.of(context).addNaviItemTapListener(onNaviItemTapped);
     super.initState();
@@ -97,23 +91,23 @@ class _ExplorePageState extends State<ExplorePage>
   }
 
   Widget buildFAB() => Material(
-        color: Colors.transparent,
-        child: FloatingActionButton(
-          key: const Key("FAB"),
-          onPressed: refresh,
-          child: const Icon(Icons.refresh),
-        ),
-      );
+    color: Colors.transparent,
+    child: FloatingActionButton(
+      key: const Key("FAB"),
+      onPressed: refresh,
+      child: const Icon(Icons.refresh),
+    ),
+  );
 
   Tab buildTab(String i) {
-    var comicSource = ComicSource.all()
-        .firstWhere((e) => e.explorePages.any((e) => e.title == i));
+    var comicSource = ComicSource.all().firstWhere(
+      (e) => e.explorePages.any((e) => e.title == i),
+    );
     return Tab(text: i.ts(comicSource.key), key: Key(i));
   }
 
-  Widget buildBody(String i) => Material(
-        child: _SingleExplorePage(i, key: PageStorageKey(i)),
-      );
+  Widget buildBody(String i) =>
+      Material(child: _SingleExplorePage(i, key: PageStorageKey(i)));
 
   Widget buildEmpty() {
     var msg = "No Explore Pages".tl;
@@ -201,7 +195,7 @@ class _ExplorePageState extends State<ExplorePage>
                     ),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -214,14 +208,16 @@ class _ExplorePageState extends State<ExplorePage>
             child: showFB ? buildFAB() : const SizedBox(),
             transitionBuilder: (widget, animation) {
               var tween = Tween<Offset>(
-                  begin: const Offset(0, 1), end: const Offset(0, 0));
+                begin: const Offset(0, 1),
+                end: const Offset(0, 0),
+              );
               return SlideTransition(
                 position: tween.animate(animation),
                 child: widget,
               );
             },
           ),
-        )
+        ),
       ],
     );
   }
@@ -316,9 +312,7 @@ class _SingleExplorePageState extends AutomaticGlobalState<_SingleExplorePage>
         },
       );
     } else {
-      return const Center(
-        child: Text("Empty Page"),
-      );
+      return const Center(child: Text("Empty Page"));
     }
   }
 
@@ -345,8 +339,13 @@ class _SingleExplorePageState extends AutomaticGlobalState<_SingleExplorePage>
 }
 
 class _MixedExplorePage extends StatefulWidget {
-  const _MixedExplorePage(this.data, this.sourceKey,
-      {super.key, this.controller, required this.refreshHandlerCallback});
+  const _MixedExplorePage(
+    this.data,
+    this.sourceKey, {
+    super.key,
+    this.controller,
+    required this.refreshHandlerCallback,
+  });
 
   final ExplorePageData data;
 
@@ -377,9 +376,7 @@ class _MixedExplorePageState
     for (var part in data) {
       if (part is ExplorePagePart) {
         if (cache.isNotEmpty) {
-          yield SliverGridComics(
-            comics: (cache),
-          );
+          yield SliverGridComics(comics: (cache));
           yield const SliverToBoxAdapter(child: Divider());
           cache.clear();
         }
@@ -390,9 +387,7 @@ class _MixedExplorePageState
       }
     }
     if (cache.isNotEmpty) {
-      yield SliverGridComics(
-        comics: (cache),
-      );
+      yield SliverGridComics(comics: (cache));
     }
   }
 
@@ -423,7 +418,9 @@ class _MixedExplorePageState
 }
 
 Iterable<Widget> _buildExplorePagePart(
-    ExplorePagePart part, String sourceKey) sync* {
+  ExplorePagePart part,
+  String sourceKey,
+) sync* {
   Widget buildTitle(ExplorePagePart part) {
     return SliverToBoxAdapter(
       child: SizedBox(
@@ -434,8 +431,10 @@ Iterable<Widget> _buildExplorePagePart(
             children: [
               Text(
                 part.title,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const Spacer(),
               if (part.viewMore != null)
@@ -445,7 +444,7 @@ Iterable<Widget> _buildExplorePagePart(
                     part.viewMore!.jump(context);
                   },
                   child: Text("View more".tl),
-                )
+                ),
             ],
           ),
         ),
@@ -492,10 +491,10 @@ class _MultiPartExplorePageState extends State<_MultiPartExplorePage> {
   String? message;
 
   Map<String, dynamic> get state => {
-        "loading": loading,
-        "message": message,
-        "parts": parts,
-      };
+    "loading": loading,
+    "message": message,
+    "parts": parts,
+  };
 
   void restoreState(dynamic state) {
     if (state == null) return;
@@ -549,9 +548,7 @@ class _MultiPartExplorePageState extends State<_MultiPartExplorePage> {
   Widget build(BuildContext context) {
     if (loading) {
       load();
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     } else if (message != null) {
       return NetworkError(
         message: message!,

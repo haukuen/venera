@@ -19,6 +19,7 @@ abstract mixin class _ComicPageActions {
     update();
     var res = await comicSource.likeOrUnlikeComic!(comic.id, isLiked);
     if (res.error) {
+      if (!App.rootContext.mounted) return;
       App.rootContext.showMessage(message: res.errorMessage!);
     } else {
       isLiked = !isLiked;
@@ -105,22 +106,22 @@ abstract mixin class _ComicPageActions {
   void read([int? ep, int? page, int? group]) {
     App.rootContext
         .to(
-      () => Reader(
-        type: comic.comicType,
-        cid: comic.id,
-        name: comic.title,
-        chapters: comic.chapters,
-        initialChapter: ep,
-        initialPage: page,
-        initialChapterGroup: group,
-        history: history ?? History.fromModel(model: comic, ep: 0, page: 0),
-        author: comic.findAuthor() ?? '',
-        tags: comic.plainTags,
-      )
-    )
+          () => Reader(
+            type: comic.comicType,
+            cid: comic.id,
+            name: comic.title,
+            chapters: comic.chapters,
+            initialChapter: ep,
+            initialPage: page,
+            initialChapterGroup: group,
+            history: history ?? History.fromModel(model: comic, ep: 0, page: 0),
+            author: comic.findAuthor() ?? '',
+            tags: comic.plainTags,
+          ),
+        )
         .then((_) {
-      onReadEnd();
-    });
+          onReadEnd();
+        });
   }
 
   void continueRead() {
@@ -166,10 +167,7 @@ abstract mixin class _ComicPageActions {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      RadioListTile<int>(
-                        value: -1,
-                        title: Text("Normal".tl),
-                      ),
+                      RadioListTile<int>(value: -1, title: Text("Normal".tl)),
                       ExpansionTile(
                         title: Text("Archive".tl),
                         shape: const RoundedRectangleBorder(
@@ -184,16 +182,18 @@ abstract mixin class _ComicPageActions {
                             comicSource.archiveDownloader!
                                 .getArchives(comic.id)
                                 .then((value) {
-                              if (value.success) {
-                                archives = value.data;
-                              } else {
-                                App.rootContext
-                                    .showMessage(message: value.errorMessage!);
-                              }
-                              setState(() {
-                                isLoading = false;
-                              });
-                            });
+                                  if (value.success) {
+                                    archives = value.data;
+                                  } else {
+                                    if (!App.rootContext.mounted) return;
+                                    App.rootContext.showMessage(
+                                      message: value.errorMessage!,
+                                    );
+                                  }
+                                  setState(() {
+                                    isLoading = false;
+                                  });
+                                });
                           }
                         },
                         children: [
@@ -205,9 +205,9 @@ abstract mixin class _ComicPageActions {
                                 value: i,
                                 title: Text(archives![i].title),
                                 subtitle: Text(archives![i].description),
-                              )
+                              ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -223,22 +223,22 @@ abstract mixin class _ComicPageActions {
                       setState(() {
                         isGettingLink = true;
                       });
-                      var res =
-                          await comicSource.archiveDownloader!.getDownloadUrl(
-                        comic.id,
-                        archives![selected].id,
-                      );
+                      var res = await comicSource.archiveDownloader!
+                          .getDownloadUrl(comic.id, archives![selected].id);
                       if (res.error) {
+                        if (!App.rootContext.mounted) return;
                         App.rootContext.showMessage(message: res.errorMessage!);
                         setState(() {
                           isGettingLink = false;
                         });
                       } else if (context.mounted) {
                         if (res.data.isNotEmpty) {
-                          LocalManager()
-                            .addTask(ArchiveDownloadTask(res.data, comic));
-                          App.rootContext
-                            .showMessage(message: "Download started".tl);
+                          LocalManager().addTask(
+                            ArchiveDownloadTask(res.data, comic),
+                          );
+                          App.rootContext.showMessage(
+                            message: "Download started".tl,
+                          );
                         }
                         context.pop();
                       }
@@ -257,23 +257,27 @@ abstract mixin class _ComicPageActions {
     }
 
     if (comic.chapters == null) {
-      LocalManager().addTask(ImagesDownloadTask(
-        source: comicSource,
-        comicId: comic.id,
-        comic: comic,
-      ));
+      LocalManager().addTask(
+        ImagesDownloadTask(
+          source: comicSource,
+          comicId: comic.id,
+          comic: comic,
+        ),
+      );
     } else {
       List<int>? selected;
       var downloaded = <int>[];
       var localComic = LocalManager().find(comic.id, comic.comicType);
       if (localComic != null) {
         for (int i = 0; i < comic.chapters!.length; i++) {
-          if (localComic.downloadedChapters
-              .contains(comic.chapters!.ids.elementAt(i))) {
+          if (localComic.downloadedChapters.contains(
+            comic.chapters!.ids.elementAt(i),
+          )) {
             downloaded.add(i);
           }
         }
       }
+      if (!App.rootContext.mounted) return;
       await showSideBar(
         App.rootContext,
         _SelectDownloadChapter(
@@ -283,15 +287,19 @@ abstract mixin class _ComicPageActions {
         ),
       );
       if (selected == null) return;
-      LocalManager().addTask(ImagesDownloadTask(
-        source: comicSource,
-        comicId: comic.id,
-        comic: comic,
-        chapters: selected!.map((i) {
-          return comic.chapters!.ids.elementAt(i);
-        }).toList(),
-      ));
+      if (!App.rootContext.mounted) return;
+      LocalManager().addTask(
+        ImagesDownloadTask(
+          source: comicSource,
+          comicId: comic.id,
+          comic: comic,
+          chapters: selected!.map((i) {
+            return comic.chapters!.ids.elementAt(i);
+          }).toList(),
+        ),
+      );
     }
+    if (!App.rootContext.mounted) return;
     App.rootContext.showMessage(message: "Download started".tl);
     update();
   }
@@ -304,56 +312,47 @@ abstract mixin class _ComicPageActions {
 
   void showMoreActions() {
     var context = App.rootContext;
-    showMenuX(
-        context,
-        Offset(
-          context.width - 16,
-          context.padding.top,
+    showMenuX(context, Offset(context.width - 16, context.padding.top), [
+      MenuEntry(
+        icon: Icons.copy,
+        text: "Copy Title".tl,
+        onClick: () {
+          Clipboard.setData(ClipboardData(text: comic.title));
+          context.showMessage(message: "Copied".tl);
+        },
+      ),
+      MenuEntry(
+        icon: Icons.copy_rounded,
+        text: "Copy ID".tl,
+        onClick: () {
+          Clipboard.setData(ClipboardData(text: comic.id));
+          context.showMessage(message: "Copied".tl);
+        },
+      ),
+      if (comic.url != null)
+        MenuEntry(
+          icon: Icons.link,
+          text: "Copy URL".tl,
+          onClick: () {
+            Clipboard.setData(ClipboardData(text: comic.url!));
+            context.showMessage(message: "Copied".tl);
+          },
         ),
-        [
-          MenuEntry(
-            icon: Icons.copy,
-            text: "Copy Title".tl,
-            onClick: () {
-              Clipboard.setData(ClipboardData(text: comic.title));
-              context.showMessage(message: "Copied".tl);
-            },
-          ),
-          MenuEntry(
-            icon: Icons.copy_rounded,
-            text: "Copy ID".tl,
-            onClick: () {
-              Clipboard.setData(ClipboardData(text: comic.id));
-              context.showMessage(message: "Copied".tl);
-            },
-          ),
-          if (comic.url != null)
-            MenuEntry(
-              icon: Icons.link,
-              text: "Copy URL".tl,
-              onClick: () {
-                Clipboard.setData(ClipboardData(text: comic.url!));
-                context.showMessage(message: "Copied".tl);
-              },
-            ),
-          if (comic.url != null)
-            MenuEntry(
-              icon: Icons.open_in_browser,
-              text: "Open in Browser".tl,
-              onClick: () {
-                launchUrlString(comic.url!);
-              },
-            ),
-        ]);
+      if (comic.url != null)
+        MenuEntry(
+          icon: Icons.open_in_browser,
+          text: "Open in Browser".tl,
+          onClick: () {
+            launchUrlString(comic.url!);
+          },
+        ),
+    ]);
   }
 
   void showComments() {
     showSideBar(
       App.rootContext,
-      CommentsPage(
-        data: comic,
-        source: comicSource,
-      ),
+      CommentsPage(data: comic, source: comicSource),
     );
   }
 
@@ -377,9 +376,7 @@ abstract mixin class _ComicPageActions {
                   width: 210,
                   child: Column(
                     children: [
-                      const SizedBox(
-                        height: 10,
-                      ),
+                      const SizedBox(height: 10),
                       RatingWidget(
                         padding: 2,
                         onRatingUpdate: (value) => rating = value,
@@ -396,26 +393,31 @@ abstract mixin class _ComicPageActions {
                           });
                           comicSource.starRatingFunc!(comic.id, rating.round())
                               .then((value) {
-                            if (value.success) {
-                              App.rootContext
-                                  .showMessage(message: "Success".tl);
-                              Navigator.of(dialogContext).pop();
-                            } else {
-                              App.rootContext
-                                  .showMessage(message: value.errorMessage!);
-                              setState(() {
-                                isLoading = false;
+                                if (value.success) {
+                                  if (!App.rootContext.mounted) return;
+                                  App.rootContext.showMessage(
+                                    message: "Success".tl,
+                                  );
+                                  Navigator.of(dialogContext).pop();
+                                } else {
+                                  if (!App.rootContext.mounted) return;
+                                  App.rootContext.showMessage(
+                                    message: value.errorMessage!,
+                                  );
+                                  if (!context.mounted) return;
+                                  setState(() {
+                                    isLoading = false;
+                                  });
+                                }
                               });
-                            }
-                          });
                         },
                         child: Text("Submit".tl),
-                      )
+                      ),
                     ],
                   ),
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),

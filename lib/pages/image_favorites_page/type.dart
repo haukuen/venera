@@ -30,8 +30,10 @@ class TimeRange {
 
   static const lastMonth = TimeRange(end: null, duration: Duration(days: 30));
 
-  static const lastHalfYear =
-      TimeRange(end: null, duration: Duration(days: 180));
+  static const lastHalfYear = TimeRange(
+    end: null,
+    duration: Duration(days: 180),
+  );
 
   static const lastYear = TimeRange(end: null, duration: Duration(days: 365));
 

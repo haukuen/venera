@@ -10,7 +10,10 @@ Database openSqliteDatabase(String path) {
 
 /// Execute a function with a temporary database connection, ensuring cleanup.
 /// Use this in Isolate operations to avoid manual open/dispose boilerplate.
-Future<T> withDatabase<T>(String path, Future<T> Function(Database db) fn) async {
+Future<T> withDatabase<T>(
+  String path,
+  Future<T> Function(Database db) fn,
+) async {
   final db = openSqliteDatabase(path);
   try {
     return await fn(db);

@@ -18,27 +18,43 @@ class LocalComicImageProvider
   @override
   Future<Uint8List> load(chunkEvents, checkStop) async {
     File? file = comic.coverFile;
-    if(! await file.exists()) {
+    if (!await file.exists()) {
       file = null;
       var dir = Directory(comic.directory);
-      if (! await dir.exists()) {
+      if (!await dir.exists()) {
         throw "Error: Comic not found.";
       }
       Directory? firstDir;
       await for (var entity in dir.list()) {
-        if(entity is File) {
-          if(["jpg", "jpeg", "png", "webp", "gif", "jpe", "jpeg"].contains(entity.extension)) {
+        if (entity is File) {
+          if ([
+            "jpg",
+            "jpeg",
+            "png",
+            "webp",
+            "gif",
+            "jpe",
+            "jpeg",
+          ].contains(entity.extension)) {
             file = entity;
             break;
           }
-        } else if(entity is Directory) {
+        } else if (entity is Directory) {
           firstDir ??= entity;
         }
       }
-      if(file == null && firstDir != null) {
+      if (file == null && firstDir != null) {
         await for (var entity in firstDir.list()) {
-          if(entity is File) {
-            if(["jpg", "jpeg", "png", "webp", "gif", "jpe", "jpeg"].contains(entity.extension)) {
+          if (entity is File) {
+            if ([
+              "jpg",
+              "jpeg",
+              "png",
+              "webp",
+              "gif",
+              "jpe",
+              "jpeg",
+            ].contains(entity.extension)) {
               file = entity;
               break;
             }
@@ -46,12 +62,12 @@ class LocalComicImageProvider
         }
       }
     }
-    if(file == null) {
+    if (file == null) {
       throw "Error: Cover not found.";
     }
     checkStop();
     var data = await file.readAsBytes();
-    if(data.isEmpty) {
+    if (data.isEmpty) {
       throw "Exception: Empty file(${file.path}).";
     }
     return data;
