@@ -45,7 +45,7 @@ Future<bool> _deleteComic(
                     context.showMessage(message: "Deleted".tl);
                     result = true;
                     context.pop();
-                  } else {
+                    if (!context.mounted) return;
                     setState(() {
                       loading = false;
                     });
