@@ -42,9 +42,11 @@ class _AppSettingsState extends State<AppSettings> {
             if (!App.rootContext.mounted) return;
             var loadingDialog = showLoadingDialog(
               App.rootContext,
+              barrierDismissible: false,
               allowCancel: false,
             );
             var res = await LocalManager().setNewPath(result);
+            if (!App.rootContext.mounted) return;
             loadingDialog.close();
             if (res != null) {
               if (!context.mounted) return;

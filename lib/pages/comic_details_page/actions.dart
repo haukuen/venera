@@ -404,6 +404,7 @@ abstract mixin class _ComicPageActions {
                                   App.rootContext.showMessage(
                                     message: value.errorMessage!,
                                   );
+                                  if (!context.mounted) return;
                                   setState(() {
                                     isLoading = false;
                                   });

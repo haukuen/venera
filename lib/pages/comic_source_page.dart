@@ -716,7 +716,9 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
           context.showMessage(message: e.toString());
         }
       }
-      loadingController.close();
+      if (mounted) {
+        loadingController.close();
+      }
     }
   }
 
