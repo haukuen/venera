@@ -26,6 +26,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
 
   var lastValue = 0;
 
+  _ReaderState? _readerRef;
   _ReaderGestureDetectorState? _gestureDetectorState;
 
   void setFloatingButton(int value) {
@@ -96,11 +97,12 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.reader._scaffoldState = this;
+      _readerRef = context.reader;
+      _readerRef!._scaffoldState = this;
       final show =
           appdata.settings.getReaderSetting(
-            context.reader.cid,
-            context.reader.type.sourceKey,
+            _readerRef!.cid,
+            _readerRef!.type.sourceKey,
             'showSystemStatusBar',
           ) ==
           true;
@@ -113,7 +115,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
 
   @override
   void dispose() {
-    context.reader._scaffoldState = null;
+    _readerRef?._scaffoldState = null;
     sliderFocus.dispose();
     super.dispose();
   }
