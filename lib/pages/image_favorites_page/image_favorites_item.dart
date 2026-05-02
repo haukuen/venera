@@ -7,6 +7,7 @@ class _ImageFavoritesItem extends StatefulWidget {
     required this.addSelected,
     required this.multiSelectMode,
     required this.finalImageFavoritesComicList,
+    this.onReturnFromReader,
   });
 
   final ImageFavoritesComic imageFavoritesComic;
@@ -14,13 +15,24 @@ class _ImageFavoritesItem extends StatefulWidget {
   final Map<ImageFavorite, bool> selectedImageFavorites;
   final List<ImageFavoritesComic> finalImageFavoritesComicList;
   final bool multiSelectMode;
+  final VoidCallback? onReturnFromReader;
 
   @override
   State<_ImageFavoritesItem> createState() => _ImageFavoritesItemState();
 }
 
 class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
-  late final imageFavorites = widget.imageFavoritesComic.images.toList();
+  late List<ImageFavorite> imageFavorites = widget.imageFavoritesComic.images
+      .toList();
+
+  @override
+  void didUpdateWidget(covariant _ImageFavoritesItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageFavoritesComic.images !=
+        widget.imageFavoritesComic.images) {
+      imageFavorites = widget.imageFavoritesComic.images.toList();
+    }
+  }
 
   void goComicInfo(ImageFavoritesComic comic) {
     App.mainNavigatorKey?.currentContext?.to(
@@ -29,14 +41,18 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
   }
 
   void goReaderPage(ImageFavoritesComic comic, int ep, int page) {
-    App.rootContext.to(
-      () => ReaderWithLoading(
-        id: comic.id,
-        sourceKey: comic.sourceKey,
-        initialEp: ep,
-        initialPage: page,
-      ),
-    );
+    App.rootContext
+        .to(
+          () => ReaderWithLoading(
+            id: comic.id,
+            sourceKey: comic.sourceKey,
+            initialEp: ep,
+            initialPage: page,
+          ),
+        )
+        .then((_) {
+          widget.onReturnFromReader?.call();
+        });
   }
 
   void goPhotoView(ImageFavorite imageFavorite) {

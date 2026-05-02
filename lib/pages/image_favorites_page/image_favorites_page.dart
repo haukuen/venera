@@ -294,6 +294,7 @@ class _ImageFavoritesPageState extends State<ImageFavoritesPage> {
               addSelected: addSelected,
               multiSelectMode: multiSelectMode,
               finalImageFavoritesComicList: comics,
+              onReturnFromReader: updateImageFavorites,
             );
           }, childCount: comics.length),
         ),
