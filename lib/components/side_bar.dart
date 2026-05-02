@@ -180,7 +180,7 @@ Future<void> showSideBar(
   bool useSurfaceTintColor = false,
   bool dismissible = true,
   double width = 500,
-  bool addTopPadding = false,
+  bool addTopPadding = true,
 }) {
   return Navigator.of(context).push(
     SideBarRoute(
