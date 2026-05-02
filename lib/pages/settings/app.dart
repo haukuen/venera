@@ -39,16 +39,18 @@ class _AppSettingsState extends State<AppSettings> {
               result = await selectDirectory();
             }
             if (result == null) return;
+            if (!App.rootContext.mounted) return;
             var loadingDialog = showLoadingDialog(
               App.rootContext,
-              barrierDismissible: false,
               allowCancel: false,
             );
             var res = await LocalManager().setNewPath(result);
             loadingDialog.close();
             if (res != null) {
+              if (!context.mounted) return;
               context.showMessage(message: res);
             } else {
+              if (!context.mounted) return;
               context.showMessage(message: "Path set successfully".tl);
               setState(() {});
             }
@@ -69,6 +71,7 @@ class _AppSettingsState extends State<AppSettings> {
             );
             await CacheManager().clear();
             loadingDialog.close();
+            if (!context.mounted) return;
             context.showMessage(message: "Cache cleared".tl);
             setState(() {});
           },
@@ -111,6 +114,7 @@ class _AppSettingsState extends State<AppSettings> {
                 }
               } catch (e, s) {
                 Log.error("Import data", e.toString(), s);
+                if (!context.mounted) return;
                 context.showMessage(message: "Failed to import data".tl);
               } finally {
                 cacheFile.deleteIgnoreError();
@@ -166,6 +170,7 @@ class _AppSettingsState extends State<AppSettings> {
                     canAuthenticateWithBiometrics ||
                     await auth.isDeviceSupported();
                 if (!canAuthenticate) {
+                  if (!context.mounted) return;
                   context.showMessage(message: "Biometrics not supported".tl);
                   setState(() {
                     appdata.settings['authorizationRequired'] = false;
@@ -524,10 +529,12 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                     appdata.implicitData['webdavAutoSync'] = oldAutoSync;
                     appdata.writeImplicitData();
                     appdata.saveData();
+                    if (!context.mounted) return;
                     context.showMessage(message: testResult.errorMessage!);
                     context.showMessage(message: "Saved Failed".tl);
                   } else {
                     appdata.saveData();
+                    if (!context.mounted) return;
                     context.showMessage(message: "Saved".tl);
                     App.rootPop();
                   }

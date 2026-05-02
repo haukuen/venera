@@ -98,6 +98,7 @@ Future<void> checkUpdateUi([
       if (delay) {
         await Future.delayed(const Duration(seconds: 2));
       }
+      if (!App.rootContext.mounted) return;
       showDialog(
         context: App.rootContext,
         builder: (context) {
@@ -119,6 +120,7 @@ Future<void> checkUpdateUi([
         },
       );
     } else if (showMessageIfNoUpdate) {
+      if (!App.rootContext.mounted) return;
       App.rootContext.showMessage(message: "No new version available".tl);
     }
   } catch (e, s) {

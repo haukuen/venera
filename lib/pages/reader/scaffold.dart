@@ -293,6 +293,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       int maxPage = context.reader.images!.length;
       int? page = await selectImage();
       if (page == null) return;
+      if (!mounted) return;
       page += 1;
       String sourceKey = context.reader.type.sourceKey;
       String imageKey = context.reader.images![page - 1];
@@ -686,6 +687,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (result == null) {
       return;
     }
+    if (!mounted) return;
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
     // Save file name: ComicName_EP{chapter}_P{page}.{ext} to avoid conflict.
@@ -700,6 +702,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (result == null) {
       return;
     }
+    if (!mounted) return;
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
     var filename =
@@ -922,10 +925,12 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (i == null) {
       return null;
     }
+    if (!mounted) return null;
     var imageKey = context.reader.images![i];
     Uint8List data;
     if (imageKey.startsWith("file://")) {
       data = await File(imageKey.substring(7)).readAsBytes();
+      if (!mounted) return null;
     } else {
       data = await (await CacheManager().findCache(
         "$imageKey@${context.reader.type.sourceKey}@${context.reader.cid}@${context.reader.eid}",

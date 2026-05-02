@@ -409,6 +409,7 @@ Future<void> showInputDialog({
                     result = futureOr;
                   }
                   if (result == null) {
+                    if (!context.mounted) return;
                     context.pop();
                   } else {
                     setState(() => error = result.toString());

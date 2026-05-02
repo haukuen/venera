@@ -742,6 +742,7 @@ mixin class _ReaderWindow {
     await windowManager.setFullScreen(!isFullscreen);
     await windowManager.show();
     isFullscreen = !isFullscreen;
+    if (!App.rootContext.mounted) return;
     WindowFrame.of(App.rootContext).setWindowFrame(!isFullscreen);
   }
 

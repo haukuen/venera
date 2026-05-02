@@ -19,6 +19,7 @@ abstract mixin class _ComicPageActions {
     update();
     var res = await comicSource.likeOrUnlikeComic!(comic.id, isLiked);
     if (res.error) {
+      if (!App.rootContext.mounted) return;
       App.rootContext.showMessage(message: res.errorMessage!);
     } else {
       isLiked = !isLiked;
@@ -184,6 +185,7 @@ abstract mixin class _ComicPageActions {
                                   if (value.success) {
                                     archives = value.data;
                                   } else {
+                                    if (!App.rootContext.mounted) return;
                                     App.rootContext.showMessage(
                                       message: value.errorMessage!,
                                     );
@@ -224,6 +226,7 @@ abstract mixin class _ComicPageActions {
                       var res = await comicSource.archiveDownloader!
                           .getDownloadUrl(comic.id, archives![selected].id);
                       if (res.error) {
+                        if (!App.rootContext.mounted) return;
                         App.rootContext.showMessage(message: res.errorMessage!);
                         setState(() {
                           isGettingLink = false;
@@ -274,6 +277,7 @@ abstract mixin class _ComicPageActions {
           }
         }
       }
+      if (!App.rootContext.mounted) return;
       await showSideBar(
         App.rootContext,
         _SelectDownloadChapter(
@@ -283,6 +287,7 @@ abstract mixin class _ComicPageActions {
         ),
       );
       if (selected == null) return;
+      if (!App.rootContext.mounted) return;
       LocalManager().addTask(
         ImagesDownloadTask(
           source: comicSource,
@@ -294,6 +299,7 @@ abstract mixin class _ComicPageActions {
         ),
       );
     }
+    if (!App.rootContext.mounted) return;
     App.rootContext.showMessage(message: "Download started".tl);
     update();
   }
@@ -388,11 +394,13 @@ abstract mixin class _ComicPageActions {
                           comicSource.starRatingFunc!(comic.id, rating.round())
                               .then((value) {
                                 if (value.success) {
+                                  if (!App.rootContext.mounted) return;
                                   App.rootContext.showMessage(
                                     message: "Success".tl,
                                   );
                                   Navigator.of(dialogContext).pop();
                                 } else {
+                                  if (!App.rootContext.mounted) return;
                                   App.rootContext.showMessage(
                                     message: value.errorMessage!,
                                   );

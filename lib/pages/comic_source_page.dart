@@ -58,6 +58,7 @@ class ComicSourcePage extends StatelessWidget {
     } catch (e) {
       if (cancel) return;
       if (showLoading) {
+        if (!App.rootContext.mounted) return;
         App.rootContext.showMessage(message: e.toString());
       } else {
         rethrow;
@@ -171,6 +172,7 @@ class _BodyState extends State<_Body> {
     if (App.isDesktop) {
       try {
         await Process.run("code", [source.filePath], runInShell: true);
+        if (!App.rootContext.mounted) return;
         await showDialog(
           context: App.rootContext,
           builder: (context) => AlertDialog(
@@ -195,6 +197,7 @@ class _BodyState extends State<_Body> {
         //
       }
     }
+    if (!mounted) return;
     context.to(
       () => _EditFilePage(source.filePath, () async {
         await ComicSourceManager().reload();
@@ -277,6 +280,7 @@ class _BodyState extends State<_Body> {
       var content = utf8.decode(bytes);
       await addSource(content, fileName);
     } catch (e, s) {
+      if (!App.rootContext.mounted) return;
       App.rootContext.showMessage(message: e.toString());
       Log.error("Add comic source", "$e\n$s");
     }
@@ -314,6 +318,7 @@ class _BodyState extends State<_Body> {
       await addSource(res.data!, fileName);
     } catch (e, s) {
       if (cancel) return;
+      if (!mounted) return;
       context.showMessage(message: e.toString());
       Log.error("Add comic source", "$e\n$s");
     }
@@ -366,6 +371,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       context.showMessage(message: "Network error".tl);
       if (mounted) {
         setState(() {
@@ -650,6 +656,7 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
       isLoading = true;
     });
     var count = await ComicSourcePage.checkComicSourceUpdate();
+    if (!mounted) return;
     if (count == -1) {
       context.showMessage(message: "Network error".tl);
     } else if (count == 0) {
@@ -687,6 +694,7 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
         );
       },
     );
+    if (!mounted) return;
     if (doUpdate) {
       var loadingController = showLoadingDialog(
         context,
@@ -704,7 +712,9 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
           loadingController.setProgress(current / total);
         }
       } catch (e) {
-        context.showMessage(message: e.toString());
+        if (mounted) {
+          context.showMessage(message: e.toString());
+        }
       }
       loadingController.close();
     }
@@ -1040,6 +1050,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
             });
             final List account = source.data["account"];
             var res = await source.account!.login!(account[0], account[1]);
+            if (!mounted) return;
             if (res.error) {
               context.showMessage(message: res.errorMessage!);
             } else {
@@ -1206,6 +1217,7 @@ class _LoginPageState extends State<_LoginPage> {
         loading = true;
       });
       widget.config.login!(username, password).then((value) {
+        if (!mounted) return;
         if (value.error) {
           context.showMessage(message: value.errorMessage!);
           setState(() {
@@ -1225,6 +1237,7 @@ class _LoginPageState extends State<_LoginPage> {
           .map((e) => _cookies[e] ?? '')
           .toList();
       widget.config.validateCookies!(cookies).then((value) {
+        if (!mounted) return;
         if (value) {
           widget.source.data['account'] = 'ok';
           widget.source.saveData();
@@ -1284,6 +1297,7 @@ class _LoginPageState extends State<_LoginPage> {
     if (success) {
       widget.source.data['account'] = 'ok';
       widget.source.saveData();
+      if (!mounted) return;
       context.pop();
     }
   }
@@ -1291,6 +1305,7 @@ class _LoginPageState extends State<_LoginPage> {
   // for linux
   void loginWithWebview2() async {
     if (!await DesktopWebview.isAvailable()) {
+      if (!mounted) return;
       context.showMessage(message: "Webview is not available".tl);
     }
 

@@ -531,6 +531,10 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       }
     } catch (e, s) {
       Log.error("Export Comics", e, s);
+      if (!mounted) {
+        loadingController.close();
+        return;
+      }
       context.showMessage(message: e.toString());
       loadingController.close();
       return;

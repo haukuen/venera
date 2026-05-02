@@ -58,6 +58,7 @@ Future<bool> handleAppLink(Uri uri) async {
         });
       } else if (comic.title != null && comic.title!.isNotEmpty) {
         final keyword = comic.title!;
+        if (!App.rootContext.mounted) return true;
         App.rootContext.showMessage(
           message: 'Comic source not found: @s'.tlParams({'s': comicSource}),
         );

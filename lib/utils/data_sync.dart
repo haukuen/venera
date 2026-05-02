@@ -29,6 +29,7 @@ class DataSync with ChangeNotifier {
     ComicSourceManager().addListener(onDataChanged);
     if (App.isDesktop) {
       Future.delayed(const Duration(seconds: 1), () {
+        if (!App.rootContext.mounted) return;
         var controller = WindowFrame.of(App.rootContext);
         controller.addCloseListener(_handleWindowClose);
       });

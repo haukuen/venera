@@ -544,6 +544,7 @@ class _ImportComicsWidgetState extends State<_ImportComicsWidget> {
       int() => true,
     };
     if (result) {
+      if (!mounted) return;
       context.pop();
     } else {
       setState(() {
@@ -814,6 +815,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
           displayType = type;
         });
         await Future.delayed(const Duration(milliseconds: 20));
+        if (!mounted) return;
         var scrollController = ScrollState.of(context).controller;
         scrollController.animateTo(
           scrollController.position.maxScrollExtent,

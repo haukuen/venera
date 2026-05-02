@@ -41,6 +41,7 @@ Future<bool> _deleteComic(
                   if (res.success) {
                     // Invalidate network cache so next loads fetch fresh data
                     NetworkCacheManager().clear();
+                    if (!context.mounted) return;
                     context.showMessage(message: "Deleted".tl);
                     result = true;
                     context.pop();
@@ -48,6 +49,7 @@ Future<bool> _deleteComic(
                     setState(() {
                       loading = false;
                     });
+                    if (!context.mounted) return;
                     context.showMessage(message: res.errorMessage!);
                   }
                 },
@@ -458,6 +460,7 @@ class _FolderTile extends StatelessWidget {
                     });
                     var res = await deleteFolder!();
                     if (res.success) {
+                      if (!context.mounted) return;
                       context.showMessage(message: "Deleted".tl);
                       context.pop();
                       updateState?.call();
@@ -465,6 +468,7 @@ class _FolderTile extends StatelessWidget {
                       setState(() {
                         loading = false;
                       });
+                      if (!context.mounted) return;
                       context.showMessage(message: res.errorMessage!);
                     }
                   },
@@ -522,11 +526,13 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
             });
             widget.data.addFolder!(controller.text).then((b) {
               if (b.error) {
+                if (!context.mounted) return;
                 context.showMessage(message: b.errorMessage!);
                 setState(() {
                   loading = false;
                 });
               } else {
+                if (!context.mounted) return;
                 context.pop();
                 context.showMessage(message: "Created successfully".tl);
                 widget.updateState();

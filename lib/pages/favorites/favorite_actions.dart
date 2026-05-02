@@ -40,9 +40,11 @@ Future<void> newFolder() async {
                   try {
                     LocalFavoritesManager().fromJson(utf8.decode(data));
                   } catch (e) {
+                    if (!context.mounted) return;
                     context.showMessage(message: "Failed to import".tl);
                     return;
                   }
+                  if (!context.mounted) return;
                   context.pop();
                 },
               ).paddingRight(4),
@@ -456,6 +458,7 @@ Future<void> importNetworkFolder(
   void Function()? updateDialog;
   void Function()? closeDialog;
 
+  if (!App.rootContext.mounted) return;
   showDialog(
     context: App.rootContext,
     builder: (context) {

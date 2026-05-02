@@ -104,6 +104,7 @@ class _Tag {
   static void handleLink(String link) async {
     if (link.isURL) {
       if (await handleAppLink(Uri.parse(link))) {
+        if (!App.rootContext.mounted) return;
         Navigator.of(App.rootContext).maybePop();
       } else {
         launchUrlString(link);

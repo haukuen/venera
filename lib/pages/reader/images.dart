@@ -256,6 +256,7 @@ class _GalleryModeState extends State<_GalleryMode>
     controller = PageController(initialPage: reader.page);
     reader._imageViewController = this;
     Future.microtask(() {
+      if (!mounted) return;
       context.readerScaffold.setFloatingButton(0);
     });
     super.initState();

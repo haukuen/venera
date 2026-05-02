@@ -26,13 +26,16 @@ class ImportComic {
     if (file == null) {
       return false;
     }
+    if (!App.rootContext.mounted) return false;
     var controller = showLoadingDialog(App.rootContext, allowCancel: false);
     try {
       var comic = await CBZ.import(File(file.path));
       imported[selectedFolder] = [comic];
     } catch (e, s) {
       Log.error("Import Comic", e.toString(), s);
-      App.rootContext.showMessage(message: e.toString());
+      if (App.rootContext.mounted) {
+        App.rootContext.showMessage(message: e.toString());
+      }
     }
     controller.close();
     return registerComics(imported, false);
@@ -46,6 +49,7 @@ class ImportComic {
       const supportedExtensions = ['cbz', 'zip', '7z', 'cb7'];
       files.removeWhere((e) => !supportedExtensions.contains(e.extension));
       Map<String?, List<LocalComic>> imported = {};
+      if (!App.rootContext.mounted) return false;
       var controller = showLoadingDialog(App.rootContext, allowCancel: false);
       var comics = <LocalComic>[];
       for (var file in files) {
@@ -57,6 +61,7 @@ class ImportComic {
         }
       }
       if (comics.isEmpty) {
+        if (!App.rootContext.mounted) return false;
         App.rootContext.showMessage(message: "No valid comics found".tl);
       }
       imported[selectedFolder] = comics;
@@ -76,6 +81,7 @@ class ImportComic {
     }
 
     bool cancelled = false;
+    if (!App.rootContext.mounted) return false;
     var controller = showLoadingDialog(
       App.rootContext,
       onCancel: () {
@@ -170,7 +176,9 @@ class ImportComic {
       await File(cache).deleteIgnoreError();
     } catch (e, s) {
       Log.error("Import Comic", e.toString(), s);
-      App.rootContext.showMessage(message: e.toString());
+      if (App.rootContext.mounted) {
+        App.rootContext.showMessage(message: e.toString());
+      }
     }
     controller.close();
     if (cancelled) return false;
@@ -190,6 +198,7 @@ class ImportComic {
         if (result != null) {
           imported[selectedFolder]!.add(result);
         } else {
+          if (!App.rootContext.mounted) return false;
           App.rootContext.showMessage(message: "Invalid Comic".tl);
           return false;
         }
@@ -205,7 +214,9 @@ class ImportComic {
       }
     } catch (e, s) {
       Log.error("Import Comic", e.toString(), s);
-      App.rootContext.showMessage(message: e.toString());
+      if (App.rootContext.mounted) {
+        App.rootContext.showMessage(message: e.toString());
+      }
     }
     return registerComics(imported, copyToLocal);
   }
@@ -214,6 +225,7 @@ class ImportComic {
     var localDir = LocalManager().directory;
     Map<String?, List<LocalComic>> imported = {null: []};
     bool cancelled = false;
+    if (!App.rootContext.mounted) return false;
     var controller = showLoadingDialog(
       App.rootContext,
       onCancel: () {
@@ -222,6 +234,7 @@ class ImportComic {
     );
     try {
       if (!await localDir.exists()) {
+        if (!App.rootContext.mounted) return false;
         App.rootContext.showMessage(message: "Local path not found".tl);
         controller.close();
         return false;
@@ -243,10 +256,12 @@ class ImportComic {
         }
       }
       if (!cancelled && imported[null]!.isEmpty) {
+        if (!App.rootContext.mounted) return false;
         App.rootContext.showMessage(message: "No valid comics found".tl);
       }
     } catch (e, s) {
       Log.error("Import Comic", e.toString(), s);
+      if (!App.rootContext.mounted) return false;
       App.rootContext.showMessage(message: e.toString());
     }
     controller.close();
@@ -411,6 +426,7 @@ class ImportComic {
           );
         }
       } catch (e, s) {
+        if (!App.rootContext.mounted) return result;
         App.rootContext.showMessage(message: "Failed to copy comics".tl);
         Log.error("Import Comic", e.toString(), s);
         return result;
@@ -449,10 +465,12 @@ class ImportComic {
           }
         }
       }
+      if (!App.rootContext.mounted) return true;
       App.rootContext.showMessage(
         message: "Imported @a comics".tlParams({'a': importedCount}),
       );
     } catch (e, s) {
+      if (!App.rootContext.mounted) return false;
       App.rootContext.showMessage(message: "Failed to register comics".tl);
       Log.error("Import Comic", e.toString(), s);
       return false;

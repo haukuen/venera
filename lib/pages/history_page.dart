@@ -97,13 +97,11 @@ class _HistoryPageState extends State<HistoryPage> {
   void _refreshHistory(History comic) async {
     var result = await HistoryManager().refreshHistoryInfo(comic);
     if (result) {
-      if (mounted) {
-        App.rootContext.showMessage(message: "Refresh Success".tl);
-      }
+      if (!App.rootContext.mounted) return;
+      App.rootContext.showMessage(message: "Refresh Success".tl);
     } else {
-      if (mounted) {
-        App.rootContext.showMessage(message: "Refresh Failed".tl);
-      }
+      if (!App.rootContext.mounted) return;
+      App.rootContext.showMessage(message: "Refresh Failed".tl);
     }
   }
 

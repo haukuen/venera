@@ -191,6 +191,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
   void loadFolders() async {
     var res = await widget.comicSource.favoriteData!.loadFolders!(widget.cid);
     if (res.error) {
+      if (!mounted) return;
       context.showMessage(message: res.errorMessage!);
       setState(() {
         isLoadingFolders = false;
@@ -336,13 +337,17 @@ class _NetworkSectionState extends State<_NetworkSection> {
                         localIsFavorite = !isFavorite;
                       });
                       widget.onFavorite(!isFavorite);
-                      App.rootContext.showMessage(
-                        message: isFavorite ? "Removed".tl : "Added".tl,
-                      );
+                      if (App.rootContext.mounted) {
+                        App.rootContext.showMessage(
+                          message: isFavorite ? "Removed".tl : "Added".tl,
+                        );
+                      }
                       if (appdata.settings['autoCloseFavoritePanel'] ?? false) {
+                        if (!mounted) return;
                         context.pop();
                       }
                     } else {
+                      if (!mounted) return;
                       context.showMessage(message: res.errorMessage!);
                     }
                     setState(() {
@@ -431,12 +436,16 @@ class _NetworkSectionState extends State<_NetworkSection> {
                         });
                         // notify parent so page state updates when closing and reopening panel
                         widget.onFavorite(addedFolders.isNotEmpty);
-                        context.showMessage(message: "Success".tl);
+                        if (mounted) {
+                          context.showMessage(message: "Success".tl);
+                        }
                         if (appdata.settings['autoCloseFavoritePanel'] ??
                             false) {
+                          if (!mounted) return;
                           context.pop();
                         }
                       } else {
+                        if (!mounted) return;
                         context.showMessage(message: res.errorMessage!);
                       }
                       setState(() {

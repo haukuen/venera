@@ -366,6 +366,7 @@ class _ReaderGestureDetectorState
     if (image != null) {
       writeImageToClipboard(image);
     } else {
+      if (!mounted) return;
       context.showMessage(message: "No Image");
     }
   }
@@ -377,6 +378,7 @@ class _ReaderGestureDetectorState
       var filetype = detectFileType(image);
       saveFile(filename: "image${filetype.ext}", data: image);
     } else {
+      if (!mounted) return;
       context.showMessage(message: "No Image");
     }
   }
