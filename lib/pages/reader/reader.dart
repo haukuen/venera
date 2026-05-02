@@ -187,6 +187,8 @@ class _ReaderState extends State<Reader>
 
   var focusNode = FocusNode();
 
+  _ReaderScaffoldState? _scaffoldState;
+
   @override
   void initState() {
     page = widget.initialPage ?? 1;
@@ -305,6 +307,28 @@ class _ReaderState extends State<Reader>
   void onKeyEvent(KeyEvent event) {
     if (event.logicalKey == LogicalKeyboardKey.f12 && event is KeyUpEvent) {
       fullscreen();
+      return;
+    }
+    if (event is KeyDownEvent) {
+      final key = event.logicalKey;
+      if (key == LogicalKeyboardKey.home) {
+        toPage(1);
+        return;
+      } else if (key == LogicalKeyboardKey.end) {
+        toPage(maxPage);
+        return;
+      } else if (key == LogicalKeyboardKey.pageUp) {
+        toPrevChapter(toLastPage: true);
+        return;
+      } else if (key == LogicalKeyboardKey.pageDown) {
+        toNextChapter();
+        return;
+      } else if (key == LogicalKeyboardKey.keyB) {
+        if (!isLoading) {
+          _scaffoldState?.addImageFavorite();
+        }
+        return;
+      }
     }
     _imageViewController?.handleKeyEvent(event);
   }

@@ -596,6 +596,12 @@ class _GalleryModeState extends State<_GalleryMode>
 
   @override
   void handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.space) {
+      if (!reader.toPage(reader.page + 1) && !reader.isLastChapterOfGroup) {
+        reader.toNextChapter();
+      }
+      return;
+    }
     bool? forward;
     if (reader.mode == ReaderMode.galleryLeftToRight &&
         event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -1194,6 +1200,10 @@ class _ContinuousModeState extends State<_ContinuousMode>
       });
     }
     if (event is KeyUpEvent) {
+      return;
+    }
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.space) {
+      smoothTo(context.height * 0.8);
       return;
     }
     bool? forward;
