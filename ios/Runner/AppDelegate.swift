@@ -51,15 +51,20 @@ import Foundation // 添加此行
         self.directoryPicker?.selectDirectory(result: result)
       } else if call.method == "getVeneraClipboardLink" {
         if #available(iOS 16.0, *) {
-          UIPasteboard.general.detectPatterns(for: [UTType.url.identifier]) { patterns, error in
-            if let patterns = patterns, !patterns.isEmpty {
-              let text = UIPasteboard.general.string ?? ""
-              if text.contains("venera://") {
-                result(text)
+          UIPasteboard.general.detectPatterns(for: [UTType.url.identifier]) { pasteboardResult in
+            switch pasteboardResult {
+            case .success(let patterns):
+              if !patterns.isEmpty {
+                let text = UIPasteboard.general.string ?? ""
+                if text.contains("venera://") {
+                  result(text)
+                } else {
+                  result(nil)
+                }
               } else {
                 result(nil)
               }
-            } else {
+            case .failure:
               result(nil)
             }
           }
