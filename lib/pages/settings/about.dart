@@ -63,7 +63,7 @@ class _AboutSettingsState extends State<AboutSettings> {
           settingKey: "checkUpdateOnStart",
         ).toSliver(),
         ListTile(
-          title: const Text("Repository"),
+          title: Text("Source Code".tl),
           trailing: const Icon(Icons.open_in_new),
           onTap: () {
             launchUrlString("https://github.com/haukuen/venera");
