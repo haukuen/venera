@@ -1,14 +1,13 @@
 import Flutter
 import UIKit
 import UniformTypeIdentifiers
-import Foundation // 添加此行
+import Foundation
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, UIDocumentPickerDelegate {
   var flutterResult: FlutterResult?
   var directoryPath: URL!
 
-  // 定义插件通道名称
   private var directoryPicker: DirectoryPicker?
 
   override func application(
@@ -22,66 +21,68 @@ import Foundation // 添加此行
     }
 
     let methodChannel = FlutterMethodChannel(name: "venera/method_channel", binaryMessenger: controller.binaryMessenger)
-    methodChannel.setMethodCallHandler { (call, result) in
-      if call.method == "getProxy" {
-        if let proxySettings = CFNetworkCopySystemProxySettings()?.takeUnretainedValue() as NSDictionary?,
-          let dict = proxySettings.object(forKey: kCFNetworkProxiesHTTPProxy) as? NSDictionary,
-          let host = dict.object(forKey: kCFNetworkProxiesHTTPProxy) as? String,
-          let port = dict.object(forKey: kCFNetworkProxiesHTTPPort) as? Int {
-          let proxyConfig = "\(host):\(port)"
-          result(proxyConfig)
-        } else {
-          result("")
-        }
-      } else if call.method == "setScreenOn" {
-        if let arguments = call.arguments as? Bool {
-          let screenOn = arguments
-          UIApplication.shared.isIdleTimerDisabled = screenOn
-        }
-        result(nil)
-      } else if call.method == "getDirectoryPath" {
-        self.flutterResult = result
-        self.getDirectoryPath()
-      } else if call.method == "stopAccessingSecurityScopedResource" {
-        self.directoryPath?.stopAccessingSecurityScopedResource()
-        self.directoryPath = nil
-        result(nil)
-      } else if call.method == "selectDirectory" {
-        self.directoryPicker = DirectoryPicker()
-        self.directoryPicker?.selectDirectory(result: result)
-      } else if call.method == "getVeneraClipboardLink" {
-        if #available(iOS 16.0, *) {
-          UIPasteboard.general.detectPatterns(for: [UTType.url.identifier]) { pasteboardResult in
-            switch pasteboardResult {
-            case .success(let patterns):
-              if !patterns.isEmpty {
-                let text = UIPasteboard.general.string ?? ""
-                if text.contains("venera://") {
-                  result(text)
-                } else {
-                  result(nil)
-                }
+    methodChannel.setMethodCallHandler(self.handleMethodCall)
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if call.method == "getProxy" {
+      if let proxySettings = CFNetworkCopySystemProxySettings()?.takeUnretainedValue() as NSDictionary?,
+        let dict = proxySettings.object(forKey: kCFNetworkProxiesHTTPProxy) as? NSDictionary,
+        let host = dict.object(forKey: kCFNetworkProxiesHTTPProxy) as? String,
+        let port = dict.object(forKey: kCFNetworkProxiesHTTPPort) as? Int {
+        let proxyConfig = "\(host):\(port)"
+        result(proxyConfig)
+      } else {
+        result("")
+      }
+    } else if call.method == "setScreenOn" {
+      if let arguments = call.arguments as? Bool {
+        let screenOn = arguments
+        UIApplication.shared.isIdleTimerDisabled = screenOn
+      }
+      result(nil as Any?)
+    } else if call.method == "getDirectoryPath" {
+      self.flutterResult = result
+      self.getDirectoryPath()
+    } else if call.method == "stopAccessingSecurityScopedResource" {
+      self.directoryPath?.stopAccessingSecurityScopedResource()
+      self.directoryPath = nil
+      result(nil as Any?)
+    } else if call.method == "selectDirectory" {
+      self.directoryPicker = DirectoryPicker()
+      self.directoryPicker?.selectDirectory(result: result)
+    } else if call.method == "getVeneraClipboardLink" {
+      if #available(iOS 16.0, *) {
+        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { (pasteboardResult: Result<Set<UIPasteboard.DetectionPattern>, Error>) in
+          switch pasteboardResult {
+          case .success(let patterns):
+            if !patterns.isEmpty {
+              let text = UIPasteboard.general.string ?? ""
+              if text.contains("venera://") {
+                result(text)
               } else {
-                result(nil)
+                result(nil as Any?)
               }
-            case .failure:
-              result(nil)
+            } else {
+              result(nil as Any?)
             }
-          }
-        } else {
-          let text = UIPasteboard.general.string ?? ""
-          if text.contains("venera://") {
-            result(text)
-          } else {
-            result(nil)
+          case .failure:
+            result(nil as Any?)
           }
         }
       } else {
-        result(FlutterMethodNotImplemented)
+        let text = UIPasteboard.general.string ?? ""
+        if text.contains("venera://") {
+          result(text)
+        } else {
+          result(nil as Any?)
+        }
       }
+    } else {
+      result(FlutterMethodNotImplemented)
     }
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
   func getDirectoryPath() {
@@ -99,7 +100,7 @@ import Foundation // 添加此行
   func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
     self.directoryPath = urls.first
     if self.directoryPath == nil {
-      flutterResult?(nil)
+      flutterResult?(nil as Any?)
       return
     }
 
@@ -108,11 +109,11 @@ import Foundation // 添加此行
     if success {
       flutterResult?(self.directoryPath.path)
     } else {
-      flutterResult?(nil)
+      flutterResult?(nil as Any?)
     }
   }
 
   func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-    flutterResult?(nil)
+    flutterResult?(nil as Any?)
   }
 }
