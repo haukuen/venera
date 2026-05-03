@@ -264,6 +264,7 @@ class Settings with ChangeNotifier {
     'showChapterComments': true, // show chapter comments in reader
     'showChapterCommentsAtEnd':
         false, // show chapter comments at end of chapter
+    'autoFavoriteCover': true, // auto favorite cover when adding favorite
   };
 
   operator [](String key) {

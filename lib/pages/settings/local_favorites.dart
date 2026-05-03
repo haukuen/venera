@@ -21,6 +21,10 @@ class _LocalFavoritesSettingsState extends State<LocalFavoritesSettings> {
           title: "Auto close favorite panel after operation".tl,
           settingKey: "autoCloseFavoritePanel",
         ).toSliver(),
+        _SwitchSetting(
+          title: "Auto favorite cover when adding favorite".tl,
+          settingKey: "autoFavoriteCover",
+        ).toSliver(),
         SelectSetting(
           title: "Add new favorite to".tl,
           settingKey: "newFavoriteAddTo",

@@ -7,6 +7,7 @@ class _ImageFavoritesItem extends StatefulWidget {
     required this.addSelected,
     required this.multiSelectMode,
     required this.finalImageFavoritesComicList,
+    this.onReturnFromReader,
   });
 
   final ImageFavoritesComic imageFavoritesComic;
@@ -14,14 +15,13 @@ class _ImageFavoritesItem extends StatefulWidget {
   final Map<ImageFavorite, bool> selectedImageFavorites;
   final List<ImageFavoritesComic> finalImageFavoritesComicList;
   final bool multiSelectMode;
+  final VoidCallback? onReturnFromReader;
 
   @override
   State<_ImageFavoritesItem> createState() => _ImageFavoritesItemState();
 }
 
 class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
-  late final imageFavorites = widget.imageFavoritesComic.images.toList();
-
   void goComicInfo(ImageFavoritesComic comic) {
     App.mainNavigatorKey?.currentContext?.to(
       () => ComicPage(id: comic.id, sourceKey: comic.sourceKey),
@@ -29,14 +29,18 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
   }
 
   void goReaderPage(ImageFavoritesComic comic, int ep, int page) {
-    App.rootContext.to(
-      () => ReaderWithLoading(
-        id: comic.id,
-        sourceKey: comic.sourceKey,
-        initialEp: ep,
-        initialPage: page,
-      ),
-    );
+    App.rootContext
+        .to(
+          () => ReaderWithLoading(
+            id: comic.id,
+            sourceKey: comic.sourceKey,
+            initialEp: ep,
+            initialPage: page,
+          ),
+        )
+        .then((_) {
+          widget.onReturnFromReader?.call();
+        });
   }
 
   void goPhotoView(ImageFavorite imageFavorite) {
@@ -137,7 +141,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemBuilder: buildItem,
-                itemCount: imageFavorites.length,
+                itemCount: widget.imageFavoritesComic.images.length,
               ),
             ).paddingHorizontal(8),
             buildBottom(),
@@ -148,7 +152,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
   }
 
   Widget buildItem(BuildContext context, int index) {
-    var image = imageFavorites[index];
+    var image = widget.imageFavoritesComic.images.elementAt(index);
     bool isSelected = widget.selectedImageFavorites[image] ?? false;
     int curPage = image.page;
     String pageText = curPage == firstPage
@@ -229,7 +233,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            "${imageFavorites.length}/${widget.imageFavoritesComic.maxPageFromEp}",
+            "${widget.imageFavoritesComic.images.length}/${widget.imageFavoritesComic.maxPageFromEp}",
             style: ts.s12,
           ),
         ),
