@@ -22,18 +22,6 @@ class _ImageFavoritesItem extends StatefulWidget {
 }
 
 class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
-  late List<ImageFavorite> imageFavorites = widget.imageFavoritesComic.images
-      .toList();
-
-  @override
-  void didUpdateWidget(covariant _ImageFavoritesItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageFavoritesComic.images !=
-        widget.imageFavoritesComic.images) {
-      imageFavorites = widget.imageFavoritesComic.images.toList();
-    }
-  }
-
   void goComicInfo(ImageFavoritesComic comic) {
     App.mainNavigatorKey?.currentContext?.to(
       () => ComicPage(id: comic.id, sourceKey: comic.sourceKey),
@@ -153,7 +141,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 itemBuilder: buildItem,
-                itemCount: imageFavorites.length,
+                itemCount: widget.imageFavoritesComic.images.length,
               ),
             ).paddingHorizontal(8),
             buildBottom(),
@@ -164,7 +152,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
   }
 
   Widget buildItem(BuildContext context, int index) {
-    var image = imageFavorites[index];
+    var image = widget.imageFavoritesComic.images.elementAt(index);
     bool isSelected = widget.selectedImageFavorites[image] ?? false;
     int curPage = image.page;
     String pageText = curPage == firstPage
@@ -245,7 +233,7 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            "${imageFavorites.length}/${widget.imageFavoritesComic.maxPageFromEp}",
+            "${widget.imageFavoritesComic.images.length}/${widget.imageFavoritesComic.maxPageFromEp}",
             style: ts.s12,
           ),
         ),
