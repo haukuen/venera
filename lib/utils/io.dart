@@ -356,7 +356,11 @@ Future<void> saveFile({
       file = File(cache);
     }
     if (App.isMobile) {
-      final params = SaveFileDialogParams(sourceFilePath: file!.path);
+      // FIX: iOS export dialog cannot show filename and save.
+      final params = SaveFileDialogParams(
+        sourceFilePath: file!.path,
+        fileName: filename
+      );
       await FlutterFileDialog.saveFile(params: params);
     } else {
       final result = await file_selector.getSaveLocation(
