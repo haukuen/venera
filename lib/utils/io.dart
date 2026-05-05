@@ -359,7 +359,7 @@ Future<void> saveFile({
       // FIX: iOS export dialog cannot show filename and save.
       final params = SaveFileDialogParams(
         sourceFilePath: file!.path,
-        fileName: filename
+        fileName: App.isIOS ? filename : null,
       );
       await FlutterFileDialog.saveFile(params: params);
     } else {
