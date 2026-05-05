@@ -107,7 +107,6 @@ class _WindowFrameState extends State<WindowFrame> {
             left: 0,
             right: 0,
             child: Material(
-              color: Colors.transparent,
               child: Theme(
                 data: Theme.of(
                   context,
