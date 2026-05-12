@@ -152,6 +152,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
         comics: comics,
         outputPath: tempFile.path,
         onProgress: (progress, total) {
+          if (!mounted) return;
           setState(() {
             _current = progress;
           });

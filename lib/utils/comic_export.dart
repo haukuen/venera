@@ -50,6 +50,65 @@ class ComicExportInfo {
     };
   }
 
+  factory ComicExportInfo.fromJson(Map<String, dynamic> json) {
+    String asString(dynamic value, String field) {
+      if (value is String) return value;
+      throw FormatException(
+        'Invalid metadata: "$field" must be a String, got ${value.runtimeType}',
+      );
+    }
+
+    int asInt(dynamic value, String field) {
+      if (value is int) return value;
+      throw FormatException(
+        'Invalid metadata: "$field" must be an int, got ${value.runtimeType}',
+      );
+    }
+
+    List<String> asStringList(dynamic value, String field) {
+      if (value is List) {
+        return value.map((e) {
+          if (e is String) return e;
+          throw FormatException(
+            'Invalid metadata: items in "$field" must be Strings',
+          );
+        }).toList();
+      }
+      throw FormatException(
+        'Invalid metadata: "$field" must be a List, got ${value.runtimeType}',
+      );
+    }
+
+    Map<String, String> asStringMap(dynamic value, String field) {
+      if (value is Map) {
+        return value.map((k, v) {
+          if (v is String) return MapEntry(k.toString(), v);
+          throw FormatException(
+            'Invalid metadata: values in "$field" must be Strings',
+          );
+        });
+      }
+      throw FormatException(
+        'Invalid metadata: "$field" must be a Map, got ${value.runtimeType}',
+      );
+    }
+
+    return ComicExportInfo(
+      id: asString(json['id'], 'id'),
+      title: asString(json['title'], 'title'),
+      subtitle: asString(json['subtitle'], 'subtitle'),
+      tags: asStringList(json['tags'], 'tags'),
+      directory: asString(json['directory'], 'directory'),
+      chapters: asStringMap(json['chapters'], 'chapters'),
+      cover: asString(json['cover'], 'cover'),
+      comicType: asInt(json['comicType'], 'comicType'),
+      downloadedChapters:
+          asStringList(json['downloadedChapters'], 'downloadedChapters'),
+      createdAt: asInt(json['createdAt'], 'createdAt'),
+      sourceDirectory: asString(json['sourceDirectory'], 'sourceDirectory'),
+    );
+  }
+
   factory ComicExportInfo.fromLocalComic(LocalComic comic) {
     final sourceDirectory = '${comic.id}_${comic.comicType.value}';
     final chapters = <String, String>{};
@@ -143,9 +202,13 @@ class ComicExporter {
           FilePath.join(tempDirPath, exportInfos[i].sourceDirectory),
         );
 
-        if (sourceDir.existsSync()) {
-          await copyDirectoryIsolate(sourceDir, targetDir);
+        if (!sourceDir.existsSync()) {
+          throw StateError(
+            'Source directory missing for comic "${comic.title}" '
+            '(id: ${comic.id}): ${sourceDir.path}',
+          );
         }
+        await copyDirectoryIsolate(sourceDir, targetDir);
 
         onProgress?.call(i + 1, comics.length);
       }
@@ -180,8 +243,6 @@ class ComicExporter {
 
         zipFile.close();
       });
-    } catch (e) {
-      throw Exception('Failed to export comics to "$outputPath": $e');
     } finally {
       // 6. 清理临时目录
       if (tempDir.existsSync()) {

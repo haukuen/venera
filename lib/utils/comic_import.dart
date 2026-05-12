@@ -111,22 +111,7 @@ class ComicImporter {
 
   /// 解析漫画导出信息
   static ComicExportInfo _parseComicExportInfo(Map<String, dynamic> json) {
-    return ComicExportInfo(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      subtitle: json['subtitle'] as String,
-      tags: (json['tags'] as List<dynamic>).map((e) => e as String).toList(),
-      directory: json['directory'] as String,
-      chapters: (json['chapters'] as Map<String, dynamic>)
-          .map((k, v) => MapEntry(k, v as String)),
-      cover: json['cover'] as String,
-      comicType: json['comicType'] as int,
-      downloadedChapters: (json['downloadedChapters'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
-      createdAt: json['createdAt'] as int,
-      sourceDirectory: json['sourceDirectory'] as String,
-    );
+    return ComicExportInfo.fromJson(json);
   }
 
   /// 检查漫画是否已存在

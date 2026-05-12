@@ -122,6 +122,7 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
       final result = await ComicImporter.importComics(
         filePath: file.path,
         onProgress: (current, total) {
+          if (!mounted) return;
           setState(() {
             _current = current;
             _total = total;
