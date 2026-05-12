@@ -101,6 +101,10 @@ class ComicExportMetadata {
 /// 漫画导出工具
 class ComicExporter {
   /// 导出漫画到 .venera-comics 文件
+  ///
+  /// Throws [FileSystemException] if source comics cannot be read or
+  /// the output path is not writable.
+  /// Throws [StateException] if a comic's source directory is missing.
   static Future<void> exportComics({
     required List<LocalComic> comics,
     required String outputPath,
@@ -148,29 +152,36 @@ class ComicExporter {
 
       // 5. 打包成 ZIP
       // Ensure the parent directory of the output file exists
-      final outputDir = Directory(FilePath.join(outputPath, '..'));
+      final outputDir = Directory(outputPath).parent;
       if (!outputDir.existsSync()) {
         outputDir.createSync(recursive: true);
       }
+
+      // Convert to plain Maps before passing to Isolate to ensure sendability
+      final metadataFilePath = metadataFile.path;
+      final exportInfosData =
+          exportInfos.map((e) => e.toJson()).toList();
 
       await Isolate.run(() {
         final zipFile = ZipFile.open(outputPath);
 
         // 添加 metadata.json
-        zipFile.addFile('metadata.json', metadataFile.path);
+        zipFile.addFile('metadata.json', metadataFilePath);
 
         // 添加漫画文件夹
-        for (var info in exportInfos) {
-          final comicDir = Directory(
-            FilePath.join(tempDirPath, info.sourceDirectory),
-          );
+        for (var info in exportInfosData) {
+          final sourceDir = info['sourceDirectory'] as String;
+          final comicDirPath = '$tempDirPath/$sourceDir';
+          final comicDir = Directory(comicDirPath);
           if (comicDir.existsSync()) {
-            _addDirectoryToZip(zipFile, comicDir, info.sourceDirectory);
+            _addDirectoryToZip(zipFile, comicDir, sourceDir);
           }
         }
 
         zipFile.close();
       });
+    } catch (e) {
+      throw Exception('Failed to export comics to "$outputPath": $e');
     } finally {
       // 6. 清理临时目录
       if (tempDir.existsSync()) {
