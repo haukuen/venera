@@ -90,9 +90,7 @@ class ComicHorizontalList extends StatelessWidget {
         itemCount: comics.length,
         itemBuilder: (context, index) {
           final comic = comics[index];
-          final heroID = heroTagPrefix != null
-              ? '$heroTagPrefix${comic.id}'.hashCode
-              : comic.id.hashCode;
+          final heroID = '${heroTagPrefix ?? ''}${comic.id}'.hashCode;
           return SimpleComicTile(
             comic: comic,
             heroID: heroID,

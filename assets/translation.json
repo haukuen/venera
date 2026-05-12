@@ -461,7 +461,21 @@
     "Earlier": "更早",
     "This Week": "本周",
     "Today": "今天",
-    "Yesterday": "昨天"
+    "Yesterday": "昨天",
+    "Export Comics": "导出漫画",
+    "Export All": "导出全部",
+    "Export Selected": "导出选中",
+    "No comics to export": "没有可导出的漫画",
+    "Export completed": "导出完成",
+    "Export failed": "导出失败",
+    "Select a .venera-comics file to import.": "选择一个 .venera-comics 文件进行导入",
+    "Import Result": "导入结果",
+    "Imported": "已导入",
+    "Skipped": "已跳过",
+    "Errors": "错误",
+    "OK": "确定",
+    "Select File": "选择文件",
+    "Import failed": "导入失败"
   },
   "zh_TW": {
     "Home": "首頁",
@@ -925,6 +939,20 @@
     "Earlier": "更早",
     "This Week": "本週",
     "Today": "今天",
-    "Yesterday": "昨天"
+    "Yesterday": "昨天",
+    "Export Comics": "匯出漫畫",
+    "Export All": "匯出全部",
+    "Export Selected": "匯出選中",
+    "No comics to export": "沒有可匯出的漫畫",
+    "Export completed": "匯出完成",
+    "Export failed": "匯出失敗",
+    "Select a .venera-comics file to import.": "選擇一個 .venera-comics 檔案進行匯入",
+    "Import Result": "匯入結果",
+    "Imported": "已匯入",
+    "Skipped": "已跳過",
+    "Errors": "錯誤",
+    "OK": "確定",
+    "Select File": "選擇檔案",
+    "Import failed": "匯入失敗"
   }
 }

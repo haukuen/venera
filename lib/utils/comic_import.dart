@@ -30,6 +30,7 @@ class ComicImporter {
   static Future<ImportResult> importComics({
     required String filePath,
     void Function(int current, int total)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     // 1. 解压到临时目录
     final tempDirPath = FilePath.join(App.cachePath, 'comic_import_temp');
@@ -57,7 +58,8 @@ class ComicImporter {
       final List<ComicExportInfo> comicsInfo;
       try {
         final metadataJson =
-            jsonDecode(await metadataFile.readAsString()) as Map<String, dynamic>;
+            jsonDecode(await metadataFile.readAsString())
+                as Map<String, dynamic>;
         final comicsJson = metadataJson['comics'] as List<dynamic>;
         comicsInfo = comicsJson
             .map((e) => _parseComicExportInfo(e as Map<String, dynamic>))
@@ -70,13 +72,18 @@ class ComicImporter {
         );
       }
 
-      // 3. 检查本地重复，过滤已存在的漫画
+      // 3. 检查本地重复和 ComicSource 可用性，过滤不合规的漫画
       final comicsToImport = <ComicExportInfo>[];
       var skippedCount = 0;
+      final sourceErrors = <String>[];
 
       for (var info in comicsInfo) {
         if (_isComicExists(info.id, info.comicType)) {
           skippedCount++;
+        } else if (!_isComicSourceAvailable(info.comicType)) {
+          sourceErrors.add(
+            '"${info.title}": Comic source not available on this device',
+          );
         } else {
           comicsToImport.add(info);
         }
@@ -85,11 +92,23 @@ class ComicImporter {
       // 4. 导入漫画
       final errors = <String>[];
       for (var i = 0; i < comicsToImport.length; i++) {
+        if (isCancelled?.call() == true) {
+          return ImportResult(
+            imported: i - errors.length,
+            skipped: skippedCount,
+            errors: errors,
+          );
+        }
+
         try {
           final info = comicsToImport[i];
           await _importSingleComic(info, tempDirPath);
         } catch (e, s) {
-          Log.error("ComicImporter", "Failed to import ${comicsToImport[i].title}", s);
+          Log.error(
+            "ComicImporter",
+            "Failed to import ${comicsToImport[i].title}",
+            s,
+          );
           errors.add('Failed to import ${comicsToImport[i].title}: $e');
         } finally {
           onProgress?.call(i + 1, comicsToImport.length);
@@ -99,7 +118,7 @@ class ComicImporter {
       return ImportResult(
         imported: comicsToImport.length - errors.length,
         skipped: skippedCount,
-        errors: errors,
+        errors: [...sourceErrors, ...errors],
       );
     } finally {
       // 5. 清理临时目录
@@ -120,12 +139,22 @@ class ComicImporter {
     return existing != null;
   }
 
+  /// 检查 ComicSource 是否在当前设备上可用
+  static bool _isComicSourceAvailable(int comicType) {
+    final type = ComicType(comicType);
+    // Local comics (type 0) are always available
+    if (type == ComicType.local) return true;
+    return type.comicSource != null;
+  }
+
   /// 导入单个漫画
   static Future<void> _importSingleComic(
     ComicExportInfo info,
     String tempDirPath,
   ) async {
-    final sourceDir = Directory(FilePath.join(tempDirPath, info.sourceDirectory));
+    final sourceDir = Directory(
+      FilePath.join(tempDirPath, info.sourceDirectory),
+    );
     if (!sourceDir.existsSync()) {
       throw Exception('Comic directory not found: ${info.sourceDirectory}');
     }
@@ -153,7 +182,7 @@ class ComicImporter {
       subtitle: info.subtitle,
       tags: info.tags,
       directory: finalDirectory,
-      chapters: ComicChapters(info.chapters),
+      chapters: ComicChapters.fromJsonOrNull(info.chapters),
       cover: info.cover,
       comicType: ComicType(info.comicType),
       downloadedChapters: info.downloadedChapters,

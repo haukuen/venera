@@ -189,6 +189,39 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
 
   @override
   Widget build(BuildContext context) {
+    void showExportImportMenu() {
+      showDialog(
+        context: context,
+        builder: (context) => ExportComicsDialog(
+          selectedComics: selectedComics.isNotEmpty
+              ? selectedComics.keys.toList()
+              : null,
+        ),
+      );
+    }
+
+    void showImportDialog() {
+      showDialog(
+        context: context,
+        builder: (context) => const ImportComicsDialog(),
+      );
+    }
+
+    final exportImportMenu = MenuButton(
+      entries: [
+        MenuEntry(
+          icon: Icons.upload,
+          text: "Export Comics".tl,
+          onClick: showExportImportMenu,
+        ),
+        MenuEntry(
+          icon: Icons.file_download,
+          text: "Import Comics".tl,
+          onClick: showImportDialog,
+        ),
+      ],
+    );
+
     List<Widget> selectActions = [
       IconButton(
         icon: const Icon(Icons.select_all),
@@ -206,6 +239,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         onPressed: invertSelection,
       ),
       buildMultiSelectMenu(),
+      exportImportMenu,
     ];
 
     List<Widget> normalActions = [
@@ -233,30 +267,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
           },
         ),
       ),
-      IconButton(
-        icon: const Icon(Icons.upload),
-        tooltip: 'Export Comics'.tl,
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => ExportComicsDialog(
-              selectedComics: selectedComics.isNotEmpty
-                  ? selectedComics.keys.toList()
-                  : null,
-            ),
-          );
-        },
-      ),
-      IconButton(
-        icon: const Icon(Icons.file_download),
-        tooltip: 'Import Comics'.tl,
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => const ImportComicsDialog(),
-          );
-        },
-      ),
+      exportImportMenu,
     ];
 
     var body = Scaffold(

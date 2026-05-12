@@ -267,6 +267,7 @@ class _HistoryState extends State<_History> {
         content: history.isNotEmpty
             ? ComicHorizontalList(
                 comics: history,
+                heroTagPrefix: 'history_',
                 onItemTap: (comic, heroID) {
                   context.to(
                     () => ComicPage(
@@ -329,6 +330,7 @@ class _LocalState extends State<_Local> {
         content: local.isNotEmpty
             ? ComicHorizontalList(
                 comics: local,
+                heroTagPrefix: 'local_',
                 onItemTap: (comic, heroID) {
                   context.to(
                     () => ComicPage(

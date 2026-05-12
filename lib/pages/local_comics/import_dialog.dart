@@ -18,6 +18,7 @@ class ImportComicsDialog extends StatefulWidget {
 
 class _ImportComicsDialogState extends State<ImportComicsDialog> {
   bool _isImporting = false;
+  bool _cancelled = false;
   int _current = 0;
   int _total = 0;
   String? _error;
@@ -31,7 +32,7 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
     return ContentDialog(
       title: "Import Comics".tl,
       content: _isImporting ? _buildProgress() : _buildInitial(),
-      actions: _isImporting ? [] : _buildActions(),
+      actions: _isImporting ? _buildProgressActions() : _buildActions(),
     );
   }
 
@@ -39,8 +40,9 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("Select a .venera-comics file to import.".tl)
-            .paddingHorizontal(16),
+        Text(
+          "Select a .venera-comics file to import.".tl,
+        ).paddingHorizontal(16),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
@@ -57,9 +59,7 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LinearProgressIndicator(
-          value: _total > 0 ? _current / _total : null,
-        ),
+        LinearProgressIndicator(value: _total > 0 ? _current / _total : null),
         const SizedBox(height: 16),
         Text("$_current / $_total"),
       ],
@@ -73,17 +73,15 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Imported: ${_result!.imported}".tl).paddingHorizontal(16),
-          Text("Skipped: ${_result!.skipped}".tl).paddingHorizontal(16),
+          Text("${"Imported".tl}: ${_result!.imported}").paddingHorizontal(16),
+          Text("${"Skipped".tl}: ${_result!.skipped}").paddingHorizontal(16),
           if (_result!.errors.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               "Errors:".tl,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ).paddingHorizontal(16),
-            ..._result!.errors.map(
-              (e) => Text("• $e").paddingHorizontal(16),
-            ),
+            ..._result!.errors.map((e) => Text("• $e").paddingHorizontal(16)),
           ],
         ],
       ),
@@ -102,9 +100,19 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
         onPressed: () => Navigator.of(context).pop(),
         child: Text("Cancel".tl),
       ),
-      FilledButton(
-        onPressed: _startImport,
-        child: Text("Select File".tl),
+      FilledButton(onPressed: _startImport, child: Text("Select File".tl)),
+    ];
+  }
+
+  List<Widget> _buildProgressActions() {
+    return [
+      TextButton(
+        onPressed: () {
+          setState(() {
+            _cancelled = true;
+          });
+        },
+        child: Text("Cancel".tl),
       ),
     ];
   }
@@ -115,6 +123,7 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
 
     setState(() {
       _isImporting = true;
+      _cancelled = false;
       _error = null;
     });
 
@@ -128,9 +137,19 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
             _total = total;
           });
         },
+        isCancelled: () => _cancelled,
       );
 
       if (!mounted) return;
+
+      if (_cancelled) {
+        setState(() {
+          _isImporting = false;
+          _cancelled = false;
+          _result = result;
+        });
+        return;
+      }
 
       setState(() {
         _isImporting = false;

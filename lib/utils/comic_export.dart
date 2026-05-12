@@ -13,7 +13,10 @@ class ComicExportInfo {
   final String subtitle;
   final List<String> tags;
   final String directory;
-  final Map<String, String> chapters;
+
+  /// Chapter data as stored by [ComicChapters.toJson].
+  /// May be a flat `Map<String, String>` or grouped `Map<String, Map<String, String>>`.
+  final Map<String, dynamic> chapters;
   final String cover;
   final int comicType;
   final List<String> downloadedChapters;
@@ -79,12 +82,14 @@ class ComicExportInfo {
       );
     }
 
-    Map<String, String> asStringMap(dynamic value, String field) {
+    Map<String, dynamic> asStringMap(dynamic value, String field) {
       if (value is Map) {
         return value.map((k, v) {
           if (v is String) return MapEntry(k.toString(), v);
+          if (v is Map)
+            return MapEntry(k.toString(), Map<String, dynamic>.from(v));
           throw FormatException(
-            'Invalid metadata: values in "$field" must be Strings',
+            'Invalid metadata: values in "$field" must be Strings or Maps',
           );
         });
       }
@@ -102,8 +107,10 @@ class ComicExportInfo {
       chapters: asStringMap(json['chapters'], 'chapters'),
       cover: asString(json['cover'], 'cover'),
       comicType: asInt(json['comicType'], 'comicType'),
-      downloadedChapters:
-          asStringList(json['downloadedChapters'], 'downloadedChapters'),
+      downloadedChapters: asStringList(
+        json['downloadedChapters'],
+        'downloadedChapters',
+      ),
       createdAt: asInt(json['createdAt'], 'createdAt'),
       sourceDirectory: asString(json['sourceDirectory'], 'sourceDirectory'),
     );
@@ -111,12 +118,7 @@ class ComicExportInfo {
 
   factory ComicExportInfo.fromLocalComic(LocalComic comic) {
     final sourceDirectory = '${comic.id}_${comic.comicType.value}';
-    final chapters = <String, String>{};
-    if (comic.chapters != null) {
-      for (var entry in comic.chapters!.allChapters.entries) {
-        chapters[entry.key] = entry.value;
-      }
-    }
+    final chapters = comic.chapters?.toJson() ?? <String, dynamic>{};
     return ComicExportInfo(
       id: comic.id,
       title: comic.title,
@@ -168,6 +170,7 @@ class ComicExporter {
     required List<LocalComic> comics,
     required String outputPath,
     void Function(int current, int total)? onProgress,
+    bool Function()? isCancelled,
   }) async {
     // 1. 创建临时目录
     final tempDirPath = FilePath.join(App.cachePath, 'comic_export_temp');
@@ -179,8 +182,9 @@ class ComicExporter {
 
     try {
       // 2. 生成元数据
-      final exportInfos =
-          comics.map((e) => ComicExportInfo.fromLocalComic(e)).toList();
+      final exportInfos = comics
+          .map((e) => ComicExportInfo.fromLocalComic(e))
+          .toList();
       final metadata = ComicExportMetadata(
         version: 1,
         exportTime: DateTime.now().toIso8601String(),
@@ -194,6 +198,8 @@ class ComicExporter {
 
       // 4. 复制漫画文件
       for (var i = 0; i < comics.length; i++) {
+        if (isCancelled?.call() == true) return;
+
         final comic = comics[i];
         final sourceDir = Directory(
           FilePath.join(LocalManager().path, comic.directory),
@@ -222,8 +228,7 @@ class ComicExporter {
 
       // Convert to plain Maps before passing to Isolate to ensure sendability
       final metadataFilePath = metadataFile.path;
-      final exportInfosData =
-          exportInfos.map((e) => e.toJson()).toList();
+      final exportInfosData = exportInfos.map((e) => e.toJson()).toList();
 
       await Isolate.run(() {
         final zipFile = ZipFile.open(outputPath);
@@ -259,7 +264,9 @@ class ComicExporter {
   ) {
     for (var entity in dir.listSync(recursive: true)) {
       if (entity is File) {
-        final relativePath = entity.path.substring(dir.path.length + 1);
+        var relativePath = entity.path.substring(dir.path.length + 1);
+        // ZIP entries must use forward slashes regardless of platform
+        relativePath = relativePath.replaceAll('\\', '/');
         final zipPath = '$basePath/$relativePath';
         zipFile.addFile(zipPath, entity.path);
       }

@@ -25,10 +25,7 @@ class ExportComicsDialog extends StatefulWidget {
   /// If null or empty, the "selected" option will be disabled.
   final List<LocalComic>? selectedComics;
 
-  const ExportComicsDialog({
-    super.key,
-    this.selectedComics,
-  });
+  const ExportComicsDialog({super.key, this.selectedComics});
 
   @override
   State<ExportComicsDialog> createState() => _ExportComicsDialogState();
@@ -37,6 +34,7 @@ class ExportComicsDialog extends StatefulWidget {
 class _ExportComicsDialogState extends State<ExportComicsDialog> {
   ExportScope _scope = ExportScope.all;
   bool _isExporting = false;
+  bool _cancelled = false;
   int _current = 0;
   int _total = 0;
   String? _error;
@@ -49,7 +47,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
     return ContentDialog(
       title: "Export Comics".tl,
       content: _isExporting ? _buildProgress() : _buildSelection(),
-      actions: _isExporting ? [] : _buildActions(),
+      actions: _isExporting ? _buildProgressActions() : _buildActions(),
     );
   }
 
@@ -97,9 +95,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LinearProgressIndicator(
-          value: _total > 0 ? _current / _total : null,
-        ),
+        LinearProgressIndicator(value: _total > 0 ? _current / _total : null),
         const SizedBox(height: 16),
         Text("$_current / $_total"),
       ],
@@ -112,9 +108,19 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
         onPressed: () => Navigator.of(context).pop(),
         child: Text("Cancel".tl),
       ),
-      FilledButton(
-        onPressed: _startExport,
-        child: Text("Export".tl),
+      FilledButton(onPressed: _startExport, child: Text("Export".tl)),
+    ];
+  }
+
+  List<Widget> _buildProgressActions() {
+    return [
+      TextButton(
+        onPressed: () {
+          setState(() {
+            _cancelled = true;
+          });
+        },
+        child: Text("Cancel".tl),
       ),
     ];
   }
@@ -142,6 +148,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
 
     setState(() {
       _isExporting = true;
+      _cancelled = false;
       _total = comics.length;
       _current = 0;
       _error = null;
@@ -157,7 +164,18 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
             _current = progress;
           });
         },
+        isCancelled: () => _cancelled,
       );
+
+      if (_cancelled) {
+        if (mounted) {
+          setState(() {
+            _isExporting = false;
+            _cancelled = false;
+          });
+        }
+        return;
+      }
 
       if (!mounted) return;
 
@@ -176,17 +194,18 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
       }
 
       if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
         Navigator.of(context).pop(true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Export completed".tl)),
-        );
+        messenger.showSnackBar(SnackBar(content: Text("Export completed".tl)));
       }
     } catch (e, s) {
       Log.error("Export Comics", e, s);
-      setState(() {
-        _isExporting = false;
-        _error = "${"Export failed".tl}: $e";
-      });
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+          _error = "${"Export failed".tl}: $e";
+        });
+      }
     } finally {
       tempFile.deleteIgnoreError();
     }

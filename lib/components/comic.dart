@@ -910,6 +910,7 @@ class _SliverGridComicsState extends State<SliverGridComics> {
           comics.add(comic);
         }
       }
+      generateHeroID();
     });
   }
 

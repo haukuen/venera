@@ -134,109 +134,125 @@ void main() {
       expect(restored.sourceDirectory, original.sourceDirectory);
     });
 
-    test('fromJson should throw FormatException on wrong type for String field',
-        () {
-      final json = {
-        'id': 123, // should be String
-        'title': 'Test',
-        'subtitle': '',
-        'tags': <String>[],
-        'directory': 'dir',
-        'chapters': <String, String>{},
-        'cover': '',
-        'comicType': 0,
-        'downloadedChapters': <String>[],
-        'createdAt': 0,
-        'sourceDirectory': '0_0',
-      };
+    test(
+      'fromJson should throw FormatException on wrong type for String field',
+      () {
+        final json = {
+          'id': 123, // should be String
+          'title': 'Test',
+          'subtitle': '',
+          'tags': <String>[],
+          'directory': 'dir',
+          'chapters': <String, String>{},
+          'cover': '',
+          'comicType': 0,
+          'downloadedChapters': <String>[],
+          'createdAt': 0,
+          'sourceDirectory': '0_0',
+        };
 
-      expect(
-        () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('"id" must be a String'),
-        )),
-      );
-    });
+        expect(
+          () => ComicExportInfo.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('"id" must be a String'),
+            ),
+          ),
+        );
+      },
+    );
 
-    test('fromJson should throw FormatException on wrong type for int field',
-        () {
-      final json = {
-        'id': '1',
-        'title': 'Test',
-        'subtitle': '',
-        'tags': <String>[],
-        'directory': 'dir',
-        'chapters': <String, String>{},
-        'cover': '',
-        'comicType': 'not-an-int', // should be int
-        'downloadedChapters': <String>[],
-        'createdAt': 0,
-        'sourceDirectory': '1_0',
-      };
+    test(
+      'fromJson should throw FormatException on wrong type for int field',
+      () {
+        final json = {
+          'id': '1',
+          'title': 'Test',
+          'subtitle': '',
+          'tags': <String>[],
+          'directory': 'dir',
+          'chapters': <String, String>{},
+          'cover': '',
+          'comicType': 'not-an-int', // should be int
+          'downloadedChapters': <String>[],
+          'createdAt': 0,
+          'sourceDirectory': '1_0',
+        };
 
-      expect(
-        () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('"comicType" must be an int'),
-        )),
-      );
-    });
+        expect(
+          () => ComicExportInfo.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('"comicType" must be an int'),
+            ),
+          ),
+        );
+      },
+    );
 
-    test('fromJson should throw FormatException on wrong type for List field',
-        () {
-      final json = {
-        'id': '1',
-        'title': 'Test',
-        'subtitle': '',
-        'tags': 'not-a-list', // should be List
-        'directory': 'dir',
-        'chapters': <String, String>{},
-        'cover': '',
-        'comicType': 0,
-        'downloadedChapters': <String>[],
-        'createdAt': 0,
-        'sourceDirectory': '1_0',
-      };
+    test(
+      'fromJson should throw FormatException on wrong type for List field',
+      () {
+        final json = {
+          'id': '1',
+          'title': 'Test',
+          'subtitle': '',
+          'tags': 'not-a-list', // should be List
+          'directory': 'dir',
+          'chapters': <String, String>{},
+          'cover': '',
+          'comicType': 0,
+          'downloadedChapters': <String>[],
+          'createdAt': 0,
+          'sourceDirectory': '1_0',
+        };
 
-      expect(
-        () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('"tags" must be a List'),
-        )),
-      );
-    });
+        expect(
+          () => ComicExportInfo.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('"tags" must be a List'),
+            ),
+          ),
+        );
+      },
+    );
 
-    test('fromJson should throw FormatException on wrong type for Map field',
-        () {
-      final json = {
-        'id': '1',
-        'title': 'Test',
-        'subtitle': '',
-        'tags': <String>[],
-        'directory': 'dir',
-        'chapters': 'not-a-map', // should be Map
-        'cover': '',
-        'comicType': 0,
-        'downloadedChapters': <String>[],
-        'createdAt': 0,
-        'sourceDirectory': '1_0',
-      };
+    test(
+      'fromJson should throw FormatException on wrong type for Map field',
+      () {
+        final json = {
+          'id': '1',
+          'title': 'Test',
+          'subtitle': '',
+          'tags': <String>[],
+          'directory': 'dir',
+          'chapters': 'not-a-map', // should be Map
+          'cover': '',
+          'comicType': 0,
+          'downloadedChapters': <String>[],
+          'createdAt': 0,
+          'sourceDirectory': '1_0',
+        };
 
-      expect(
-        () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('"chapters" must be a Map'),
-        )),
-      );
-    });
+        expect(
+          () => ComicExportInfo.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('"chapters" must be a Map'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('fromJson should throw FormatException on non-String list item', () {
       final json = {
@@ -255,22 +271,24 @@ void main() {
 
       expect(
         () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('items in "tags" must be Strings'),
-        )),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('items in "tags" must be Strings'),
+          ),
+        ),
       );
     });
 
-    test('fromJson should throw FormatException on non-String map value', () {
+    test('fromJson should throw FormatException on invalid map value type', () {
       final json = {
         'id': '1',
         'title': 'Test',
         'subtitle': '',
         'tags': <String>[],
         'directory': 'dir',
-        'chapters': {'c1': 123}, // values should be String
+        'chapters': {'c1': 123}, // values should be String or Map
         'cover': '',
         'comicType': 0,
         'downloadedChapters': <String>[],
@@ -280,12 +298,63 @@ void main() {
 
       expect(
         () => ComicExportInfo.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          contains('values in "chapters" must be Strings'),
-        )),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('"chapters" must be Strings or Maps'),
+          ),
+        ),
       );
+    });
+
+    test('fromJson should handle grouped chapters', () {
+      final json = {
+        'id': '1',
+        'title': 'Grouped Comic',
+        'subtitle': '',
+        'tags': <String>[],
+        'directory': 'dir',
+        'chapters': {
+          'Volume 1': {'c1': 'Chapter 1', 'c2': 'Chapter 2'},
+          'Volume 2': {'c3': 'Chapter 3'},
+        },
+        'cover': 'cover.jpg',
+        'comicType': 0,
+        'downloadedChapters': <String>['c1', 'c2'],
+        'createdAt': 0,
+        'sourceDirectory': '1_0',
+      };
+
+      final info = ComicExportInfo.fromJson(json);
+      expect(info.chapters, isA<Map<String, dynamic>>());
+      expect(info.chapters['Volume 1'], isA<Map>());
+      expect((info.chapters['Volume 1'] as Map)['c1'], 'Chapter 1');
+      expect((info.chapters['Volume 2'] as Map)['c3'], 'Chapter 3');
+    });
+
+    test('toJson -> fromJson round trip should preserve grouped chapters', () {
+      final original = ComicExportInfo(
+        id: 'grouped',
+        title: 'Grouped Comic',
+        subtitle: '',
+        tags: [],
+        directory: 'dir',
+        chapters: {
+          'Vol 1': {'c1': 'Ch 1', 'c2': 'Ch 2'},
+          'Vol 2': {'c3': 'Ch 3'},
+        },
+        cover: 'cover.jpg',
+        comicType: 0,
+        downloadedChapters: ['c1', 'c2', 'c3'],
+        createdAt: 0,
+        sourceDirectory: 'grouped_0',
+      );
+
+      final json = original.toJson();
+      final restored = ComicExportInfo.fromJson(json);
+
+      expect(restored.chapters, original.chapters);
     });
   });
 
