@@ -54,12 +54,21 @@ class ComicImporter {
         );
       }
 
-      final metadataJson =
-          jsonDecode(await metadataFile.readAsString()) as Map<String, dynamic>;
-      final comicsJson = metadataJson['comics'] as List<dynamic>;
-      final comicsInfo = comicsJson
-          .map((e) => _parseComicExportInfo(e as Map<String, dynamic>))
-          .toList();
+      final List<ComicExportInfo> comicsInfo;
+      try {
+        final metadataJson =
+            jsonDecode(await metadataFile.readAsString()) as Map<String, dynamic>;
+        final comicsJson = metadataJson['comics'] as List<dynamic>;
+        comicsInfo = comicsJson
+            .map((e) => _parseComicExportInfo(e as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        return ImportResult(
+          imported: 0,
+          skipped: 0,
+          errors: ['Failed to parse metadata: $e'],
+        );
+      }
 
       // 3. 检查本地重复，过滤已存在的漫画
       final comicsToImport = <ComicExportInfo>[];
@@ -79,10 +88,11 @@ class ComicImporter {
         try {
           final info = comicsToImport[i];
           await _importSingleComic(info, tempDirPath);
-          onProgress?.call(i + 1, comicsToImport.length);
         } catch (e, s) {
           Log.error("ComicImporter", "Failed to import ${comicsToImport[i].title}", s);
           errors.add('Failed to import ${comicsToImport[i].title}: $e');
+        } finally {
+          onProgress?.call(i + 1, comicsToImport.length);
         }
       }
 
@@ -92,7 +102,7 @@ class ComicImporter {
         errors: errors,
       );
     } finally {
-      // 6. 清理临时目录
+      // 5. 清理临时目录
       if (tempDir.existsSync()) {
         tempDir.deleteSync(recursive: true);
       }
