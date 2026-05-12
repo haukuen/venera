@@ -6,6 +6,8 @@ import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
+import 'package:venera/pages/local_comics/export_dialog.dart';
+import 'package:venera/pages/local_comics/import_dialog.dart';
 import 'package:venera/pages/downloading_page.dart';
 import 'package:venera/pages/favorites/favorites_page.dart';
 import 'package:venera/utils/cbz.dart';
@@ -230,6 +232,30 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
             showPopUpWidget(context, const DownloadingPage());
           },
         ),
+      ),
+      IconButton(
+        icon: const Icon(Icons.upload),
+        tooltip: 'Export Comics'.tl,
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => ExportComicsDialog(
+              selectedComics: selectedComics.isNotEmpty
+                  ? selectedComics.keys.toList()
+                  : null,
+            ),
+          );
+        },
+      ),
+      IconButton(
+        icon: const Icon(Icons.file_download),
+        tooltip: 'Import Comics'.tl,
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => const ImportComicsDialog(),
+          );
+        },
       ),
     ];
 
