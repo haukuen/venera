@@ -161,12 +161,18 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
       if (!mounted) return;
 
       // 3. Save to user-selected location
-      await saveFile(
+      final saved = await saveFile(
         file: tempFile,
         filename: "comics.venera-comics",
       );
 
-      tempFile.deleteIgnoreError();
+      if (!saved) {
+        // User cancelled the save dialog — stay on the current state
+        setState(() {
+          _isExporting = false;
+        });
+        return;
+      }
 
       if (mounted) {
         Navigator.of(context).pop(true);
