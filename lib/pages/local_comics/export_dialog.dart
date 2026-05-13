@@ -45,7 +45,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
   @override
   Widget build(BuildContext context) {
     return ContentDialog(
-      title: "Export Comics".tl,
+      title: "Migrate Comics".tl,
       content: _isExporting ? _buildProgress() : _buildSelection(),
       actions: _isExporting ? _buildProgressActions() : _buildActions(),
     );
@@ -68,11 +68,11 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
           child: Column(
             children: [
               RadioListTile<ExportScope>(
-                title: Text("Export All".tl),
+                title: Text("Migrate All".tl),
                 value: ExportScope.all,
               ),
               RadioListTile<ExportScope>(
-                title: Text("Export Selected".tl),
+                title: Text("Migrate Selected".tl),
                 value: ExportScope.selected,
                 enabled: _hasSelectedComics,
               ),
@@ -108,7 +108,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
         onPressed: () => Navigator.of(context).pop(),
         child: Text("Cancel".tl),
       ),
-      FilledButton(onPressed: _startExport, child: Text("Export".tl)),
+      FilledButton(onPressed: _startExport, child: Text("Migrate".tl)),
     ];
   }
 
@@ -136,7 +136,7 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
 
     if (comics.isEmpty) {
       setState(() {
-        _error = "No comics to export".tl;
+        _error = "No comics to migrate".tl;
       });
       return;
     }
@@ -196,14 +196,16 @@ class _ExportComicsDialogState extends State<ExportComicsDialog> {
       if (mounted) {
         final messenger = ScaffoldMessenger.of(context);
         Navigator.of(context).pop(true);
-        messenger.showSnackBar(SnackBar(content: Text("Export completed".tl)));
+        messenger.showSnackBar(
+          SnackBar(content: Text("Migration completed".tl)),
+        );
       }
     } catch (e, s) {
-      Log.error("Export Comics", e, s);
+      Log.error("Migrate Comics", e, s);
       if (mounted) {
         setState(() {
           _isExporting = false;
-          _error = "${"Export failed".tl}: $e";
+          _error = "${"Migration failed".tl}: $e";
         });
       }
     } finally {

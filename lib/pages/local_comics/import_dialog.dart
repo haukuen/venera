@@ -30,7 +30,7 @@ class _ImportComicsDialogState extends State<ImportComicsDialog> {
       return _buildResult();
     }
     return ContentDialog(
-      title: "Import Comics".tl,
+      title: "Import Migrated Comics".tl,
       content: _isImporting ? _buildProgress() : _buildInitial(),
       actions: _isImporting ? _buildProgressActions() : _buildActions(),
     );

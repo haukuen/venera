@@ -162,6 +162,19 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
           ),
         if (selectedComics.isNotEmpty)
           ...exportActions(selectedComics.keys.toList()),
+        if (selectedComics.isNotEmpty)
+          MenuEntry(
+            icon: Icons.upload,
+            text: "Migrate Comics".tl,
+            onClick: () {
+              showDialog(
+                context: context,
+                builder: (context) => ExportComicsDialog(
+                  selectedComics: selectedComics.keys.toList(),
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -211,12 +224,12 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       entries: [
         MenuEntry(
           icon: Icons.upload,
-          text: "Export Comics".tl,
+          text: "Migrate Comics".tl,
           onClick: showExportImportMenu,
         ),
         MenuEntry(
           icon: Icons.file_download,
-          text: "Import Comics".tl,
+          text: "Import Migrated Comics".tl,
           onClick: showImportDialog,
         ),
       ],
@@ -239,7 +252,6 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         onPressed: invertSelection,
       ),
       buildMultiSelectMenu(),
-      exportImportMenu,
     ];
 
     List<Widget> normalActions = [
