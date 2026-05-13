@@ -86,8 +86,9 @@ class ComicExportInfo {
       if (value is Map) {
         return value.map((k, v) {
           if (v is String) return MapEntry(k.toString(), v);
-          if (v is Map)
+          if (v is Map) {
             return MapEntry(k.toString(), Map<String, dynamic>.from(v));
+          }
           throw FormatException(
             'Invalid metadata: values in "$field" must be Strings or Maps',
           );
@@ -173,12 +174,12 @@ class ComicExporter {
     bool Function()? isCancelled,
   }) async {
     // 1. 创建临时目录
-    final tempDirPath = FilePath.join(App.cachePath, 'comic_export_temp');
+    final tempDirPath = FilePath.join(
+      App.cachePath,
+      'comic_export_temp_${DateTime.now().millisecondsSinceEpoch}',
+    );
     final tempDir = Directory(tempDirPath);
-    if (tempDir.existsSync()) {
-      tempDir.deleteSync(recursive: true);
-    }
-    tempDir.createSync();
+    tempDir.createSync(recursive: true);
 
     try {
       // 2. 生成元数据

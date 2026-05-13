@@ -33,12 +33,12 @@ class ComicImporter {
     bool Function()? isCancelled,
   }) async {
     // 1. 解压到临时目录
-    final tempDirPath = FilePath.join(App.cachePath, 'comic_import_temp');
+    final tempDirPath = FilePath.join(
+      App.cachePath,
+      'comic_import_temp_${DateTime.now().millisecondsSinceEpoch}',
+    );
     final tempDir = Directory(tempDirPath);
-    if (tempDir.existsSync()) {
-      tempDir.deleteSync(recursive: true);
-    }
-    tempDir.createSync();
+    tempDir.createSync(recursive: true);
 
     try {
       await Isolate.run(() {
@@ -90,7 +90,15 @@ class ComicImporter {
       }
 
       // 4. 导入漫画
+      // 进度以文件中全部漫画数量为基准，包含已跳过的部分
+      final totalCount = comicsInfo.length;
       final errors = <String>[];
+      final skippedAndUnavailable = skippedCount + sourceErrors.length;
+      // 先报告跳过的部分，让进度条从非零开始
+      if (skippedAndUnavailable > 0) {
+        onProgress?.call(skippedAndUnavailable, totalCount);
+      }
+
       for (var i = 0; i < comicsToImport.length; i++) {
         if (isCancelled?.call() == true) {
           return ImportResult(
@@ -111,7 +119,7 @@ class ComicImporter {
           );
           errors.add('Failed to import ${comicsToImport[i].title}: $e');
         } finally {
-          onProgress?.call(i + 1, comicsToImport.length);
+          onProgress?.call(skippedAndUnavailable + i + 1, totalCount);
         }
       }
 
@@ -188,6 +196,13 @@ class ComicImporter {
       downloadedChapters: info.downloadedChapters,
       createdAt: DateTime.fromMillisecondsSinceEpoch(info.createdAt),
     );
-    LocalManager().add(comic);
+    try {
+      LocalManager().add(comic);
+    } catch (e) {
+      // 数据库写入失败，清理已复制的文件
+      Directory(FilePath.join(localPath, finalDirectory))
+          .deleteIgnoreError(recursive: true);
+      rethrow;
+    }
   }
 }
