@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
@@ -112,7 +110,7 @@ class ImportComic {
           var comicObj = await _checkSingleComic(
             comicDir,
             title: title,
-            tags: [_categoryToString(comic['CATEGORY'] as int)],
+            tags: [_categoryToString(comic['CATEGORY'] as int? ?? 0)],
             createTime: downloadTime,
           );
           if (comicObj == null) {
