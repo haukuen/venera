@@ -112,21 +112,7 @@ class ImportComic {
           var comicObj = await _checkSingleComic(
             comicDir,
             title: title,
-            tags: [
-              //1 >> x
-              [
-                "MISC",
-                "DOUJINSHI",
-                "MANGA",
-                "ARTISTCG",
-                "GAMECG",
-                "IMAGE SET",
-                "COSPLAY",
-                "ASIAN PORN",
-                "NON-H",
-                "WESTERN",
-              ][(log(comic['CATEGORY'] as int) / ln2).floor()],
-            ],
+            tags: [_categoryToString(comic['CATEGORY'] as int)],
             createTime: downloadTime,
           );
           if (comicObj == null) {
@@ -476,5 +462,26 @@ class ImportComic {
       return false;
     }
     return true;
+  }
+
+  /// Convert EhViewer CATEGORY bit flag to string.
+  /// Standard categories are bit flags (1,2,4,...,512),
+  /// plus 0x400 (PRIVATE) and 0x800 (UNKNOWN).
+  static String _categoryToString(int category) {
+    const map = {
+      0x1: 'MISC',
+      0x2: 'DOUJINSHI',
+      0x4: 'MANGA',
+      0x8: 'ARTISTCG',
+      0x10: 'GAMECG',
+      0x20: 'IMAGE SET',
+      0x40: 'COSPLAY',
+      0x80: 'ASIAN PORN',
+      0x100: 'NON-H',
+      0x200: 'WESTERN',
+      0x400: 'PRIVATE',
+      0x800: 'UNKNOWN',
+    };
+    return map[category] ?? 'UNKNOWN';
   }
 }
