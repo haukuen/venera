@@ -200,8 +200,9 @@ class ComicImporter {
       LocalManager().add(comic);
     } catch (e) {
       // 数据库写入失败，清理已复制的文件
-      Directory(FilePath.join(localPath, finalDirectory))
-          .deleteIgnoreError(recursive: true);
+      Directory(
+        FilePath.join(localPath, finalDirectory),
+      ).deleteIgnoreError(recursive: true);
       rethrow;
     }
   }
