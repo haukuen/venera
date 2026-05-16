@@ -549,7 +549,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       for (var comic in comics) {
         fileName = FilePath.join(
           cacheDir,
-          sanitizeFileName(comic.title, maxLength: 100) + ext,
+          sanitizeFileName(comic.title, maxLength: 50) + ext,
         );
         await export(comic, fileName);
         current++;
