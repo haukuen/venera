@@ -691,7 +691,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     // Save file name: ComicName_EP{chapter}_P{page}.{ext} to avoid conflict.
     // The chapter index of different group is continuous, so we use chapter number is enough.
     var filename =
-        "${sanitizeFileName(context.reader.widget.name, maxLength: 50)}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
+        "${sanitizeFileName(context.reader.widget.name, maxLength: maxSanitizedFileNameLength)}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
     saveFile(data: data, filename: filename);
   }
 
@@ -704,7 +704,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
     var filename =
-        "${sanitizeFileName(context.reader.widget.name, maxLength: 50)}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
+        "${sanitizeFileName(context.reader.widget.name, maxLength: maxSanitizedFileNameLength)}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
     Share.shareFile(data: data, filename: filename, mime: fileType.mime);
   }
 

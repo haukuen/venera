@@ -135,6 +135,9 @@ extension DirectoryExtension on Directory {
   }
 }
 
+/// The maximum length of a sanitized file name.
+const maxSanitizedFileNameLength = 50;
+
 /// Sanitize the file name. Remove invalid characters and trim the file name.
 String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
   while (fileName.endsWith('.')) {
