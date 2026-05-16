@@ -170,6 +170,11 @@ class _ReaderState extends State<Reader>
 
   String get eid => widget.chapters?.ids.elementAtOrNull(chapter - 1) ?? '0';
 
+  String? get chapterTitle =>
+      widget.chapters?.titles.elementAtOrNull(chapter - 1);
+
+  String get chapterDisplayName => chapterTitle ?? 'E$chapter';
+
   @override
   List<String>? images;
 
