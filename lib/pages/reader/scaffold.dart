@@ -679,7 +679,8 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
     // Save file name: ComicName_EP{chapter}_P{page}.{ext} to avoid conflict.
-    // The chapter index of different group is continuous, so we use chapter number is enough.
+    // To avoid the file name being too long, here only keep the first characters define by maxSanitizedFileNameLength
+    // To keep the chapter show right with comic(define by sources), we use chapterDisplayName, if undefined, we use chapter number instead.
     var filename =
         "${sanitizeFileName(context.reader.widget.name, maxLength: maxSanitizedFileNameLength)}_EP${context.reader.chapterDisplayName}_P${imageIndex + 1}${fileType.ext}";
     saveFile(data: data, filename: filename);
