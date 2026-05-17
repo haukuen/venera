@@ -140,7 +140,10 @@ abstract class CBZ {
     }
     Map<String, String>? cpMap;
     var dest = Directory(
-      FilePath.join(LocalManager().path, sanitizeFileName(metaData.title)),
+      FilePath.join(
+        LocalManager().path,
+        sanitizeFileName(metaData.title, maxLength: maxSanitizedFileNameLength),
+      ),
     );
     dest.createSync();
     coverFile.copyMem(FilePath.join(dest.path, 'cover.${coverFile.extension}'));
