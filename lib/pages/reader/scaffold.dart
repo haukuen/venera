@@ -670,6 +670,16 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     );
   }
 
+  /// Build export filename: {ComicName}_EP{Chapter}_P{Page}.{ext}
+  String _exportFilename(int page, String ext) {
+    var raw =
+        "${context.reader.widget.name}_EP${context.reader.chapterDisplayName}_P$page$ext";
+    return sanitizeFileName(
+      raw,
+      maxLength: maxSanitizedFileNameLength + ext.length + 30,
+    );
+  }
+
   void saveCurrentImage() async {
     var result = await selectImageToData();
     if (result == null) {
@@ -678,11 +688,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (!mounted) return;
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
-    // Save file name: ComicName_EP{chapter}_P{page}.{ext} to avoid conflict.
-    // To avoid the file name being too long, here only keep the first characters define by maxSanitizedFileNameLength
-    // To keep the chapter show right with comic(define by sources), we use chapterDisplayName, if undefined, we use chapter number instead.
-    var filename =
-        "${sanitizeFileName(context.reader.widget.name, maxLength: maxSanitizedFileNameLength)}_EP${context.reader.chapterDisplayName}_P${imageIndex + 1}${fileType.ext}";
+    var filename = _exportFilename(imageIndex + 1, fileType.ext);
     saveFile(data: data, filename: filename);
   }
 
@@ -694,8 +700,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (!mounted) return;
     var (imageIndex, data) = result;
     var fileType = detectFileType(data);
-    var filename =
-        "${sanitizeFileName(context.reader.widget.name, maxLength: maxSanitizedFileNameLength)}_EP${context.reader.chapterDisplayName}_P${imageIndex + 1}${fileType.ext}";
+    var filename = _exportFilename(imageIndex + 1, fileType.ext);
     Share.shareFile(data: data, filename: filename, mime: fileType.mime);
   }
 
