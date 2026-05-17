@@ -135,8 +135,14 @@ extension DirectoryExtension on Directory {
   }
 }
 
-/// The maximum length of a sanitized file name.
-const maxSanitizedFileNameLength = 50;
+/// The maximum length of a sanitized file name title portion.
+///
+/// APFS (iOS/macOS) limits filenames to 255 UTF-8 bytes. After reserving space
+/// for suffixes like `_EP{chapter}_P{page}.{ext}` (~80 bytes worst case),
+/// this leaves ~175 bytes for the title. At 3 bytes per CJK character, that's
+/// ~58 pure CJK chars. 80 chars works for mixed CJK/ASCII titles in practice.
+/// See also: [comicDirectoryMaxLength] in local.dart which uses the same value.
+const maxSanitizedFileNameLength = 80;
 
 /// Sanitize the file name. Remove invalid characters and trim the file name.
 String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
