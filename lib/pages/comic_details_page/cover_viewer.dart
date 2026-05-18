@@ -133,8 +133,12 @@ class _CoverViewerState extends State<_CoverViewer> {
       final data = await completer.future;
       final fileType = detectFileType(data);
       await saveFile(
-        filename:
-            "cover_${sanitizeFileName(widget.title, maxLength: maxSanitizedFileNameLength)}${fileType.ext}",
+        filename: sanitizeFileNameWithSuffix(
+          widget.title,
+          middle: '_cover',
+          extension: fileType.ext,
+          fallback: 'cover',
+        ),
         data: data,
       );
     } catch (e) {

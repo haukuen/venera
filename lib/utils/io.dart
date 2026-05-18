@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -135,14 +136,31 @@ extension DirectoryExtension on Directory {
   }
 }
 
-/// The maximum length of a sanitized file name title portion.
+/// Soft upper bound for the sanitized title portion of a filename, in characters.
 ///
-/// APFS (iOS/macOS) limits filenames to 255 UTF-8 bytes. After reserving space
-/// for suffixes like `_EP{chapter}_P{page}.{ext}` (~80 bytes worst case),
-/// this leaves ~175 bytes for the title. At 3 bytes per CJK character, that's
-/// ~58 pure CJK chars. 80 chars works for mixed CJK/ASCII titles in practice.
-/// See also: [comicDirectoryMaxLength] in local.dart which uses the same value.
+/// Used together with [maxExportFileNameUtf8Bytes]: the title is capped at this
+/// many characters first, then the whole filename is bounded by the byte budget.
+/// For ASCII titles the char cap is the binding limit; for CJK/emoji titles the
+/// byte budget kicks in earlier. Kept at 80 to match [comicDirectoryMaxLength]
+/// in `local.dart`, so a comic's local directory and its exported file have
+/// comparable lengths.
 const maxSanitizedFileNameLength = 80;
+
+/// Hard upper bound for an exported filename, in UTF-8 bytes.
+///
+/// APFS (iOS/macOS) caps a single path component at 255 UTF-8 bytes. 240 leaves
+/// a small margin for platform / sync layers that prepend metadata.
+const maxExportFileNameUtf8Bytes = 240;
+
+const _defaultFallback = 'file';
+
+/// Path-illegal characters shared by [sanitizeFileName] and
+/// [sanitizeFileNameWithSuffix].
+final _invalidFileNameChars = RegExp(r'[<>:"/\\|?*]');
+
+/// Replace invalid characters with a space (matches [sanitizeFileName]).
+String _replaceInvalidChars(String value) =>
+    value.replaceAll(_invalidFileNameChars, ' ');
 
 /// Sanitize the file name. Remove invalid characters and trim the file name.
 String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
@@ -156,9 +174,7 @@ String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
     }
     length -= dir.length;
   }
-  final invalidChars = RegExp(r'[<>:"/\\|?*]');
-  final sanitizedFileName = fileName.replaceAll(invalidChars, ' ');
-  var trimmedFileName = sanitizedFileName.trim();
+  var trimmedFileName = _replaceInvalidChars(fileName).trim();
   if (trimmedFileName.isEmpty) {
     throw Exception('Invalid File Name: Empty length.');
   }
@@ -169,6 +185,83 @@ String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
     trimmedFileName = trimmedFileName.substring(0, length);
   }
   return trimmedFileName;
+}
+
+/// Truncate `value` to fit within `maxBytes` UTF-8 bytes, aligned on Unicode
+/// code points. Byte-faithful: trailing whitespace is preserved.
+///
+/// Note: iteration is by code point (rune), not by grapheme cluster, so NFD
+/// composed forms (e.g. Japanese `し` + `゙` = `じ`) may split at the boundary,
+/// leaving an orphan combining mark. Production input is typically NFC so this
+/// is rare in practice; switch to `package:characters` if strict grapheme
+/// alignment is needed.
+String _truncateUtf8(String value, int maxBytes) {
+  if (maxBytes <= 0) return '';
+  var usedBytes = 0;
+  final buffer = StringBuffer();
+  for (final rune in value.runes) {
+    final char = String.fromCharCode(rune);
+    final charBytes = utf8.encode(char).length;
+    if (usedBytes + charBytes > maxBytes) break;
+    buffer.write(char);
+    usedBytes += charBytes;
+  }
+  return buffer.toString();
+}
+
+/// Build an export filename of the form `{title}{middle}{extension}`.
+///
+/// - Invalid path characters in [middle] and [extension] are replaced with
+///   spaces. The chapter title contained in [middle] is user-controlled data
+///   and may contain `/`, `:`, `*`, etc.
+/// - [extension] is preserved whenever possible: if [middle] + [extension] fits
+///   within [maxUtf8Bytes] the extension is appended verbatim (modulo invalid
+///   chars). If they together overflow [maxUtf8Bytes] the title is dropped and
+///   only [middle] is byte-truncated; [extension] is still appended in full. If
+///   [extension] alone overflows [maxUtf8Bytes] (pathological) it is truncated.
+/// - The title is capped at [maxSanitizedFileNameLength] characters (soft) and
+///   further by the remaining UTF-8 byte budget (hard).
+/// - When the title sanitizes to empty, [fallback] is used; if [fallback] also
+///   sanitizes to empty the literal `'file'` is used. The function never throws.
+String sanitizeFileNameWithSuffix(
+  String fileName, {
+  String middle = '',
+  required String extension,
+  int maxUtf8Bytes = maxExportFileNameUtf8Bytes,
+  String fallback = _defaultFallback,
+}) {
+  final cleanMiddle = _replaceInvalidChars(middle);
+  final cleanExtension = _replaceInvalidChars(extension);
+  final extensionBytes = utf8.encode(cleanExtension).length;
+
+  if (extensionBytes >= maxUtf8Bytes) {
+    return _truncateUtf8(cleanExtension, maxUtf8Bytes);
+  }
+
+  final middleBytes = utf8.encode(cleanMiddle).length;
+  if (middleBytes + extensionBytes >= maxUtf8Bytes) {
+    final middleBudget = maxUtf8Bytes - extensionBytes;
+    return '${_truncateUtf8(cleanMiddle, middleBudget)}$cleanExtension';
+  }
+
+  final titleBudget = maxUtf8Bytes - middleBytes - extensionBytes;
+
+  String trySanitize(String input) {
+    try {
+      return sanitizeFileName(input, maxLength: maxSanitizedFileNameLength);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  var title = _truncateUtf8(trySanitize(fileName), titleBudget).trimRight();
+  if (title.isEmpty) {
+    title = _truncateUtf8(trySanitize(fallback), titleBudget).trimRight();
+  }
+  if (title.isEmpty) {
+    title = _truncateUtf8(_defaultFallback, titleBudget);
+  }
+  return '$title$cleanMiddle$cleanExtension';
 }
 
 /// Copy the **contents** of the source directory to the destination directory.
