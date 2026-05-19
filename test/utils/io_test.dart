@@ -25,7 +25,7 @@ void main() {
       );
 
       expect(filename.endsWith('$middle$extension'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
     });
 
     test('keeps ordinary CJK titles readable under the byte budget', () {
@@ -36,7 +36,7 @@ void main() {
       );
 
       expect(filename.endsWith('_EP1_P1.jpg'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
       expect(filename.startsWith('漫画标题'), isTrue);
     });
 
@@ -59,7 +59,7 @@ void main() {
       );
 
       expect(filename.endsWith('_EP1_P1.jpg'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
     });
 
     test('handles Japanese precomposed characters', () {
@@ -71,7 +71,7 @@ void main() {
       );
 
       expect(filename.endsWith('_EP1_P1.jpg'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
     });
 
     test('falls back when both fileName and fallback sanitize to empty', () {
@@ -95,7 +95,7 @@ void main() {
       );
 
       expect(filename.endsWith('$middle$extension'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
     });
 
     test('respects custom maxUtf8Bytes parameter', () {
@@ -208,7 +208,7 @@ void main() {
       );
 
       expect(filename.endsWith('.png'), isTrue);
-      expect(utf8.encode(filename).length, lessThanOrEqualTo(240));
+      expect(utf8.encode(filename).length, lessThanOrEqualTo(maxExportFileNameUtf8Bytes));
       // Title is still represented even with a heavy middle.
       expect(filename.startsWith('漫画标题'), isTrue);
     });
