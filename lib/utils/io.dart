@@ -137,20 +137,13 @@ extension DirectoryExtension on Directory {
 }
 
 /// Soft upper bound for the sanitized title portion of a filename, in characters.
-///
-/// Used together with [maxExportFileNameUtf8Bytes]: the title is capped at this
-/// many characters first, then the whole filename is bounded by the byte budget.
-/// For ASCII titles the char cap is the binding limit; for CJK/emoji titles the
-/// byte budget kicks in earlier. Kept at 80 to match [comicDirectoryMaxLength]
-/// in `local.dart`, so a comic's local directory and its exported file have
-/// comparable lengths.
 const maxSanitizedFileNameLength = 80;
 
 /// Hard upper bound for an exported filename, in UTF-8 bytes.
 ///
-/// APFS (iOS/macOS) caps a single path component at 255 UTF-8 bytes. 240 leaves
+/// APFS (iOS/macOS) caps a single path component at 255 UTF-8 bytes. 230 leaves
 /// a small margin for platform / sync layers that prepend metadata.
-const maxExportFileNameUtf8Bytes = 240;
+const maxExportFileNameUtf8Bytes = 230;
 
 const _defaultFallback = 'file';
 
