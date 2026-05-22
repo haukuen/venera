@@ -128,10 +128,11 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
 
   @override
   Widget build(BuildContext context) {
+    final syncStatus = DataSync().statusSnapshot;
     Widget child;
-    if (!DataSync().isEnabled) {
+    if (!syncStatus.shouldShow) {
       child = const SliverPadding(padding: EdgeInsets.zero);
-    } else if (DataSync().isUploading || DataSync().isDownloading) {
+    } else if (syncStatus.isSyncing) {
       child = SliverToBoxAdapter(
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -141,7 +142,8 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
           ),
           child: ListTile(
             leading: const Icon(Icons.sync),
-            title: Text('Syncing Data'.tl),
+            title: Text(syncStatus.title.tl),
+            subtitle: Text(buildSyncStatusDetail(syncStatus)),
             trailing: const CircularProgressIndicator(
               strokeWidth: 2,
             ).fixWidth(18).fixHeight(18),
@@ -160,18 +162,19 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
           ),
           child: ListTile(
             leading: const Icon(Icons.sync),
-            title: Text('Sync Data'.tl),
+            title: Text(syncStatus.title.tl),
+            subtitle: Text(buildSyncStatusDetail(syncStatus)),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (DataSync().lastError != null)
+                if (syncStatus.lastError != null)
                   InkWell(
                     borderRadius: BorderRadius.circular(16),
                     onTap: () {
                       showDialogMessage(
                         App.rootContext,
                         "Error".tl,
-                        DataSync().lastError!,
+                        syncStatus.lastError!,
                       );
                     },
                     child: Container(
@@ -218,6 +221,16 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
       duration: const Duration(milliseconds: 200),
       child: child,
     );
+  }
+
+  String buildSyncStatusDetail(DataSyncStatusSnapshot status) {
+    if (status.isUploading) return 'Uploading data...'.tl;
+    if (status.isDownloading) return 'Downloading data...'.tl;
+    if (status.lastError != null) {
+      return '${'Last sync failed'.tl}: ${status.lastError}';
+    }
+    if (status.lastSyncTime <= 0) return 'Not synced yet'.tl;
+    return '${'Last synced'.tl}: ${status.formattedLastSyncTime}';
   }
 }
 
