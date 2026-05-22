@@ -20,6 +20,90 @@ import 'package:venera/utils/translations.dart';
 
 import 'io.dart';
 
+class DataSyncStatusSnapshot {
+  const DataSyncStatusSnapshot({
+    required this.isEnabled,
+    required this.isUploading,
+    required this.isDownloading,
+    required this.lastSyncTime,
+    required this.lastError,
+  });
+
+  final bool isEnabled;
+  final bool isUploading;
+  final bool isDownloading;
+  final int lastSyncTime;
+  final String? lastError;
+
+  bool get isSyncing => isUploading || isDownloading;
+
+  bool get shouldShow => isEnabled || lastError != null || isSyncing;
+
+  String get title => isSyncing ? 'Syncing Data' : 'Sync Data';
+
+  String get detail {
+    if (isUploading) return 'Uploading data...';
+    if (isDownloading) return 'Downloading data...';
+    if (lastError != null) return 'Last sync failed: $lastError';
+    if (lastSyncTime <= 0) return 'Not synced yet';
+    return 'Last synced: $formattedLastSyncTime';
+  }
+
+  String get formattedLastSyncTime => _formatTime(lastSyncTime);
+
+  static String _formatTime(int timestamp) {
+    final time = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    return '${time.year}-${twoDigits(time.month)}-${twoDigits(time.day)} '
+        '${twoDigits(time.hour)}:${twoDigits(time.minute)}';
+  }
+}
+
+typedef WebDavProbe = Future<void> Function(List<String> config);
+
+class WebDavConnectionTester {
+  const WebDavConnectionTester._();
+
+  static List<String>? normalizeConfig(
+    Object? config, {
+    bool allowEmpty = false,
+  }) {
+    if (config is! List) return null;
+    if (config.isEmpty) return allowEmpty ? const [] : null;
+    if (config.length != 3 || config.whereType<String>().length != 3) {
+      return null;
+    }
+    final result = config.cast<String>().map((e) => e.trim()).toList();
+    if (result.first.isEmpty) return null;
+    return result;
+  }
+
+  static Future<Res<bool>> test(Object? config, {WebDavProbe? probe}) async {
+    final normalized = normalizeConfig(config);
+    if (normalized == null) {
+      return const Res.error('Invalid WebDAV configuration');
+    }
+    try {
+      await (probe ?? _defaultProbe)(normalized);
+      return const Res(true);
+    } catch (e) {
+      return Res.error(e.toString());
+    }
+  }
+
+  static Future<void> _defaultProbe(List<String> config) async {
+    final client = newClient(
+      config[0],
+      user: config[1],
+      password: config[2],
+      adapter: RHttpAdapter(
+        enableProxy: appdata.settings['webdavProxyEnabled'] != false,
+      ),
+    );
+    await client.readDir('/');
+  }
+}
+
 class DataSync with ChangeNotifier {
   DataSync._() {
     if (isEnabled) {
@@ -219,24 +303,27 @@ class DataSync with ChangeNotifier {
 
   String? get lastError => _lastError;
 
+  DataSyncStatusSnapshot get statusSnapshot => DataSyncStatusSnapshot(
+    isEnabled: isEnabled,
+    isUploading: _isUploading,
+    isDownloading: _isDownloading,
+    lastSyncTime: (appdata.settings['lastSyncTime'] as int?) ?? 0,
+    lastError: _lastError,
+  );
+
   bool get isEnabled {
     var config = appdata.settings['webdav'];
     var autoSync = appdata.implicitData['webdavAutoSync'] ?? false;
     return autoSync && config is List && config.isNotEmpty;
   }
 
-  List<String>? _validateConfig() {
-    var config = appdata.settings['webdav'];
-    if (config is! List) {
-      return null;
-    }
-    if (config.isEmpty) {
-      return [];
-    }
-    if (config.length != 3 || config.whereType<String>().length != 3) {
-      return null;
-    }
-    return List.from(config);
+  List<String>? _validateConfig() => WebDavConnectionTester.normalizeConfig(
+    appdata.settings['webdav'],
+    allowEmpty: true,
+  );
+
+  Future<Res<bool>> testConnection([Object? config]) {
+    return WebDavConnectionTester.test(config ?? appdata.settings['webdav']);
   }
 
   Future<Res<bool>> uploadData() async {
