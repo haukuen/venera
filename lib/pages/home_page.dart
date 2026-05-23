@@ -143,7 +143,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text(syncStatus.title.tl),
-            subtitle: Text(buildSyncStatusDetail(syncStatus)),
+            subtitle: buildSyncStatusSubtitle(syncStatus),
             trailing: const CircularProgressIndicator(
               strokeWidth: 2,
             ).fixWidth(18).fixHeight(18),
@@ -163,7 +163,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text(syncStatus.title.tl),
-            subtitle: Text(buildSyncStatusDetail(syncStatus)),
+            subtitle: buildSyncStatusSubtitle(syncStatus),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -231,6 +231,14 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
     }
     if (status.lastSyncTime <= 0) return 'Not synced yet'.tl;
     return '${'Last synced'.tl}: ${status.formattedLastSyncTime}';
+  }
+
+  Widget buildSyncStatusSubtitle(DataSyncStatusSnapshot status) {
+    return Text(
+      buildSyncStatusDetail(status),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }
 
