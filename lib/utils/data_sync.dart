@@ -37,17 +37,9 @@ class DataSyncStatusSnapshot {
 
   bool get isSyncing => isUploading || isDownloading;
 
-  bool get shouldShow => isEnabled || lastError != null || isSyncing;
+  bool get shouldShow => isEnabled || isSyncing;
 
   String get title => isSyncing ? 'Syncing Data' : 'Sync Data';
-
-  String get detail {
-    if (isUploading) return 'Uploading data...';
-    if (isDownloading) return 'Downloading data...';
-    if (lastError != null) return 'Last sync failed: $lastError';
-    if (lastSyncTime <= 0) return 'Not synced yet';
-    return 'Last synced: $formattedLastSyncTime';
-  }
 
   String get formattedLastSyncTime => _formatTime(lastSyncTime);
 
