@@ -9,6 +9,24 @@ class _ReaderScaffold extends StatefulWidget {
   State<_ReaderScaffold> createState() => _ReaderScaffoldState();
 }
 
+class _ReaderSafeAreaScope extends InheritedWidget {
+  const _ReaderSafeAreaScope({required this.padding, required super.child});
+
+  final EdgeInsets padding;
+
+  static EdgeInsets of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<_ReaderSafeAreaScope>()
+            ?.padding ??
+        MediaQuery.of(context).padding;
+  }
+
+  @override
+  bool updateShouldNotify(_ReaderSafeAreaScope oldWidget) {
+    return padding != oldWidget.padding;
+  }
+}
+
 class _ReaderScaffoldState extends State<_ReaderScaffold> {
   bool _isOpen = false;
 
@@ -149,6 +167,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
   @override
   Widget build(BuildContext context) {
     final isOnChapterCommentsPage = context.reader.isOnChapterCommentsPage;
+    final originalSafeAreaPadding = MediaQuery.of(context).padding;
     return Stack(
       children: [
         Positioned.fill(
@@ -158,9 +177,12 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
             removeBottom: true,
             removeLeft: true,
             removeRight: true,
-            child: AbsorbPointer(
-              absorbing: context.reader.isPageAnimating,
-              child: widget.child,
+            child: _ReaderSafeAreaScope(
+              padding: originalSafeAreaPadding,
+              child: AbsorbPointer(
+                absorbing: context.reader.isPageAnimating,
+                child: widget.child,
+              ),
             ),
           ),
         ),
