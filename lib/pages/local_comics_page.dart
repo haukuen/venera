@@ -7,6 +7,7 @@ import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/local_comics/export_dialog.dart';
+import 'package:venera/pages/local_comics/chapter_export.dart';
 import 'package:venera/pages/local_comics/import_dialog.dart';
 import 'package:venera/pages/downloading_page.dart';
 import 'package:venera/pages/favorites/favorites_page.dart';
@@ -24,6 +25,8 @@ class LocalComicsPage extends StatefulWidget {
   @override
   State<LocalComicsPage> createState() => _LocalComicsPageState();
 }
+
+enum _LocalComicExportScope { entireComic, selectedChapters }
 
 class _LocalComicsPageState extends State<LocalComicsPage> {
   late List<LocalComic> comics;
@@ -500,36 +503,200 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         icon: Icons.outbox_outlined,
         text: "Export as cbz".tl,
         onClick: () {
-          exportComics(comics, CBZ.export, ".cbz");
+          chooseExportScopeAndExport(comics, CBZ.export, ".cbz");
         },
       ),
       MenuEntry(
         icon: Icons.picture_as_pdf_outlined,
         text: "Export as pdf".tl,
         onClick: () async {
-          exportComics(comics, createPdfFromComicIsolate, ".pdf");
+          chooseExportScopeAndExport(comics, createPdfFromComicIsolate, ".pdf");
         },
       ),
       MenuEntry(
         icon: Icons.import_contacts_outlined,
         text: "Export as epub".tl,
         onClick: () async {
-          exportComics(comics, createEpubWithLocalComic, ".epub");
+          chooseExportScopeAndExport(comics, createEpubWithLocalComic, ".epub");
         },
       ),
     ];
+  }
+
+  Future<void> chooseExportScopeAndExport(
+    List<LocalComic> comics,
+    ExportComicFunc export,
+    String ext,
+  ) async {
+    final canSelectChapters =
+        comics.length == 1 &&
+        comics.first.chapters != null &&
+        orderedDownloadedChapters(comics.first).isNotEmpty;
+    var scope = _LocalComicExportScope.entireComic;
+
+    final selectedScope = await showDialog<_LocalComicExportScope>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return ContentDialog(
+              title: "Export".tl,
+              content: RadioGroup<_LocalComicExportScope>(
+                groupValue: scope,
+                onChanged: (value) {
+                  if (value == null) return;
+                  if (value == _LocalComicExportScope.selectedChapters &&
+                      !canSelectChapters) {
+                    return;
+                  }
+                  setState(() {
+                    scope = value;
+                  });
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile<_LocalComicExportScope>(
+                      title: Text("Entire comic".tl),
+                      value: _LocalComicExportScope.entireComic,
+                    ),
+                    RadioListTile<_LocalComicExportScope>(
+                      title: Text("Select chapters".tl),
+                      value: _LocalComicExportScope.selectedChapters,
+                      enabled: canSelectChapters,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text("Cancel".tl),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(scope),
+                  child: Text("Confirm".tl),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedScope == null) return;
+    switch (selectedScope) {
+      case _LocalComicExportScope.entireComic:
+        exportComics(comics, export, ext);
+      case _LocalComicExportScope.selectedChapters:
+        showExportChaptersPopWindow(comics.first, export, ext);
+    }
+  }
+
+  void showExportChaptersPopWindow(
+    LocalComic comic,
+    ExportComicFunc export,
+    String ext,
+  ) {
+    final chapters = orderedDownloadedChapters(comic);
+    final selectedChapterIds = <String>{};
+
+    showPopUpWidget(
+      context,
+      PopUpWidgetScaffold(
+        title: "Select chapters".tl,
+        body: StatefulBuilder(
+          builder: (context, setState) {
+            return Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: chapters.length,
+                    itemBuilder: (context, index) {
+                      final chapter = chapters[index];
+                      return CheckboxListTile(
+                        title: Text(chapter.title),
+                        subtitle: Text("#${chapter.position}"),
+                        value: selectedChapterIds.contains(chapter.id),
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              selectedChapterIds.add(chapter.id);
+                            } else {
+                              selectedChapterIds.remove(chapter.id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      FilledButton(
+                        onPressed: selectedChapterIds.isEmpty
+                            ? null
+                            : () {
+                                final selectedChapters = chapters
+                                    .where(
+                                      (chapter) => selectedChapterIds.contains(
+                                        chapter.id,
+                                      ),
+                                    )
+                                    .toList();
+                                final filteredComic = copyWithSelectedChapters(
+                                  comic,
+                                  selectedChapters
+                                      .map((chapter) => chapter.id)
+                                      .toList(),
+                                );
+                                final filename = selectedChapterExportFilename(
+                                  comic: comic,
+                                  selectedChapters: selectedChapters,
+                                  extension: ext,
+                                );
+                                App.rootContext.pop();
+                                exportComics(
+                                  [filteredComic],
+                                  export,
+                                  ext,
+                                  filenameOverride: filename,
+                                );
+                              },
+                        child: Text("Submit".tl),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
 
   /// Export given comics to a file
   void exportComics(
     List<LocalComic> comics,
     ExportComicFunc export,
-    String ext,
-  ) async {
+    String ext, {
+    String? filenameOverride,
+  }) async {
     var current = 0;
     var cacheDir = FilePath.join(App.cachePath, 'comics_export');
     var outFile = FilePath.join(App.cachePath, 'comics_export.zip');
     bool canceled = false;
+    if (filenameOverride != null && comics.length != 1) {
+      throw ArgumentError.value(
+        filenameOverride,
+        'filenameOverride',
+        'can only be used when exporting one comic',
+      );
+    }
     if (Directory(cacheDir).existsSync()) {
       Directory(cacheDir).deleteSync(recursive: true);
     }
@@ -549,11 +716,12 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       for (var comic in comics) {
         fileName = FilePath.join(
           cacheDir,
-          sanitizeFileNameWithSuffix(
-            comic.title,
-            extension: ext,
-            fallback: 'comic',
-          ),
+          filenameOverride ??
+              sanitizeFileNameWithSuffix(
+                comic.title,
+                extension: ext,
+                fallback: 'comic',
+              ),
         );
         await export(comic, fileName);
         current++;
