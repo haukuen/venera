@@ -142,7 +142,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
       int curPage = image.page;
       String pageText = curPage == firstPage
           ? '@a Cover'.tlParams({"a": image.epName})
-          : '${image.epName} - P${curPage}';
+          : '${image.epName} - P$curPage';
 
       return InkWell(
         onTap: () {
