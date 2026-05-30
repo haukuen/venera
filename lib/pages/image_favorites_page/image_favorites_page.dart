@@ -24,6 +24,8 @@ part "image_favorites_item.dart";
 
 part "image_favorites_photo_view.dart";
 
+part "image_favorites_gallery_page.dart";
+
 class ImageFavoritesPage extends StatefulWidget {
   const ImageFavoritesPage({super.key, this.initialKeyword});
 
