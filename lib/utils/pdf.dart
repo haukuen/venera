@@ -14,6 +14,7 @@ Future<void> _createPdfFromComic({
   required LocalComic comic,
   required String savePath,
   required String localPath,
+  required String appVersion,
   required DecodeImage decodeImage,
 }) async {
   var images = <String>[];
@@ -65,6 +66,7 @@ Future<void> _createPdfFromComic({
     author: comic.subtitle,
     imagePaths: images,
     outputPath: savePath,
+    appVersion: appVersion,
     decodeImage: decodeImage,
   );
   await generator.generate();
@@ -76,6 +78,7 @@ Future<Isolate> _runIsolate(
   SendPort sendPort,
 ) {
   var localPath = LocalManager().path;
+  var appVersion = App.version;
   return Isolate.spawn<SendPort>(
     (sendPort) => overrideIO(() async {
       if (App.isAndroid) {
@@ -96,21 +99,41 @@ Future<Isolate> _runIsolate(
       }
 
       receivePort.listen((message) {
-        if (message is Image) {
+        if (message is List && message.length == 3) {
+          final width = message[0] as int;
+          final height = message[1] as int;
+          final buffer = message[2] as Uint8List;
           if (completer == null) {
             throw Exception('No image is being decoded');
           }
-          completer!.complete(message);
+          if (width == 0 || height == 0) {
+            completer!.completeError(
+              Exception('Image decode failed on main thread'),
+            );
+          } else {
+            final pixelData = Uint32List.view(
+              buffer.buffer,
+              buffer.offsetInBytes,
+              width * height,
+            );
+            completer!.complete(Image(pixelData, width, height));
+          }
           completer = null;
         }
       });
 
-      await _createPdfFromComic(
-        comic: comic,
-        savePath: savePath,
-        localPath: localPath,
-        decodeImage: decodeImage,
-      );
+      try {
+        await _createPdfFromComic(
+          comic: comic,
+          savePath: savePath,
+          localPath: localPath,
+          appVersion: appVersion,
+          decodeImage: decodeImage,
+        );
+      } catch (e) {
+        sendPort.send(e.toString());
+        return;
+      }
 
       sendPort.send(null);
     }),
@@ -129,10 +152,30 @@ Future<File> createPdfFromComicIsolate(
   receivePort.listen((message) {
     if (message is SendPort) {
       sendPort = message;
+    } else if (message is String) {
+      // Error from isolate
+      receivePort.close();
+      isolate?.kill();
+      completer.completeError(Exception(message));
     } else if (message is Uint8List) {
-      Image.decodeImage(message).then((image) {
-        sendPort!.send(image);
-      });
+      Image.decodeImage(message)
+          .then((image) {
+            // Transfer raw RGBA bytes instead of Image object.
+            // Uint8List is safely transferable across isolates.
+            final rgbaBytes = Uint8List(image.width * image.height * 4);
+            for (var i = 0; i < image.width * image.height; i++) {
+              final pixel = image.getPixelAtIndex(i);
+              rgbaBytes[i * 4] = pixel.r;
+              rgbaBytes[i * 4 + 1] = pixel.g;
+              rgbaBytes[i * 4 + 2] = pixel.b;
+              rgbaBytes[i * 4 + 3] = pixel.a;
+            }
+            sendPort!.send([image.width, image.height, rgbaBytes]);
+          })
+          .catchError((e) {
+            // Send a zero-size result so the isolate doesn't hang forever
+            sendPort!.send([0, 0, Uint8List(0)]);
+          });
     } else if (message == null) {
       receivePort.close();
       completer.complete();
@@ -149,6 +192,7 @@ class PdfGenerator {
   final String author;
   final List<String> imagePaths;
   final String outputPath;
+  final String appVersion;
   final DecodeImage decodeImage;
 
   // PDF文件的对象ID计数器
@@ -165,6 +209,7 @@ class PdfGenerator {
     required this.author,
     required this.imagePaths,
     required this.outputPath,
+    required this.appVersion,
     required this.decodeImage,
   });
 
@@ -295,7 +340,7 @@ class PdfGenerator {
     write('/Author <');
     writeData(_toPdfString(author));
     write('>\n');
-    write('/Producer (venera v${App.version})\n');
+    write('/Producer (venera v$appVersion)\n');
     write('/CreationDate (D:${_formatDateTime(DateTime.now())})\n');
     write('>>\nendobj\n\n');
 
