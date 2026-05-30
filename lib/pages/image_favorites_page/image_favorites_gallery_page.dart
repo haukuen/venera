@@ -251,15 +251,17 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
       slivers: [
         buildSliverAppBar(),
         SliverPadding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate(
               (context, index) => buildGridItem(index),
               childCount: imgList.length,
             ),
-            gridDelegate: const SliverGridDelegateWithFixedHeight(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 150,
-              itemHeight: 200,
+              childAspectRatio: 150 / 200,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
             ),
           ),
         ),
