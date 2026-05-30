@@ -126,14 +126,10 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
               tooltip: "Deselect".tl,
               onPressed: deselectAll,
             ),
-            MenuButton(
-              entries: [
-                MenuEntry(
-                  icon: Icons.delete_outline,
-                  text: "Delete".tl,
-                  onClick: deleteSelected,
-                ),
-              ],
+            IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: "Delete".tl,
+              onPressed: deleteSelected,
             ),
           ],
         );
@@ -163,7 +159,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
       int curPage = image.page;
       String pageText = curPage == firstPage
           ? '@a Cover'.tlParams({"a": image.epName})
-          : '${image.epName} - P$curPage';
+          : '@a - @b'.tlParams({"a": image.epName, "b": curPage.toString()});
 
       return InkWell(
         onTap: () {
