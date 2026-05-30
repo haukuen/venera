@@ -25,13 +25,12 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
   void _onDataChanged() {
     if (!mounted) return;
     final updated = ImageFavoriteManager().find(comic.id, comic.sourceKey);
+    if (updated == null) {
+      Navigator.of(context).pop();
+      return;
+    }
     setState(() {
-      if (updated != null) {
-        comic = updated;
-      } else {
-        // Comic was fully deleted, pop back
-        Navigator.of(context).pop();
-      }
+      comic = updated;
       selectedImages.clear();
       multiSelectMode = false;
     });
@@ -200,7 +199,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Hero(
-                  tag: "${image.id}_${image.ep}_${image.page}_gallery",
+                  tag: "${image.id}_${image.ep}_${image.page}",
                   child: AnimatedImage(
                     image: ImageFavoritesProvider(image),
                     width: double.infinity,
@@ -271,9 +270,12 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
           builder: (context, constraints) {
             const spacing = 6.0;
             const itemWidth = 120.0;
-            final crossCount =
-                (constraints.crossAxisExtent + spacing) ~/
-                (itemWidth + spacing);
+            final crossCount = (() {
+              var calculated =
+                  (constraints.crossAxisExtent + spacing) ~/
+                  (itemWidth + spacing);
+              return calculated < 1 ? 1 : calculated;
+            })();
             return SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               sliver: SliverGrid(
@@ -298,6 +300,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
     return PopScope(
       canPop: !multiSelectMode,
       onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         if (multiSelectMode) {
           deselectAll();
         }
