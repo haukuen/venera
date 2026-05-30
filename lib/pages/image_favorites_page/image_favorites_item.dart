@@ -104,6 +104,15 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
           goPhotoView(widget.imageFavoritesComic.images.first);
         },
       ),
+      MenuEntry(
+        icon: Icons.grid_view,
+        text: 'Gallery View'.tl,
+        onClick: () {
+          App.mainNavigatorKey?.currentContext?.to(
+            () => ImageFavoritesGalleryPage(comic: widget.imageFavoritesComic),
+          );
+        },
+      ),
     ]);
   }
 
@@ -225,6 +234,18 @@ class _ImageFavoritesItemState extends State<_ImageFavoritesItem> {
             overflow: TextOverflow.ellipsis,
             softWrap: true,
           ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.grid_view, size: 18),
+          tooltip: 'Gallery View'.tl,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          onPressed: () {
+            App.mainNavigatorKey?.currentContext?.to(
+              () =>
+                  ImageFavoritesGalleryPage(comic: widget.imageFavoritesComic),
+            );
+          },
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
