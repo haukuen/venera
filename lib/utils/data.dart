@@ -205,6 +205,7 @@ Future<void> importAppData(
     HistoryManager().notifyChanges();
     LocalFavoritesManager().notifyChanges();
     ReadLaterManager().notifyChanges();
+    ImageFavoriteManager().notifyChanges();
   } finally {
     cacheDir.deleteIgnoreError(recursive: true);
   }

@@ -282,6 +282,7 @@ class DataSync with ChangeNotifier {
     HistoryManager().notifyChanges();
     LocalFavoritesManager().notifyChanges();
     ReadLaterManager().notifyChanges();
+    ImageFavoriteManager().notifyChanges();
   }
 
   void _cleanupBackup() {

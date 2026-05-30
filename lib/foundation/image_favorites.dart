@@ -524,6 +524,10 @@ class ImageFavoriteManager with ChangeNotifier {
     );
   }
 
+  void notifyChanges() {
+    notifyListeners();
+  }
+
   ImageFavoritesComic? find(String id, String sourceKey) {
     var row = _db.select(
       """
