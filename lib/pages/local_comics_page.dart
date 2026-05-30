@@ -585,6 +585,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
     );
 
     if (selectedScope == null) return;
+    if (!mounted) return;
     switch (selectedScope) {
       case _LocalComicExportScope.entireComic:
         exportComics(comics, export, ext);
@@ -609,6 +610,32 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
           builder: (context, setState) {
             return Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            if (selectedChapterIds.length == chapters.length) {
+                              selectedChapterIds.clear();
+                            } else {
+                              selectedChapterIds.addAll(
+                                chapters.map((chapter) => chapter.id),
+                              );
+                            }
+                          });
+                        },
+                        child: Text(
+                          selectedChapterIds.length == chapters.length
+                              ? "Deselect All".tl
+                              : "Select All".tl,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: ListView.builder(
                     itemCount: chapters.length,
