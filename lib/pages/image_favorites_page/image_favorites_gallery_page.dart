@@ -11,7 +11,31 @@ class ImageFavoritesGalleryPage extends StatefulWidget {
 }
 
 class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
-  List<ImageFavorite> get images => widget.comic.images.toList();
+  late ImageFavoritesComic comic;
+
+  List<ImageFavorite> get images => comic.images.toList();
+
+  @override
+  void initState() {
+    super.initState();
+    comic = widget.comic;
+    ImageFavoriteManager().addListener(_onDataChanged);
+  }
+
+  void _onDataChanged() {
+    if (!mounted) return;
+    final updated = ImageFavoriteManager().find(comic.id, comic.sourceKey);
+    setState(() {
+      if (updated != null) {
+        comic = updated;
+      } else {
+        // Comic was fully deleted, pop back
+        Navigator.of(context).pop();
+      }
+      selectedImages.clear();
+      multiSelectMode = false;
+    });
+  }
 
   bool multiSelectMode = false;
   Map<ImageFavorite, bool> selectedImages = {};
@@ -47,17 +71,13 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
   void deleteSelected() {
     if (selectedImages.isEmpty) return;
     ImageFavoriteManager().deleteImageFavorite(selectedImages.keys);
-    setState(() {
-      selectedImages.clear();
-      multiSelectMode = false;
-    });
   }
 
   void goPhotoView(ImageFavorite image) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) =>
-            ImageFavoritesPhotoView(comic: widget.comic, imageFavorite: image),
+            ImageFavoritesPhotoView(comic: comic, imageFavorite: image),
       ),
     );
   }
@@ -75,6 +95,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
 
   @override
   void dispose() {
+    ImageFavoriteManager().removeListener(_onDataChanged);
     scrollController.dispose();
     super.dispose();
   }
@@ -119,7 +140,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
       }
 
       return SliverAppbar(
-        title: Text(widget.comic.title),
+        title: Text(comic.title),
         actions: [
           Tooltip(
             message: "Multi-Select".tl,
