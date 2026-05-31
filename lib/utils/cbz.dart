@@ -433,13 +433,7 @@ abstract class CBZ {
   }
 
   static List<String> _uniqueValues(List<String> values) {
-    final result = <String>[];
-    for (final value in values) {
-      if (!result.contains(value)) {
-        result.add(value);
-      }
-    }
-    return result;
+    return values.toSet().toList();
   }
 
   static _compress(String src, String dst) async {
