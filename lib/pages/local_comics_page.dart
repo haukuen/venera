@@ -12,6 +12,7 @@ import 'package:venera/pages/local_comics/import_dialog.dart';
 import 'package:venera/pages/downloading_page.dart';
 import 'package:venera/pages/favorites/favorites_page.dart';
 import 'package:venera/utils/cbz.dart';
+import 'package:venera/utils/comic_backup.dart';
 import 'package:venera/utils/epub.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/pdf.dart';
@@ -165,6 +166,14 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
           ),
         if (selectedComics.isNotEmpty)
           ...exportActions(selectedComics.keys.toList()),
+        if (selectedComics.isNotEmpty && BackupConfig.fromSettings().isValid)
+          MenuEntry(
+            icon: Icons.cloud_upload_outlined,
+            text: "Archive to WebDAV".tl,
+            onClick: () {
+              backupComics(selectedComics.keys.toList());
+            },
+          ),
         if (selectedComics.isNotEmpty)
           MenuEntry(
             icon: Icons.upload,
@@ -495,6 +504,99 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       },
     );
     return isDeleted;
+  }
+
+  Future<void> backupComics(List<LocalComic> comics) async {
+    if (comics.isEmpty) return;
+    var current = 0;
+    var total = comics.length;
+    var currentTitle = "";
+    var cancelled = false;
+    var started = false;
+    BackupResult? result;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            if (result == null && !started) {
+              started = true;
+              Future.microtask(() async {
+                final backupResult = await ComicBackupManager.backup(
+                  comics,
+                  isCancelled: () => cancelled,
+                  onProgress: (progress, totalCount, title) {
+                    if (!context.mounted) return;
+                    setState(() {
+                      current = progress;
+                      total = totalCount;
+                      currentTitle = title;
+                    });
+                  },
+                );
+                if (!context.mounted) return;
+                setState(() {
+                  result = backupResult;
+                });
+              });
+            }
+            return ContentDialog(
+              title: result == null
+                  ? "Archive to WebDAV".tl
+                  : "Backup Complete".tl,
+              content: result == null
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        LinearProgressIndicator(
+                          value: total > 0 ? current / total : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Text("$current / $total"),
+                        if (currentTitle.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(currentTitle, overflow: TextOverflow.ellipsis),
+                        ],
+                      ],
+                    ).paddingHorizontal(16)
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Success: @a".tlParams({'a': result!.success})),
+                        Text("Skipped: @a".tlParams({'a': result!.skipped})),
+                        Text("Failed: @a".tlParams({'a': result!.failed})),
+                        if (result!.errors.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          for (final error in result!.errors.take(3))
+                            Text(error),
+                        ],
+                      ],
+                    ).paddingHorizontal(16),
+              actions: result == null
+                  ? [
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            cancelled = true;
+                          });
+                        },
+                        child: Text("Cancel".tl),
+                      ),
+                    ]
+                  : [
+                      FilledButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text("OK".tl),
+                      ),
+                    ],
+            );
+          },
+        );
+      },
+    );
   }
 
   List<MenuEntry> exportActions(List<LocalComic> comics) {

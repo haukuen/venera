@@ -114,10 +114,14 @@ class Appdata with Init {
     "customImageProcessing",
     "webdav",
     "webdavProxyEnabled",
+    "backupWebdav",
+    "backupWebdavPath",
     "disableSyncFields",
     "deviceId",
     "lastSyncTime",
   ];
+
+  static const _archiveSyncFields = ["backupWebdav", "backupWebdavPath"];
 
   /// Sync data from another device
   void syncData(Map<String, dynamic> data) {
@@ -128,7 +132,18 @@ class Appdata with Init {
         this.settings["disableSyncFields"] as String,
       );
 
+      // Read the local toggle BEFORE the loop so sync decisions are
+      // based on the pre-sync local state.
+      final archiveSyncEnabled =
+          this.settings["backupWebdavSyncEnabled"] == true;
+
       for (var key in settings.keys) {
+        if (_archiveSyncFields.contains(key)) {
+          if (archiveSyncEnabled) {
+            this.settings[key] = settings[key];
+          }
+          continue;
+        }
         if (!_disableSync.contains(key) && !customDisableSync.contains(key)) {
           this.settings[key] = settings[key];
         }
@@ -229,6 +244,9 @@ class Settings with ChangeNotifier {
     'limitImageWidth': true,
     'webdav': [], // empty means not configured
     'webdavProxyEnabled': true,
+    'backupWebdav': [], // empty means not configured
+    'backupWebdavPath': '/venera_backup/',
+    'backupWebdavSyncEnabled': false,
     "disableSyncFields": "", // TODO: remove, UI entry has been deleted
     'dataVersion': 0,
     'lastSyncTime': 0,

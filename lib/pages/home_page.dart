@@ -13,6 +13,7 @@ import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/read_later.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
+import 'package:venera/pages/comic_archive_page.dart';
 import 'package:venera/pages/comic_source_page.dart';
 import 'package:venera/pages/downloading_page.dart';
 import 'package:venera/pages/follow_updates_page.dart';
@@ -20,7 +21,9 @@ import 'package:venera/pages/history_page.dart';
 import 'package:venera/pages/image_favorites_page/image_favorites_page.dart';
 import 'package:venera/pages/search_page.dart';
 import 'package:venera/utils/data_sync.dart';
+import 'package:venera/utils/comic_backup.dart';
 import 'package:venera/utils/import_comic.dart';
+import 'package:venera/utils/io.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'package:venera/utils/translations.dart';
 
@@ -42,6 +45,7 @@ class HomePage extends StatelessWidget {
         const FollowUpdatesWidget(),
         const _ComicSourceWidget(),
         const ImageFavorites(),
+        const _ComicArchiveWidget(),
         SliverPadding(padding: EdgeInsets.only(top: context.padding.bottom)),
       ],
     );
@@ -472,6 +476,86 @@ class _LocalState extends State<_Local> {
         return const _ImportComicsWidget();
       },
     );
+  }
+}
+
+class _ComicArchiveWidget extends StatefulWidget {
+  const _ComicArchiveWidget();
+
+  @override
+  State<_ComicArchiveWidget> createState() => _ComicArchiveWidgetState();
+}
+
+class _ComicArchiveWidgetState extends State<_ComicArchiveWidget> {
+  List<BackupFile>? files;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load() async {
+    if (!BackupConfig.fromSettings().isValid) return;
+    final result = await ComicBackupManager.listBackups();
+    if (!mounted) return;
+    setState(() {
+      if (result.success) {
+        files = result.data;
+        error = null;
+      } else {
+        files = null;
+        error = result.errorMessage;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!BackupConfig.fromSettings().isValid) {
+      return const SliverPadding(padding: EdgeInsets.zero);
+    }
+    final currentFiles = files ?? const <BackupFile>[];
+    final totalSize = currentFiles.fold<int>(0, (sum, file) => sum + file.size);
+    final newest = currentFiles.isEmpty ? null : currentFiles.first.modified;
+    return SliverToBoxAdapter(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ListTile(
+          leading: const Icon(Icons.archive_outlined),
+          title: Text("Comic Archive".tl),
+          subtitle: Text(
+            error != null
+                ? error!
+                : currentFiles.isEmpty
+                ? "No archive files".tl
+                : "@a archives · @b".tlParams({
+                        'a': currentFiles.length,
+                        'b': bytesToReadableString(totalSize),
+                      }) +
+                      (newest == null
+                          ? ''
+                          : '\n${"Latest".tl}: ${_formatTime(newest)}'),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            context.to(() => const ComicArchivePage()).then((_) => load());
+          },
+        ),
+      ),
+    );
+  }
+
+  static String _formatTime(DateTime time) {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    return '${time.year}-${twoDigits(time.month)}-${twoDigits(time.day)}';
   }
 }
 

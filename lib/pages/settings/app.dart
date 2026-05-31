@@ -134,6 +134,13 @@ class _AppSettingsState extends State<AppSettings> {
           },
           actionTitle: 'Set'.tl,
         ).toSliver(),
+        _CallbackSetting(
+          title: "Comic Archive Backup".tl,
+          callback: () async {
+            showPopUpWidget(context, const _BackupWebdavSetting());
+          },
+          actionTitle: 'Set'.tl,
+        ).toSliver(),
         _SettingPartTitle(title: "User".tl, icon: Icons.person_outline),
         SelectSetting(
           title: "Language".tl,
@@ -582,6 +589,197 @@ class _WebdavSettingState extends State<_WebdavSetting> {
       context.showMessage(message: result.errorMessage!);
     } else {
       context.showMessage(message: "Connection successful".tl);
+    }
+  }
+}
+
+class _BackupWebdavSetting extends StatefulWidget {
+  const _BackupWebdavSetting();
+
+  @override
+  State<_BackupWebdavSetting> createState() => _BackupWebdavSettingState();
+}
+
+class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
+  String url = "";
+  String user = "";
+  String pass = "";
+  String remotePath = "/venera_backup/";
+  bool syncEnabled = false;
+
+  bool isTesting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = BackupConfig.fromSettings();
+    url = config.url;
+    user = config.user;
+    pass = config.pass;
+    remotePath = config.remotePath;
+    syncEnabled = appdata.settings['backupWebdavSyncEnabled'] == true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopUpWidgetScaffold(
+      title: "Comic Archive Backup".tl,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "URL",
+                hintText: "A valid WebDav directory URL".tl,
+                border: OutlineInputBorder(),
+              ),
+              controller: TextEditingController(text: url),
+              onChanged: (value) => url = value,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Username".tl,
+                border: const OutlineInputBorder(),
+              ),
+              controller: TextEditingController(text: user),
+              onChanged: (value) => user = value,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Password".tl,
+                border: const OutlineInputBorder(),
+              ),
+              controller: TextEditingController(text: pass),
+              onChanged: (value) => pass = value,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                labelText: "Remote Path".tl,
+                hintText: "/venera_backup/",
+                border: const OutlineInputBorder(),
+              ),
+              controller: TextEditingController(text: remotePath),
+              onChanged: (value) => remotePath = value,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "This is only used for CBZ archive backup and restore."
+                          .tl,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: Icon(Icons.sync),
+              title: Text("Sync archive config".tl),
+              subtitle: Text(
+                "Sync archive WebDAV URL, username, password and remote path with app data."
+                    .tl,
+              ),
+              trailing: Switch(
+                value: syncEnabled,
+                onChanged: (v) {
+                  setState(() {
+                    syncEnabled = v;
+                  });
+                },
+              ),
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Button.outlined(
+                    isLoading: isTesting,
+                    onPressed: testConnection,
+                    child: Text("Test Connection".tl),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Button.filled(
+                    isLoading: isTesting,
+                    onPressed: save,
+                    child: Text("Continue".tl),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ).paddingHorizontal(16),
+      ),
+    );
+  }
+
+  BackupConfig get currentConfig =>
+      BackupConfig(url: url, user: user, pass: pass, remotePath: remotePath);
+
+  Future<void> testConnection() async {
+    if (isTesting) return;
+    setState(() {
+      isTesting = true;
+    });
+    final result = await ComicBackupManager.testConnection(currentConfig);
+    if (!mounted) return;
+    setState(() {
+      isTesting = false;
+    });
+    if (result.error) {
+      context.showMessage(message: result.errorMessage!);
+    } else {
+      context.showMessage(message: "Connection successful".tl);
+    }
+  }
+
+  Future<void> save() async {
+    if (isTesting) return;
+    appdata.settings['backupWebdavSyncEnabled'] = syncEnabled;
+    final config = currentConfig;
+    if (!config.isValid && config.user.trim().isEmpty && config.pass.isEmpty) {
+      await BackupConfig.saveToSettings(config);
+      if (!mounted) return;
+      context.showMessage(message: "Saved".tl);
+      App.rootPop();
+      return;
+    }
+    setState(() {
+      isTesting = true;
+    });
+    final result = await ComicBackupManager.testConnection(config);
+    if (!mounted) return;
+    setState(() {
+      isTesting = false;
+    });
+    if (result.error) {
+      context.showMessage(message: result.errorMessage!);
+      context.showMessage(message: "Saved Failed".tl);
+    } else {
+      await BackupConfig.saveToSettings(config);
+      if (!mounted) return;
+      context.showMessage(message: "Saved".tl);
+      App.rootPop();
     }
   }
 }
