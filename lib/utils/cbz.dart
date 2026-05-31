@@ -323,11 +323,7 @@ abstract class CBZ {
     }
 
     if (data.tags.isNotEmpty) {
-      var tags = data.tags;
-      if (tags.length > 5) {
-        tags = tags.sublist(0, 5);
-      }
-      buffer.writeln('  <Genre>${_escapeXml(tags.join(', '))}</Genre>');
+      buffer.writeln('  <Tags>${_escapeXml(data.tags.join(', '))}</Tags>');
     }
 
     buffer.writeln('  <PageCount>$pageCount</PageCount>');

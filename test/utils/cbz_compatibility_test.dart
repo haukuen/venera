@@ -24,7 +24,8 @@ void main() {
 
         expect(xml, contains('<Title>Title &amp; &lt;Story&gt;</Title>'));
         expect(xml, contains('<Writer>Author &quot;A&quot; &amp; Co</Writer>'));
-        expect(xml, contains('<Genre>tag &lt;one&gt;, tag &amp; two</Genre>'));
+        expect(xml, contains('<Tags>tag &lt;one&gt;, tag &amp; two</Tags>'));
+        expect(xml, isNot(contains('<Genre>')));
         expect(xml, contains('<PageCount>3</PageCount>'));
         expect(xml, contains('<Manga>Unknown</Manga>'));
         expect(xml, contains('<BlackAndWhite>Unknown</BlackAndWhite>'));
