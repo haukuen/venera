@@ -30,7 +30,7 @@ class BackupConfig {
     final config = appdata.settings['backupWebdav'];
     final path = appdata.settings['backupWebdavPath'];
     if (config is List && config.whereType<String>().length == 3) {
-      final values = config.cast<String>();
+      final values = config.whereType<String>().toList();
       return BackupConfig(
         url: values[0].trim(),
         user: values[1].trim(),
@@ -82,6 +82,18 @@ class BackupFile {
   final String name;
   final int size;
   final DateTime modified;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BackupFile &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          size == other.size &&
+          modified == other.modified;
+
+  @override
+  int get hashCode => Object.hash(name, size, modified);
 }
 
 /// Abstraction over WebDAV operations to keep backup logic testable.
@@ -271,19 +283,21 @@ class ComicBackupManager {
     }
     // 批量获取远端已有文件，避免逐本 PROPFIND
     final remoteFileNames = <String>{};
+    var listSuccess = false;
     try {
       final remoteFiles = await ops.list(config);
       for (final f in remoteFiles) {
         remoteFileNames.add(f.name);
       }
+      listSuccess = true;
     } catch (_) {
-      // 列表失败忽略，后续逐本检查会兜底
+      // 列表失败忽略，后续退化为逐本检查
     }
     for (var i = 0; i < comics.length; i++) {
       if (isCancelled?.call() == true) break;
       final comic = comics[i];
       onProgress?.call(i + 1, comics.length, comic.title);
-      final fileName = _backupFileName(comic);
+      final fileName = backupFileName(comic);
       final remotePath = config.remoteFilePath(fileName);
       final localPath = FilePath.join(
         App.cachePath,
@@ -291,8 +305,10 @@ class ComicBackupManager {
       );
       final localFile = File(localPath);
       try {
-        if (remoteFileNames.contains(fileName) ||
-            await ops.exists(config, remotePath)) {
+        final exists = listSuccess
+            ? remoteFileNames.contains(fileName)
+            : await ops.exists(config, remotePath);
+        if (exists) {
           skipped++;
           continue;
         }
@@ -393,7 +409,7 @@ class ComicBackupManager {
     }
   }
 
-  static String _backupFileName(LocalComic comic) {
+  static String backupFileName(LocalComic comic) {
     final name = sanitizeFileName(
       comic.title,
       maxLength: maxSanitizedFileNameLength,

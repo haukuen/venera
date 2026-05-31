@@ -162,15 +162,22 @@ void main() {
           'p',
         ];
         final uploadedPaths = <String>[];
-        final fakeOps = _FakeBackupOps(existingRemoteNames: {'Existing'});
+        final dupComic = _comic('Dup');
+        final freshComic = _comic('Fresh');
+        final dupFileName = ComicBackupManager.backupFileName(dupComic);
+        final fakeOps = _FakeBackupOps(
+          listResult: [
+            BackupFile(name: dupFileName, size: 0, modified: DateTime(2024)),
+          ],
+        );
         ComicBackupManager.ops = fakeOps;
         ComicBackupManager.exportComic = (comic, path) async {
           File(path).writeAsStringSync(comic.title);
         };
 
         final result = await ComicBackupManager.backup([
-          _comic('Existing'),
-          _comic('Fresh'),
+          dupComic,
+          freshComic,
         ], onProgress: (_, _, __) {});
         uploadedPaths.addAll(fakeOps.uploadedRemotePaths);
 
@@ -263,13 +270,9 @@ LocalComic _comic(String title) {
 }
 
 class _FakeBackupOps implements ComicBackupWebDavOps {
-  _FakeBackupOps({
-    this.listResult = const [],
-    this.existingRemoteNames = const {},
-  });
+  _FakeBackupOps({this.listResult = const []});
 
   final List<BackupFile> listResult;
-  final Set<String> existingRemoteNames;
   String? listedPath;
   String? testedPath;
   final uploadedRemotePaths = <String>[];
@@ -282,16 +285,14 @@ class _FakeBackupOps implements ComicBackupWebDavOps {
   }
 
   @override
+  @override
   Future<List<BackupFile>> list(BackupConfig config) async {
     listedPath = config.remotePath;
     return listResult;
   }
 
   @override
-  Future<bool> exists(BackupConfig config, String remotePath) async {
-    final name = remotePath.split('/').last;
-    return existingRemoteNames.any((e) => name.startsWith(e));
-  }
+  Future<bool> exists(BackupConfig config, String remotePath) async => false;
 
   @override
   Future<void> ensureDirectory(BackupConfig config) async {}
