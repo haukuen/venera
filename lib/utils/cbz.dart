@@ -318,12 +318,22 @@ abstract class CBZ {
     buffer.writeln('  <Title>${_escapeXml(data.title)}</Title>');
     buffer.writeln('  <Series>${_escapeXml(data.title)}</Series>');
 
-    if (data.author.isNotEmpty) {
-      buffer.writeln('  <Writer>${_escapeXml(data.author)}</Writer>');
+    final comicInfoTags = _buildComicInfoTags(data);
+
+    if (comicInfoTags.writer.isNotEmpty) {
+      buffer.writeln('  <Writer>${_escapeXml(comicInfoTags.writer)}</Writer>');
     }
 
-    if (data.tags.isNotEmpty) {
-      buffer.writeln('  <Tags>${_escapeXml(data.tags.join(', '))}</Tags>');
+    if (comicInfoTags.genres.isNotEmpty) {
+      buffer.writeln(
+        '  <Genre>${_escapeXml(comicInfoTags.genres.join(', '))}</Genre>',
+      );
+    }
+
+    if (comicInfoTags.tags.isNotEmpty) {
+      buffer.writeln(
+        '  <Tags>${_escapeXml(comicInfoTags.tags.join(', '))}</Tags>',
+      );
     }
 
     buffer.writeln('  <PageCount>$pageCount</PageCount>');
@@ -365,7 +375,88 @@ abstract class CBZ {
         .replaceAll("'", '&apos;');
   }
 
+  static _ComicInfoTags _buildComicInfoTags(ComicMetaData data) {
+    final writers = <String>[];
+    if (data.author.isNotEmpty) {
+      writers.add(data.author);
+    }
+
+    final genres = <String>[];
+    final tags = <String>[];
+
+    for (final tag in data.tags) {
+      final normalizedTag = tag.trim();
+      if (normalizedTag.isEmpty) continue;
+
+      final separator = normalizedTag.indexOf(':');
+      if (separator <= 0) {
+        tags.add(normalizedTag);
+        continue;
+      }
+
+      final key = normalizedTag.substring(0, separator).trim().toLowerCase();
+      final value = normalizedTag.substring(separator + 1).trim();
+      if (value.isEmpty) continue;
+
+      switch (key) {
+        case 'author':
+        case 'authors':
+        case 'artist':
+        case 'artists':
+          writers.addAll(_splitComicInfoValues(value));
+        case 'category':
+        case 'categories':
+        case 'genre':
+        case 'genres':
+          genres.addAll(_splitComicInfoValues(value));
+        case 'tag':
+        case 'tags':
+          tags.addAll(_splitComicInfoValues(value));
+        default:
+          tags.add(normalizedTag);
+      }
+    }
+
+    return _ComicInfoTags(
+      writer: _uniqueValues(writers).join(', '),
+      genres: _uniqueValues(genres),
+      tags: _uniqueValues(tags),
+    );
+  }
+
+  static List<String> _splitComicInfoValues(String value) {
+    return value
+        .split(RegExp(r'[,，]'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  static List<String> _uniqueValues(List<String> values) {
+    final result = <String>[];
+    for (final value in values) {
+      if (!result.contains(value)) {
+        result.add(value);
+      }
+    }
+    return result;
+  }
+
   static _compress(String src, String dst) async {
     await ZipFile.compressFolderAsync(src, dst, 4);
   }
+}
+
+class _ComicInfoTags {
+  final String writer;
+
+  final List<String> genres;
+
+  final List<String> tags;
+
+  _ComicInfoTags({
+    required this.writer,
+    required this.genres,
+    required this.tags,
+  });
 }
