@@ -601,23 +601,31 @@ class _BackupWebdavSetting extends StatefulWidget {
 }
 
 class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
-  String url = "";
-  String user = "";
-  String pass = "";
-  String remotePath = "/venera_backup/";
+  late final TextEditingController _urlController;
+  late final TextEditingController _userController;
+  late final TextEditingController _passController;
+  late final TextEditingController _remotePathController;
   bool syncEnabled = false;
-
   bool isTesting = false;
 
   @override
   void initState() {
     super.initState();
     final config = BackupConfig.fromSettings();
-    url = config.url;
-    user = config.user;
-    pass = config.pass;
-    remotePath = config.remotePath;
+    _urlController = TextEditingController(text: config.url);
+    _userController = TextEditingController(text: config.user);
+    _passController = TextEditingController(text: config.pass);
+    _remotePathController = TextEditingController(text: config.remotePath);
     syncEnabled = appdata.settings['backupWebdavSyncEnabled'] == true;
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _userController.dispose();
+    _passController.dispose();
+    _remotePathController.dispose();
+    super.dispose();
   }
 
   @override
@@ -634,8 +642,7 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
                 hintText: "A valid WebDav directory URL".tl,
                 border: OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: url),
-              onChanged: (value) => url = value,
+              controller: _urlController,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -643,8 +650,7 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
                 labelText: "Username".tl,
                 border: const OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: user),
-              onChanged: (value) => user = value,
+              controller: _userController,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -652,8 +658,8 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
                 labelText: "Password".tl,
                 border: const OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: pass),
-              onChanged: (value) => pass = value,
+              controller: _passController,
+              obscureText: true,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -662,8 +668,7 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
                 hintText: "/venera_backup/",
                 border: const OutlineInputBorder(),
               ),
-              controller: TextEditingController(text: remotePath),
-              onChanged: (value) => remotePath = value,
+              controller: _remotePathController,
             ),
             const SizedBox(height: 16),
             Container(
@@ -733,8 +738,12 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
     );
   }
 
-  BackupConfig get currentConfig =>
-      BackupConfig(url: url, user: user, pass: pass, remotePath: remotePath);
+  BackupConfig get currentConfig => BackupConfig(
+    url: _urlController.text,
+    user: _userController.text,
+    pass: _passController.text,
+    remotePath: _remotePathController.text,
+  );
 
   Future<void> testConnection() async {
     if (isTesting) return;

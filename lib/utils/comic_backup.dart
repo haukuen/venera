@@ -269,6 +269,16 @@ class ComicBackupManager {
         errors: [e.toString()],
       );
     }
+    // 批量获取远端已有文件，避免逐本 PROPFIND
+    final remoteFileNames = <String>{};
+    try {
+      final remoteFiles = await ops.list(config);
+      for (final f in remoteFiles) {
+        remoteFileNames.add(f.name);
+      }
+    } catch (_) {
+      // 列表失败忽略，后续逐本检查会兜底
+    }
     for (var i = 0; i < comics.length; i++) {
       if (isCancelled?.call() == true) break;
       final comic = comics[i];
@@ -281,7 +291,8 @@ class ComicBackupManager {
       );
       final localFile = File(localPath);
       try {
-        if (await ops.exists(config, remotePath)) {
+        if (remoteFileNames.contains(fileName) ||
+            await ops.exists(config, remotePath)) {
           skipped++;
           continue;
         }
