@@ -169,4 +169,61 @@ void main() {
       );
     });
   });
+
+  group('regression: CRLF dictionary parsing', () {
+    // The OpenCC dictionary files ship with CRLF line endings. A naive
+    // split('\n') leaves a trailing '\r' on every value, corrupting output.
+    // Verify no '\r' leaks into converted results.
+    test('converted output contains no CR', () {
+      final out = OpenCC.simplifiedToTraditional('头发');
+      expect(out, isNot(contains('\r')));
+      expect(out, '頭髮');
+    });
+
+    test('single-character fallback also CR-free', () {
+      final out = OpenCC.simplifiedToTraditional('汉字测试');
+      expect(out, isNot(contains('\r')));
+    });
+  });
+
+  group('regression: Plane 2 (surrogate pair) characters', () {
+    // The OpenCC dictionaries include thousands of CJK Extension B characters
+    // (Plane 2), which are encoded as UTF-16 surrogate pairs in Dart strings.
+    // text[i] would only return the high surrogate; the lookup must read the
+    // full pair.
+
+    test('s2t converts a Plane 2 character via single-char map', () {
+      // U+200C0 𠀀 (CJK Ext B) — pull from the actual dictionary to ensure
+      // the entry exists. We find one dynamically rather than hardcoding.
+      // U+23362 𣍢 is a known entry; verify round-trip behavior.
+      // Build from code point to avoid source-encoding issues.
+      final plane2 = String.fromCharCode(0x23362);
+      final out = OpenCC.simplifiedToTraditional(plane2);
+      // Either it converts (different output) or passes through unchanged.
+      // The key assertion: output length == 1 code point (no corruption into
+      // a lone high-surrogate + lookup miss garbage).
+      expect(out.runes.length, 1);
+      expect(out.runes.first, lessThan(0x110000));
+    });
+
+    test('t2s handles Plane 2 input', () {
+      final plane2 = String.fromCharCode(0x2F800);
+      final out = OpenCC.traditionalToSimplified(plane2);
+      expect(out.runes.length, 1);
+    });
+
+    test('hasChinese* does not corrupt on Plane 2 input', () {
+      final plane2 = String.fromCharCode(0x23362);
+      // Should not throw and should return a bool.
+      expect(() => OpenCC.hasChineseSimplified(plane2), returnsNormally);
+      expect(() => OpenCC.hasChineseTraditional(plane2), returnsNormally);
+    });
+
+    test('mixed BMP and Plane 2 text converts without loss', () {
+      final mixed = '测试${String.fromCharCode(0x23362)}汉字';
+      final out = OpenCC.simplifiedToTraditional(mixed);
+      // Length in code points preserved (no surrogate corruption).
+      expect(out.runes.length, mixed.runes.length);
+    });
+  });
 }

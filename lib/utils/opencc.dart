@@ -40,11 +40,15 @@ abstract class OpenCC {
   /// Format: `key\tvalue` per line. `value` may contain space-separated
   /// alternatives (e.g. "只\t隻 只"); the first alternative is used.
   /// Lines starting with '#' or empty are skipped.
+  ///
+  /// Uses [LineSplitter] instead of `split('\n')` so that CRLF, LF, and CR
+  /// line endings are all handled without leaving a trailing `\r` on the
+  /// value (the OpenCC dictionary files ship as CRLF).
   static Future<Map<String, String>> _loadDict(String asset) async {
     final data = await rootBundle.load(asset);
     final text = utf8.decode(data.buffer.asUint8List());
     final map = <String, String>{};
-    for (final line in text.split('\n')) {
+    for (final line in const LineSplitter().convert(text)) {
       if (line.isEmpty || line.startsWith('#')) continue;
       final tab = line.indexOf('\t');
       if (tab <= 0) continue;
@@ -62,22 +66,27 @@ abstract class OpenCC {
 
   /// Returns true if [text] contains any character that has a
   /// Simplified-to-Traditional mapping (i.e. a "simplified" character).
+  ///
+  /// Iterates UTF-16 code units but reads full surrogate pairs as a single
+  /// key, since the OpenCC dictionaries contain Plane 2 characters (rare
+  /// Han extensions) which are encoded as surrogate pairs in Dart strings.
   static bool hasChineseSimplified(String text) {
     for (int i = 0; i < text.length; i++) {
-      if (_s2tChars.containsKey(text[i])) {
-        return true;
-      }
+      final ch = _charAt(text, i);
+      if (_s2tChars.containsKey(ch)) return true;
+      if (ch.length == 2) i++; // skip low surrogate
     }
     return false;
   }
 
   /// Returns true if [text] contains any character that has a
   /// Traditional-to-Simplified mapping (i.e. a "traditional" character).
+  /// See [hasChineseSimplified] for surrogate-pair handling.
   static bool hasChineseTraditional(String text) {
     for (int i = 0; i < text.length; i++) {
-      if (_t2sChars.containsKey(text[i])) {
-        return true;
-      }
+      final ch = _charAt(text, i);
+      if (_t2sChars.containsKey(ch)) return true;
+      if (ch.length == 2) i++; // skip low surrogate
     }
     return false;
   }
@@ -92,11 +101,31 @@ abstract class OpenCC {
     return _fmm(text, _t2sChars, _t2sPhrases);
   }
 
+  /// Reads one full character starting at [i].
+  ///
+  /// Returns a 2-char string if [i] is a high surrogate followed by a low
+  /// surrogate (a Plane 2 character such as those in CJK Extension B),
+  /// otherwise a 1-char string. Used to look up OpenCC dictionaries which
+  /// store keys as full characters including surrogate pairs.
+  static String _charAt(String text, int i) {
+    final cu = text.codeUnitAt(i);
+    const hiStart = 0xD800, hiEnd = 0xDBFF;
+    const loStart = 0xDC00, loEnd = 0xDFFF;
+    if (cu >= hiStart && cu <= hiEnd && i + 1 < text.length) {
+      final lo = text.codeUnitAt(i + 1);
+      if (lo >= loStart && lo <= loEnd) {
+        return text.substring(i, i + 2);
+      }
+    }
+    return text.substring(i, i + 1);
+  }
+
   /// Forward Maximum Matching conversion.
   ///
   /// Scans [text] left-to-right. At each position tries the longest phrase
   /// (up to [_maxPhraseLen] chars) present in [phrases]; on miss falls back
-  /// to the single-character map [chars], or the original char.
+  /// to the single-character map [chars], or the original char. Surrogate
+  /// pairs are treated as a single character in the fallback branch.
   static String _fmm(
     String text,
     Map<String, String> chars,
@@ -124,9 +153,9 @@ abstract class OpenCC {
         sb.write(matched);
         i += matchedLen;
       } else {
-        final ch = text[i];
+        final ch = _charAt(text, i);
         sb.write(chars[ch] ?? ch);
-        i++;
+        i += ch.length;
       }
     }
     return sb.toString();
