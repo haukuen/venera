@@ -2,62 +2,131 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
+/// Chinese conversion between Simplified and Traditional Chinese.
+///
+/// Uses OpenCC dictionary with Forward Maximum Matching (FMM) algorithm.
+/// Phrase-level conversion disambiguates polysemic characters such as
+/// "头发" -> "頭髮" (not "頭發") by matching multi-character phrases first
+/// before falling back to single-character mapping.
+///
+/// Dictionary source: https://github.com/BYVoid/OpenCC (Apache-2.0)
 abstract class OpenCC {
-  static late final Map<int, int> _s2t;
-  static late final Map<int, int> _t2s;
+  static late final Map<String, String> _s2tChars;
+  static late final Map<String, String> _s2tPhrases;
+  static late final Map<String, String> _t2sChars;
+  static late final Map<String, String> _t2sPhrases;
+
+  /// Maximum phrase length (in code units) in OpenCC dictionaries.
+  /// Empirically the longest key is 12 chars; clamp to 8 to bound FMM
+  /// inner-loop cost (longer entries are rare proverbs with negligible hit
+  /// rate, and substring construction cost scales with length).
+  static const int _maxPhraseLen = 8;
 
   static Future<void> init() async {
-    var data = await rootBundle.load("assets/opencc.txt");
-    var txt = utf8.decode(data.buffer.asUint8List());
-    txt = txt.replaceAll('\r', '');
-    _s2t = <int, int>{};
-    _t2s = <int, int>{};
-    for (var line in txt.split('\n')) {
-      if (line.isEmpty || line.startsWith('#') || line.length != 2) continue;
-      var s = line.runes.elementAt(0);
-      var t = line.runes.elementAt(1);
-      _s2t[s] = t;
-      _t2s[t] = s;
-    }
+    final futures = await Future.wait([
+      _loadDict("assets/opencc/STCharacters.txt"),
+      _loadDict("assets/opencc/STPhrases.txt"),
+      _loadDict("assets/opencc/TSCharacters.txt"),
+      _loadDict("assets/opencc/TSPhrases.txt"),
+    ]);
+    _s2tChars = futures[0];
+    _s2tPhrases = futures[1];
+    _t2sChars = futures[2];
+    _t2sPhrases = futures[3];
   }
 
+  /// Loads an OpenCC txt dictionary.
+  ///
+  /// Format: `key\tvalue` per line. `value` may contain space-separated
+  /// alternatives (e.g. "只\t隻 只"); the first alternative is used.
+  /// Lines starting with '#' or empty are skipped.
+  static Future<Map<String, String>> _loadDict(String asset) async {
+    final data = await rootBundle.load(asset);
+    final text = utf8.decode(data.buffer.asUint8List());
+    final map = <String, String>{};
+    for (final line in text.split('\n')) {
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final tab = line.indexOf('\t');
+      if (tab <= 0) continue;
+      final key = line.substring(0, tab);
+      var value = line.substring(tab + 1);
+      final space = value.indexOf(' ');
+      if (space >= 0) {
+        value = value.substring(0, space);
+      }
+      if (value.isEmpty) continue;
+      map[key] = value;
+    }
+    return map;
+  }
+
+  /// Returns true if [text] contains any character that has a
+  /// Simplified-to-Traditional mapping (i.e. a "simplified" character).
   static bool hasChineseSimplified(String text) {
-    for (var rune in text.runes) {
-      if (_s2t.containsKey(rune)) {
+    for (int i = 0; i < text.length; i++) {
+      if (_s2tChars.containsKey(text[i])) {
         return true;
       }
     }
     return false;
   }
 
+  /// Returns true if [text] contains any character that has a
+  /// Traditional-to-Simplified mapping (i.e. a "traditional" character).
   static bool hasChineseTraditional(String text) {
-    for (var rune in text.runes) {
-      if (_t2s.containsKey(rune)) {
+    for (int i = 0; i < text.length; i++) {
+      if (_t2sChars.containsKey(text[i])) {
         return true;
       }
     }
     return false;
   }
 
+  /// Converts Simplified Chinese to Traditional Chinese.
   static String simplifiedToTraditional(String text) {
-    var sb = StringBuffer();
-    for (var rune in text.runes) {
-      if (_s2t.containsKey(rune)) {
-        sb.write(String.fromCharCodes([_s2t[rune]!]));
-      } else {
-        sb.write(String.fromCharCodes([rune]));
-      }
-    }
-    return sb.toString();
+    return _fmm(text, _s2tChars, _s2tPhrases);
   }
 
+  /// Converts Traditional Chinese to Simplified Chinese.
   static String traditionalToSimplified(String text) {
-    var sb = StringBuffer();
-    for (var rune in text.runes) {
-      if (_t2s.containsKey(rune)) {
-        sb.write(String.fromCharCodes([_t2s[rune]!]));
+    return _fmm(text, _t2sChars, _t2sPhrases);
+  }
+
+  /// Forward Maximum Matching conversion.
+  ///
+  /// Scans [text] left-to-right. At each position tries the longest phrase
+  /// (up to [_maxPhraseLen] chars) present in [phrases]; on miss falls back
+  /// to the single-character map [chars], or the original char.
+  static String _fmm(
+    String text,
+    Map<String, String> chars,
+    Map<String, String> phrases,
+  ) {
+    if (text.isEmpty) return text;
+    final sb = StringBuffer();
+    int i = 0;
+    final n = text.length;
+    while (i < n) {
+      String? matched;
+      int matchedLen = 0;
+      final maxLen = (n - i < _maxPhraseLen) ? (n - i) : _maxPhraseLen;
+      // Try longest first; phrase table requires length >= 2.
+      for (int len = maxLen; len >= 2; len--) {
+        final candidate = text.substring(i, i + len);
+        final v = phrases[candidate];
+        if (v != null) {
+          matched = v;
+          matchedLen = len;
+          break;
+        }
+      }
+      if (matched != null) {
+        sb.write(matched);
+        i += matchedLen;
       } else {
-        sb.write(String.fromCharCodes([rune]));
+        final ch = text[i];
+        sb.write(chars[ch] ?? ch);
+        i++;
       }
     }
     return sb.toString();

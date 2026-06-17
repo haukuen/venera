@@ -106,7 +106,10 @@ flutter:
     - assets/app_icon.png
     - assets/tags.json
     - assets/tags_tw.json
-    - assets/opencc.txt
+    - assets/opencc/STCharacters.txt
+    - assets/opencc/STPhrases.txt
+    - assets/opencc/TSCharacters.txt
+    - assets/opencc/TSPhrases.txt
 # fonts:
 
 flutter_to_arch:
