@@ -46,7 +46,9 @@ abstract class OpenCC {
   /// value (the OpenCC dictionary files ship as CRLF).
   static Future<Map<String, String>> _loadDict(String asset) async {
     final data = await rootBundle.load(asset);
-    final text = utf8.decode(data.buffer.asUint8List());
+    final text = utf8.decode(
+      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+    );
     final map = <String, String>{};
     for (final line in const LineSplitter().convert(text)) {
       if (line.isEmpty || line.startsWith('#')) continue;
