@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
@@ -41,17 +40,32 @@ class ComicImporter {
     tempDir.createSync(recursive: true);
 
     try {
-      await Isolate.run(() {
-        ZipFile.openAndExtract(filePath, tempDirPath);
-      });
+      try {
+        await ZipFile.openAndExtractAsync(filePath, tempDirPath, 4);
+      } catch (e) {
+        return ImportResult(
+          imported: 0,
+          skipped: 0,
+          errors: [
+            'Failed to extract archive: $e. '
+                'Ensure the source file is readable and there is enough free '
+                'space (the archive may need to be unpacked into the app cache).',
+          ],
+        );
+      }
 
       // 2. 读取 metadata.json
       final metadataFile = File(FilePath.join(tempDirPath, 'metadata.json'));
       if (!metadataFile.existsSync()) {
+        final extractedCount = tempDir.listSync().length;
         return ImportResult(
           imported: 0,
           skipped: 0,
-          errors: ['Invalid file: metadata.json not found'],
+          errors: [
+            'Invalid file: metadata.json not found. '
+                'Extraction produced $extractedCount entries '
+                '(${extractedCount == 0 ? "the archive could not be read or is empty" : "the archive may be malformed or not a migration backup"}).',
+          ],
         );
       }
 
