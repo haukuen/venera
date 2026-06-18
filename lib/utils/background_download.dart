@@ -53,7 +53,10 @@ class BackgroundDownload {
     if (!isSupported) return;
 
     final tasks = LocalManager().downloadingTasks;
-    final runningTask = tasks.where((t) => !t.isPaused).firstOrNull;
+    // 处于错误状态的任务已停止下载（不会产生数据流），不计入"运行中"，
+    final runningTask = tasks
+        .where((t) => !t.isPaused && !t.isError)
+        .firstOrNull;
 
     if (runningTask == null) {
       if (_serviceRunning) {
@@ -87,9 +90,16 @@ class BackgroundDownload {
 
   Future<void> _pushProgress() async {
     final tasks = LocalManager().downloadingTasks;
-    final runningTask = tasks.where((t) => !t.isPaused).firstOrNull;
-    if (runningTask == null) return;
-    final activeCount = tasks.where((t) => !t.isPaused).length;
+    final runningTask = tasks
+        .where((t) => !t.isPaused && !t.isError)
+        .firstOrNull;
+    if (runningTask == null) {
+      // 没有运行中的任务（全部完成/暂停/出错）-> 立刻停掉 timer，
+      // 避免每秒空转。下一次队列状态变化会通过 sync() 重新启动。
+      _cancelTimer();
+      return;
+    }
+    final activeCount = tasks.where((t) => !t.isPaused && !t.isError).length;
     final text = _describe(
       runningTask.title,
       runningTask.message,
@@ -97,6 +107,11 @@ class BackgroundDownload {
       runningTask.progress,
     );
     await _start(text);
+    if (!_serviceRunning) {
+      // _start 失败（权限被拒 / 系统限制 / channel 缺失）-> 取消 timer，
+      // 否则每秒都会重复发起无意义的 Platform Channel 调用
+      _cancelTimer();
+    }
   }
 
   /// app 回到前台时调用。重新同步前台服务，以防 OS 在后台期间杀掉了它。

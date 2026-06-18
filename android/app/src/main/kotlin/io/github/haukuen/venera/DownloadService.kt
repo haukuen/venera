@@ -31,6 +31,13 @@ class DownloadService : Service() {
 
     private var wakeLock: PowerManager.WakeLock? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        // 在 onCreate 中一次性创建通知渠道。Service 生命周期内 onCreate 只
+        // 调用一次，避免 onStartCommand / 通知刷新时重复的 IPC 开销。
+        ensureChannel()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -56,7 +63,7 @@ class DownloadService : Service() {
     }
 
     private fun startForegroundCompat(text: String) {
-        ensureChannel()
+        // ensureChannel 已在 onCreate 中调用，此处无需重复。
         startForeground(
             NOTIFICATION_ID,
             buildNotification(text),

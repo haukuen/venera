@@ -209,6 +209,10 @@ class MainActivity : FlutterFragmentActivity() {
                     if (hasNotificationPermission()) {
                         res.success(true)
                     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        // 并发场景（虽然 Dart 侧 _permissionRequested 守卫已经几乎
+                        // 避免了）：覆盖前先把前一次的 callback 以 false 触发，
+                        // 否则前一次的 Flutter Result 会永远悬挂。
+                        notificationPermissionRequest?.invoke(false)
                         notificationPermissionRequest = { granted -> res.success(granted) }
                         ActivityCompat.requestPermissions(
                             this,
