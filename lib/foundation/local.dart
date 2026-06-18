@@ -13,6 +13,7 @@ import 'package:venera/foundation/sqlite_connection.dart';
 import 'package:venera/network/download.dart';
 import 'package:venera/pages/reader/reader.dart';
 import 'package:venera/utils/io.dart';
+import 'package:venera/utils/background_download.dart';
 
 import 'app.dart';
 import 'history.dart';
@@ -518,12 +519,14 @@ class LocalManager with ChangeNotifier {
     notifyListeners();
     saveCurrentDownloadingTasks();
     downloadingTasks.firstOrNull?.resume();
+    _syncBackgroundService();
   }
 
   void removeTask(DownloadTask task) {
     downloadingTasks.remove(task);
     notifyListeners();
     saveCurrentDownloadingTasks();
+    _syncBackgroundService();
   }
 
   void moveToFirst(DownloadTask task) {
@@ -537,6 +540,7 @@ class LocalManager with ChangeNotifier {
       if (shouldResume) {
         downloadingTasks.first.resume();
       }
+      _syncBackgroundService();
     }
   }
 
@@ -570,6 +574,13 @@ class LocalManager with ChangeNotifier {
     notifyListeners();
     saveCurrentDownloadingTasks();
     downloadingTasks.first.resume();
+    _syncBackgroundService();
+  }
+
+  /// 让原生前台服务与下载队列保持同步。
+  /// 不支持后台下载保护的平台上为 no-op。
+  void _syncBackgroundService() {
+    BackgroundDownload.instance.sync();
   }
 
   void deleteComic(LocalComic c, [bool removeFileOnDisk = true]) {

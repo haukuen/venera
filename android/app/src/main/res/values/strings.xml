@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="share_text">Search</string>
+    <string name="app_name" translatable="false">Venera</string>
+    <string name="download_channel_name">Downloads</string>
+    <string name="download_channel_desc">Shows progress while comics are downloading.</string>
+    <string name="download_notification_default">Downloading…</string>
 </resources>

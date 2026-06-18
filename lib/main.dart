@@ -11,6 +11,7 @@ import 'package:venera/pages/auth_page.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/main_page.dart';
 import 'package:venera/utils/app_links.dart';
+import 'package:venera/utils/background_download.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
 import 'package:window_manager/window_manager.dart';
@@ -94,6 +95,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && App.isMobile) {
       _checkClipboardForVeneraLink();
+      // 重新同步后台下载前台服务：OS 可能在后台期间杀掉了它。
+      // 在不支持的平台上（iOS / 桌面）为 no-op。
+      BackgroundDownload.instance.onAppResumed();
     }
     if (!App.isMobile || !appdata.settings['authorizationRequired']) {
       return;

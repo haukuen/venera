@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="share_text">搜尋</string>
+    <string name="download_channel_name">下載</string>
+    <string name="download_channel_desc">顯示漫畫下載進度</string>
+    <string name="download_notification_default">下載中…</string>
 </resources>

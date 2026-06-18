@@ -39,6 +39,9 @@ class MainActivity : FlutterFragmentActivity() {
     private val storageRequestCode = 0x10
     private var storagePermissionRequest: ((Boolean) -> Unit)? = null
 
+    private val notificationRequestCode = 0x11
+    private var notificationPermissionRequest: ((Boolean) -> Unit)? = null
+
     private val nextLocalRequestCode = AtomicInteger()
 
     private val sharedTexts = ArrayList<String>()
@@ -169,6 +172,56 @@ class MainActivity : FlutterFragmentActivity() {
         selectFileChannel.setMethodCallHandler { req, res ->
             val mimeType = req.arguments<String>()
             openFile(res, mimeType!!)
+        }
+
+        // 后台下载：Dart 侧通过此 channel 控制前台服务。
+        // start: {text} -> 启动 / 刷新服务（幂等）
+        // stop          -> 停止服务（幂等）
+        val downloadChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "venera/download_service")
+        downloadChannel.setMethodCallHandler { call, res ->
+            when (call.method) {
+                "start" -> {
+                    val text = call.argument<String>("text")
+                        ?: getString(R.string.download_notification_default)
+                    try {
+                        DownloadService.startService(this, text)
+                        res.success(true)
+                    } catch (e: Exception) {
+                        // 常见原因：Android 13+ 未授予 POST_NOTIFICATIONS，
+                        // 或前台服务被系统限制。返回 false 让 Dart 侧优雅地
+                        // 退回到"没有后台保护"的状态。
+                        Log.w("Venera", "Failed to start download service: ${e.message}")
+                        res.success(false)
+                    }
+                }
+                "stop" -> {
+                    try {
+                        DownloadService.stopService(this)
+                    } catch (e: Exception) {
+                        Log.w("Venera", "Failed to stop download service: ${e.message}")
+                    }
+                    res.success(null)
+                }
+                "hasNotificationPermission" -> {
+                    res.success(hasNotificationPermission())
+                }
+                "requestNotificationPermission" -> {
+                    if (hasNotificationPermission()) {
+                        res.success(true)
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        notificationPermissionRequest = { granted -> res.success(granted) }
+                        ActivityCompat.requestPermissions(
+                            this,
+                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            notificationRequestCode
+                        )
+                    } else {
+                        // Android 13 以下：通知权限是隐式授予的。
+                        res.success(true)
+                    }
+                }
+                else -> res.notImplemented()
+            }
         }
 
         val shareTextChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, "venera/text_share")
@@ -342,6 +395,23 @@ class MainActivity : FlutterFragmentActivity() {
                 it == PackageManager.PERMISSION_GRANTED
             })
             storagePermissionRequest = null
+        } else if (requestCode == notificationRequestCode) {
+            notificationPermissionRequest?.invoke(grantResults.isNotEmpty() &&
+                grantResults.all { it == PackageManager.PERMISSION_GRANTED })
+            notificationPermissionRequest = null
+        }
+    }
+
+    /// Android 13+ 需要在运行时申请 POST_NOTIFICATIONS 权限，前台服务通知才能显示。
+    /// 13 以下版本为隐式授予。
+    private fun hasNotificationPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
         }
     }
 

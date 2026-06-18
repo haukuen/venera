@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- 后台下载：保持进程在后台下载时不被冻结 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="venera"
         android:name="${applicationName}"
@@ -66,6 +71,13 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <!-- 前台服务：在下载任务运行期间保持 app 进程存活，
+             这样锁屏或切后台后下载才能继续。
+             仅在至少存在一个下载任务时启用。 -->
+        <service
+            android:name=".DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
