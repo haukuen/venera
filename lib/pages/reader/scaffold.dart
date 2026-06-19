@@ -899,6 +899,11 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     var reader = context.reader;
     var imageViewController = context.reader._imageViewController;
 
+    // 评论页无图片，直接返回，避免弹出选择框
+    if (reader.isOnChapterCommentsPage) {
+      return null;
+    }
+
     bool needsSelection = false;
     int? singleImageIndex;
 

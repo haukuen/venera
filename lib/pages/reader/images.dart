@@ -288,13 +288,19 @@ class _GalleryModeState extends State<_GalleryMode>
     }
   }
 
-  /// Get the image indices for current page. Returns null if no images.
-  /// Returns a single index if only one image, or a range if multiple images.
+  /// 获取当前页的图片索引范围。无图片时返回 null（如评论页或图片未加载）。
   (int, int)? getCurrentPageImageRange() {
     if (reader.images == null || reader.images!.isEmpty) {
       return null;
     }
+    // 评论页没有图片，按公式算出的 startIndex 会越界，导致收藏时崩溃
+    if (isChapterCommentsPage(reader.page)) {
+      return null;
+    }
     var (startIndex, endIndex) = getPageImagesRange(reader.page);
+    if (startIndex >= reader.images!.length) {
+      return null;
+    }
     return (startIndex, endIndex);
   }
 
@@ -370,6 +376,11 @@ class _GalleryModeState extends State<_GalleryMode>
           } else if (isChapterCommentsPage(index)) {
             return PhotoViewGalleryPageOptions.customChild(
               child: _buildChapterCommentsPage(),
+              // 评论页非图片，禁用缩放手势，防止整页被双指缩放
+              disableGestures: true,
+              initialScale: PhotoViewComputedScale.contained * 1.0,
+              minScale: PhotoViewComputedScale.contained * 1.0,
+              maxScale: PhotoViewComputedScale.contained * 1.0,
             );
           } else {
             var (startIndex, endIndex) = getPageImagesRange(index);
@@ -683,6 +694,10 @@ class _GalleryModeState extends State<_GalleryMode>
 
     var (startIndex, endIndex) = range;
     int actualImageCount = endIndex - startIndex;
+
+    if (actualImageCount <= 0) {
+      return null;
+    }
 
     if (actualImageCount == 1) {
       return reader.images![startIndex];
