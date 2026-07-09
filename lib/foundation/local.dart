@@ -311,10 +311,12 @@ class LocalManager with ChangeNotifier {
 
   Future<void> add(LocalComic comic, [String? id]) async {
     var old = find(id ?? comic.id, comic.comicType);
-    var downloaded = comic.downloadedChapters;
+    var downloaded = <String>[...comic.downloadedChapters];
     if (old != null) {
       downloaded.addAll(old.downloadedChapters);
     }
+    // 去重,避免历史数据或多次 add 累积重复 chapter id。
+    downloaded = downloaded.toSet().toList();
     _db.execute(
       'INSERT OR REPLACE INTO comics VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
       [
@@ -563,6 +565,8 @@ class LocalManager with ChangeNotifier {
       );
     } else {
       if (existing.downloadedChapters.contains(chapterId)) return;
+      // 只传新增的 [chapterId],add() 内部会自动与 existing.downloadedChapters 合并,
+      // 避免传入 [...existing.downloadedChapters, chapterId] 导致 add() 二次合并产生重复。
       await add(
         LocalComic(
           id: existing.id,
@@ -573,7 +577,7 @@ class LocalManager with ChangeNotifier {
           chapters: existing.chapters,
           cover: existing.cover,
           comicType: existing.comicType,
-          downloadedChapters: [...existing.downloadedChapters, chapterId],
+          downloadedChapters: [chapterId],
           createdAt: existing.createdAt,
         ),
       );

@@ -204,7 +204,10 @@ Future<File> createEpubWithLocalComic(
   } else {
     var availableChapters = <String>[];
     var missingChapters = <String>[];
-    for (var c in comic.downloadedChapters) {
+    // 按章节原始顺序遍历,而非 downloadedChapters(其顺序可能是完成顺序)。
+    var downloadedSet = comic.downloadedChapters.toSet();
+    for (var c in comic.chapters!.ids) {
+      if (!downloadedSet.contains(c)) continue;
       var chapterDir = Directory(
         FilePath.join(comic.baseDir, LocalManager.getChapterDirectoryName(c)),
       );
