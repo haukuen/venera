@@ -89,6 +89,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   bool isAuthPageActive = false;
+  bool _sessionAuthenticated = false;
 
   OverlayEntry? hideContentOverlay;
 
@@ -124,10 +125,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.hidden &&
         !isAuthPageActive &&
         !IO.isSelectingFiles) {
+      _sessionAuthenticated = false;
       isAuthPageActive = true;
       App.rootContext.to(
         () => AuthPage(
           onSuccessfulAuth: () {
+            _sessionAuthenticated = true;
             App.rootContext.pop();
             isAuthPageActive = false;
           },
@@ -279,17 +282,28 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       home = Builder(
         builder: (context) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_sessionAuthenticated || isAuthPageActive) return;
             isAuthPageActive = true;
             Navigator.of(context).push(
               AppPageRoute(builder: (_) => AuthPage(
                 onSuccessfulAuth: () {
+                  _sessionAuthenticated = true;
                   Navigator.of(context).pop();
                   isAuthPageActive = false;
+                  forceRebuild();
                 },
               )),
             );
           });
-          return const MainPage();
+          return Stack(
+            children: [
+              const MainPage(),
+              if (!_sessionAuthenticated)
+                Positioned.fill(
+                  child: Container(color: Theme.of(context).colorScheme.surface),
+                ),
+            ],
+          );
         },
       );
     } else {
