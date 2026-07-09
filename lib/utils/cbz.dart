@@ -246,9 +246,10 @@ abstract class CBZ {
         );
       }
       if (missingChapters.isNotEmpty) {
+        var missingTitles = missingChapters.map((c) => comic.chapters![c] ?? c);
         Log.warning(
           'CBZ',
-          'Skipped missing chapters for "${comic.title}": ${missingChapters.join(', ')}',
+          'Skipped missing chapters for "${comic.title}": ${missingTitles.join(', ')}',
         );
       }
       var allImages = <String>[];

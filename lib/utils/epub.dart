@@ -224,9 +224,10 @@ Future<File> createEpubWithLocalComic(
       );
     }
     if (missingChapters.isNotEmpty) {
+      var missingTitles = missingChapters.map((c) => comic.chapters![c] ?? c);
       Log.warning(
         'EPUB',
-        'Skipped missing chapters for "${comic.title}": ${missingChapters.join(', ')}',
+        'Skipped missing chapters for "${comic.title}": ${missingTitles.join(', ')}',
       );
     }
     for (var chapter in availableChapters) {
