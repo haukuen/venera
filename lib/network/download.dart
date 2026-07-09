@@ -407,6 +407,16 @@ class ImagesDownloadTask extends DownloadTask with _TransferSpeedMixin {
         _message = "$_downloadedCount/$_totalCount";
         await LocalManager().saveCurrentDownloadingTasks();
       }
+      // 本章全部图片下载成功,即时把该 chapter ID 标记到 SQLite
+      var completedChapterId = _images!.keys.elementAt(_chapter);
+      if (chapters == null || chapters!.contains(completedChapterId)) {
+        LocalManager().markChapterDownloaded(
+          comicId,
+          ComicType(source.key.hashCode),
+          completedChapterId,
+          comicBuilder: toLocalComic,
+        );
+      }
       _index = 0;
       _chapter++;
     }
@@ -502,7 +512,8 @@ class ImagesDownloadTask extends DownloadTask with _TransferSpeedMixin {
       chapters: comic!.chapters,
       cover: File(_cover!.split("file://").last).name,
       comicType: ComicType(source.key.hashCode),
-      downloadedChapters: chapters ?? comic?.chapters?.ids.toList() ?? [],
+      downloadedChapters: LocalManager().find(comic!.id, ComicType(source.key.hashCode))?.downloadedChapters
+          ?? chapters ?? comic?.chapters?.ids.toList() ?? [],
       createdAt: DateTime.now(),
     );
   }

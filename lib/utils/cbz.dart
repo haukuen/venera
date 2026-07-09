@@ -207,6 +207,13 @@ abstract class CBZ {
     var pageCount = 0;
     if (comic.chapters == null) {
       var images = await LocalManager().getImages(comic.id, comic.comicType, 1);
+      if (images.isEmpty) {
+        throw StateError(
+          'No images found on disk for "${comic.title}". '
+          'The comic may not have been fully downloaded. '
+          'Please delete and re-download.',
+        );
+      }
       pageCount = images.length;
       int i = 1;
       for (var image in images) {
@@ -217,9 +224,33 @@ abstract class CBZ {
         i++;
       }
     } else {
+      var availableChapters = <String>[];
+      var missingChapters = <String>[];
+      for (var c in comic.downloadedChapters) {
+        var chapterDir = Directory(
+          FilePath.join(comic.baseDir, LocalManager.getChapterDirectoryName(c)),
+        );
+        if (chapterDir.existsSync()) {
+          availableChapters.add(c);
+        } else {
+          missingChapters.add(c);
+        }
+      }
+      if (availableChapters.isEmpty) {
+        throw StateError(
+          'No downloadable chapters found on disk for "${comic.title}". '
+          'Please delete and re-download the comic.',
+        );
+      }
+      if (missingChapters.isNotEmpty) {
+        Log.warning(
+          'CBZ',
+          'Skipped missing chapters for "${comic.title}": ${missingChapters.join(', ')}',
+        );
+      }
       var allImages = <String>[];
       final chapterPageCounts = <MapEntry<String, int>>[];
-      for (var c in comic.downloadedChapters) {
+      for (var c in availableChapters) {
         var chapterName = comic.chapters![c];
         var images = await LocalManager().getImages(
           comic.id,

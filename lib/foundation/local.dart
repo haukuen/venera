@@ -429,6 +429,11 @@ class LocalManager with ChangeNotifier {
       cid = getChapterDirectoryName(cid);
       directory = Directory(FilePath.join(directory.path, cid));
     }
+    if (!await directory.exists()) {
+      throw StateError('Chapter directory not found: ${directory.path}. '
+          'The chapter may not have been fully downloaded. '
+          'Please delete and re-download the affected chapters.');
+    }
     var files = <File>[];
     await for (var entity in directory.list()) {
       if (entity is File) {
@@ -463,7 +468,10 @@ class LocalManager with ChangeNotifier {
   ]) {
     var comic = find(id, type);
     if (comic == null) return false;
-    if (comic.chapters == null || ep == null) return true;
+    if (comic.chapters == null || ep == null) {
+      // 整本下载(无章节信息):校验漫画根目录存在
+      return Directory(comic.baseDir).existsSync();
+    }
     if (chapters != null) {
       if (comic.chapters?.length != chapters.length) {
         // update
@@ -483,9 +491,13 @@ class LocalManager with ChangeNotifier {
         );
       }
     }
-    return comic.downloadedChapters.contains(
-      (chapters ?? comic.chapters)!.ids.elementAtOrNull(ep - 1),
+    var cid = (chapters ?? comic.chapters)!.ids.elementAtOrNull(ep - 1);
+    if (cid == null || !comic.downloadedChapters.contains(cid)) return false;
+    // 校验该章节目录实际存在
+    var chapterDir = Directory(
+      FilePath.join(comic.baseDir, getChapterDirectoryName(cid)),
     );
+    return chapterDir.existsSync();
   }
 
   List<DownloadTask> downloadingTasks = [];
@@ -520,6 +532,42 @@ class LocalManager with ChangeNotifier {
     saveCurrentDownloadingTasks();
     downloadingTasks.firstOrNull?.resume();
     _syncBackgroundService();
+  }
+
+  /// 把单个 chapter 标记为已下载(upsert 到 SQLite)
+  void markChapterDownloaded(String comicId, ComicType type, String chapterId, {required LocalComic Function() comicBuilder}) {
+    var existing = find(comicId, type);
+    if (existing == null) {
+      // 首次:用 comicBuilder 构造完整 LocalComic,downloadedChapters 仅含 [chapterId]
+      var comic = comicBuilder();
+      add(LocalComic(
+        id: comic.id,
+        title: comic.title,
+        subtitle: comic.subtitle,
+        tags: comic.tags,
+        directory: comic.directory,
+        chapters: comic.chapters,
+        cover: comic.cover,
+        comicType: comic.comicType,
+        downloadedChapters: [chapterId],
+        createdAt: comic.createdAt,
+      ));
+    } else {
+      if (existing.downloadedChapters.contains(chapterId)) return;
+      add(LocalComic(
+        id: existing.id,
+        title: existing.title,
+        subtitle: existing.subtitle,
+        tags: existing.tags,
+        directory: existing.directory,
+        chapters: existing.chapters,
+        cover: existing.cover,
+        comicType: existing.comicType,
+        downloadedChapters: [...existing.downloadedChapters, chapterId],
+        createdAt: existing.createdAt,
+      ));
+    }
+    notifyListeners();
   }
 
   void removeTask(DownloadTask task) {
