@@ -23,7 +23,14 @@ class _AuthPinSettingState extends State<AuthPinSetting> {
 
   Future<void> _onStage1Submit(String pin) async {
     if (pin == _firstPin) {
-      await AuthStorage.setPin(pin);
+      try {
+        await AuthStorage.setPin(pin);
+      } catch (_) {
+        if (!mounted) return;
+        context.showMessage(message: "Failed to save PIN".tl);
+        _confirmKey.currentState?.reset();
+        return;
+      }
       if (!mounted) return;
       context.showMessage(message: "PIN set".tl);
       App.pop();
@@ -34,13 +41,24 @@ class _AuthPinSettingState extends State<AuthPinSetting> {
   }
 
   Future<void> _clearPin() async {
-    await AuthStorage.clearPin();
     final auth = LocalAuthentication();
-    final canAuth =
-        await auth.canCheckBiometrics || await auth.isDeviceSupported();
-    if (!canAuth) {
+    bool canAuthenticate;
+    try {
+      canAuthenticate = await auth.canCheckBiometrics ||
+          await auth.isDeviceSupported();
+    } catch (_) {
+      canAuthenticate = false;
+    }
+    if (!canAuthenticate) {
       appdata.settings['authorizationRequired'] = false;
-      appdata.saveData();
+      await appdata.saveData();
+    }
+    try {
+      await AuthStorage.clearPin();
+    } catch (_) {
+      if (!mounted) return;
+      context.showMessage(message: "Failed to clear PIN".tl);
+      return;
     }
     if (!mounted) return;
     context.showMessage(message: "PIN cleared".tl);

@@ -225,11 +225,16 @@ class _AppSettingsState extends State<AppSettings> {
               var current = appdata.settings['authorizationRequired'];
               if (current) {
                 final auth = LocalAuthentication();
-                final bool canAuthenticateWithBiometrics =
-                    await auth.canCheckBiometrics;
-                final bool canAuthenticate =
-                    canAuthenticateWithBiometrics ||
-                    await auth.isDeviceSupported();
+                bool canAuthenticate;
+                try {
+                  final bool canAuthenticateWithBiometrics =
+                      await auth.canCheckBiometrics;
+                  canAuthenticate =
+                      canAuthenticateWithBiometrics ||
+                      await auth.isDeviceSupported();
+                } catch (_) {
+                  canAuthenticate = false;
+                }
                 if (!canAuthenticate) {
                   if (!context.mounted) return;
                   await showPopUpWidget(context, const AuthPinSetting());

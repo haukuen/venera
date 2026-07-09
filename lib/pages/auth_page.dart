@@ -33,11 +33,15 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> _init() async {
     final localAuth = LocalAuthentication();
-    final canCheckBiometrics = await localAuth.canCheckBiometrics;
-    final biometricAvailable =
-        canCheckBiometrics || await localAuth.isDeviceSupported();
+    bool canAuthenticate = false;
+    try {
+      canAuthenticate = await localAuth.canCheckBiometrics ||
+          await localAuth.isDeviceSupported();
+    } catch (e) {
+      debugPrint("Failed to check biometrics: $e");
+    }
     if (!mounted) return;
-    if (biometricAvailable) {
+    if (canAuthenticate) {
       _authBiometric();
     } else if (AuthStorage.hasPin) {
       setState(() {
@@ -54,7 +58,8 @@ class _AuthPageState extends State<AuthPage> {
       isAuthorized = await LocalAuthentication().authenticate(
         localizedReason: "Please authenticate to continue".tl,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint("Biometric auth error: $e");
       isAuthorized = false;
     }
     if (!mounted) return;
@@ -67,6 +72,8 @@ class _AuthPageState extends State<AuthPage> {
       setState(() {
         _usePin = true;
       });
+    } else {
+      context.showMessage(message: "Authentication failed, please try again".tl);
     }
   }
 

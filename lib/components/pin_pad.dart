@@ -33,11 +33,12 @@ class PinPadState extends State<PinPad> {
   static const _keypadWidth = _keySize * 3 + _keySpacing * 2;
 
   final StringBuffer _input = StringBuffer();
+  bool _isSubmitting = false;
 
   int get length => _input.length;
 
   void _append(String digit) {
-    if (_input.length >= widget.maxLength) return;
+    if (_isSubmitting || _input.length >= widget.maxLength) return;
     setState(() {
       _input.write(digit);
     });
@@ -48,7 +49,7 @@ class PinPadState extends State<PinPad> {
   }
 
   void _delete() {
-    if (_input.isEmpty) return;
+    if (_isSubmitting || _input.isEmpty) return;
     setState(() {
       final s = _input.toString();
       _input.clear();
@@ -57,13 +58,17 @@ class PinPadState extends State<PinPad> {
   }
 
   void _submit() {
-    if (_input.length < widget.minLength) return;
+    if (_input.length < widget.minLength || _isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+    });
     widget.onSubmit(_input.toString());
   }
 
   void reset() {
     setState(() {
       _input.clear();
+      _isSubmitting = false;
     });
   }
 
@@ -78,7 +83,7 @@ class PinPadState extends State<PinPad> {
         ).paddingHorizontal(16),
         actions: [
           Button.filled(
-            onPressed: App.pop,
+            onPressed: () => Navigator.of(context).pop(),
             child: Text("OK".tl),
           ),
         ],
@@ -107,7 +112,7 @@ class PinPadState extends State<PinPad> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: _isSubmitting ? null : onTap,
       borderRadius: BorderRadius.circular(32),
       child: SizedBox(
         width: _keySize,
@@ -170,7 +175,9 @@ class PinPadState extends State<PinPad> {
             SizedBox(
               width: _keypadWidth,
               child: FilledButton(
-                onPressed: _input.length >= widget.minLength ? _submit : null,
+                onPressed: _input.length >= widget.minLength && !_isSubmitting
+                    ? _submit
+                    : null,
                 child: Text("OK".tl),
               ),
             ),
