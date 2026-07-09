@@ -18,6 +18,7 @@ import 'package:window_manager/window_manager.dart';
 import 'components/components.dart';
 import 'components/window_frame.dart';
 import 'foundation/app.dart';
+import 'foundation/app_page_route.dart';
 import 'foundation/appdata.dart';
 import 'headless.dart';
 import 'init.dart';
@@ -273,9 +274,22 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     Widget home;
     if (appdata.settings['authorizationRequired']) {
-      home = AuthPage(
-        onSuccessfulAuth: () {
-          App.rootContext.toReplacement(() => const MainPage());
+      // AuthPage 不是直接作为 home，而是通过 Builder 延迟 push，
+      // 确保 Navigator 从子树内部执行 push/pop，冷启动时过渡动画正常。
+      home = Builder(
+        builder: (context) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            isAuthPageActive = true;
+            Navigator.of(context).push(
+              AppPageRoute(builder: (_) => AuthPage(
+                onSuccessfulAuth: () {
+                  Navigator.of(context).pop();
+                  isAuthPageActive = false;
+                },
+              )),
+            );
+          });
+          return const MainPage();
         },
       );
     } else {
