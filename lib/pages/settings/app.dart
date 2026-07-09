@@ -232,16 +232,29 @@ class _AppSettingsState extends State<AppSettings> {
                     await auth.isDeviceSupported();
                 if (!canAuthenticate) {
                   if (!context.mounted) return;
-                  context.showMessage(message: "Biometrics not supported".tl);
-                  setState(() {
-                    appdata.settings['authorizationRequired'] = false;
-                  });
-                  appdata.saveData();
-                  return;
+                  await showPopUpWidget(context, const AuthPinSetting());
+                  if (!context.mounted) return;
+                  if (AuthStorage.pinHash == null) {
+                    setState(() {
+                      appdata.settings['authorizationRequired'] = false;
+                    });
+                    appdata.saveData();
+                  }
                 }
               }
+              if (mounted) setState(() {});
             },
           ).toSliver(),
+        if (!App.isLinux && appdata.settings['authorizationRequired'] == true)
+          _CallbackSetting(
+            title: "Use PIN to unlock".tl,
+            actionTitle: AuthStorage.pinHash == null ? "Set".tl : "Change".tl,
+            callback: () async {
+              await showPopUpWidget(context, const AuthPinSetting());
+              if (mounted) setState(() {});
+            },
+          ).toSliver(),
+        SliverToBoxAdapter(child: SizedBox(height: 16)),
       ],
     );
   }

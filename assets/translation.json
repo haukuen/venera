@@ -514,7 +514,21 @@
     "Sync archive config": "同步归档配置",
     "Sync archive WebDAV URL, username, password and remote path with app data.": "开启后，归档 WebDAV 地址、用户名、密码和远端路径会跟随应用数据同步。",
     "Comment font size": "评论字体大小",
-    "Higher values use more memory": "数值越大占用内存越多"
+    "Higher values use more memory": "数值越大占用内存越多",
+    "Set PIN": "设置 PIN 码",
+    "Enter PIN": "输入 PIN 码",
+    "Re-enter PIN": "再次输入 PIN 码",
+    "Confirm PIN": "确认 PIN 码",
+    "PINs do not match": "两次输入不一致",
+    "PIN set": "PIN 码已设置",
+    "PIN cleared": "PIN 码已清除",
+    "Clear PIN": "清除 PIN 码",
+    "Incorrect PIN": "PIN 码错误",
+    "Authentication failed, try PIN": "生物验证失败，请使用 PIN 码",
+    "Change": "修改",
+    "PIN is stored locally and cannot be recovered. If forgotten, app data must be cleared.": "PIN 仅保存在本机并且无法找回，遗忘后需清除应用数据",
+    "Use PIN to unlock": "使用 PIN 码解锁",
+    "About PIN": "关于 PIN 码"
   },
   "zh_TW": {
     "Home": "首頁",
@@ -1031,6 +1045,20 @@
     "Sync archive config": "同步歸檔設定",
     "Sync archive WebDAV URL, username, password and remote path with app data.": "開啟後，歸檔 WebDAV 地址、使用者名稱、密碼和遠端路徑會跟隨應用程式資料同步。",
     "Comment font size": "評論字體大小",
-    "Higher values use more memory": "數值越大佔用記憶體越多"
+    "Higher values use more memory": "數值越大佔用記憶體越多",
+    "Set PIN": "設定 PIN 碼",
+    "Enter PIN": "輸入 PIN 碼",
+    "Re-enter PIN": "再次輸入 PIN 碼",
+    "Confirm PIN": "確認 PIN 碼",
+    "PINs do not match": "兩次輸入不一致",
+    "PIN set": "PIN 碼已設定",
+    "PIN cleared": "PIN 碼已清除",
+    "Clear PIN": "清除 PIN 碼",
+    "Incorrect PIN": "PIN 碼錯誤",
+    "Authentication failed, try PIN": "生物驗證失敗，請使用 PIN 碼",
+    "Change": "修改",
+    "PIN is stored locally and cannot be recovered. If forgotten, app data must be cleared.": "PIN 僅儲存於本機並且無法找回，遺忘後需清除應用資料",
+    "Use PIN to unlock": "使用 PIN 碼解鎖",
+    "About PIN": "關於 PIN 碼"
   }
 }
