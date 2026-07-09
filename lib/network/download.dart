@@ -410,7 +410,7 @@ class ImagesDownloadTask extends DownloadTask with _TransferSpeedMixin {
       // 本章全部图片下载成功,即时把该 chapter ID 标记到 SQLite
       var completedChapterId = _images!.keys.elementAt(_chapter);
       if (chapters == null || chapters!.contains(completedChapterId)) {
-        LocalManager().markChapterDownloaded(
+        await LocalManager().markChapterDownloaded(
           comicId,
           ComicType(source.key.hashCode),
           completedChapterId,
@@ -512,8 +512,7 @@ class ImagesDownloadTask extends DownloadTask with _TransferSpeedMixin {
       chapters: comic!.chapters,
       cover: File(_cover!.split("file://").last).name,
       comicType: ComicType(source.key.hashCode),
-      downloadedChapters: LocalManager().find(comic!.id, ComicType(source.key.hashCode))?.downloadedChapters
-          ?? chapters ?? comic?.chapters?.ids.toList() ?? [],
+      downloadedChapters: chapters ?? comic?.chapters?.ids.toList() ?? [],
       createdAt: DateTime.now(),
     );
   }
