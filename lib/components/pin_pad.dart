@@ -98,19 +98,12 @@ class PinPadState extends State<PinPad> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: filled ? context.colorScheme.primary : null,
-        border: Border.all(
-          color: context.colorScheme.outline,
-          width: 1.5,
-        ),
+        border: Border.all(color: context.colorScheme.outline, width: 1.5),
       ),
     );
   }
 
-  Widget _buildKey({
-    String? digit,
-    Widget? icon,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildKey({String? digit, Widget? icon, required VoidCallback onTap}) {
     return InkWell(
       onTap: _isSubmitting ? null : onTap,
       borderRadius: BorderRadius.circular(32),
@@ -118,7 +111,8 @@ class PinPadState extends State<PinPad> {
         width: _keySize,
         height: _keySize,
         child: Center(
-          child: icon ??
+          child:
+              icon ??
               Text(
                 digit!,
                 style: const TextStyle(
@@ -139,10 +133,7 @@ class PinPadState extends State<PinPad> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            widget.title,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
           if (widget.subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
@@ -151,25 +142,24 @@ class PinPadState extends State<PinPad> {
             ),
           ],
           const SizedBox(height: 24),
-          Builder(builder: (context) {
-            final slotCount = _input.length > widget.minLength
-                ? _input.length
-                : widget.minLength;
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(slotCount, (i) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: _buildDot(i < _input.length),
-                );
-              }),
-            );
-          }),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: _keypadWidth,
-            child: _buildKeypad(),
+          Builder(
+            builder: (context) {
+              final slotCount = _input.length > widget.minLength
+                  ? _input.length
+                  : widget.minLength;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(slotCount, (i) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: _buildDot(i < _input.length),
+                  );
+                }),
+              );
+            },
           ),
+          const SizedBox(height: 24),
+          SizedBox(width: _keypadWidth, child: _buildKeypad()),
           if (showConfirm) ...[
             const SizedBox(height: 16),
             SizedBox(
@@ -204,10 +194,7 @@ class PinPadState extends State<PinPad> {
     }
     keys.add(_buildKey(digit: '0', onTap: () => _append('0')));
     keys.add(
-      _buildKey(
-        icon: const Icon(Icons.backspace, size: 26),
-        onTap: _delete,
-      ),
+      _buildKey(icon: const Icon(Icons.backspace, size: 26), onTap: _delete),
     );
 
     return Column(

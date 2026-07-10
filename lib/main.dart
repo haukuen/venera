@@ -285,14 +285,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             if (_sessionAuthenticated || isAuthPageActive) return;
             isAuthPageActive = true;
             Navigator.of(context).push(
-              AppPageRoute(builder: (_) => AuthPage(
-                onSuccessfulAuth: () {
-                  _sessionAuthenticated = true;
-                  Navigator.of(context).pop();
-                  isAuthPageActive = false;
-                  forceRebuild();
-                },
-              )),
+              AppPageRoute(
+                builder: (_) => AuthPage(
+                  onSuccessfulAuth: () {
+                    _sessionAuthenticated = true;
+                    Navigator.of(context).pop();
+                    isAuthPageActive = false;
+                    forceRebuild();
+                  },
+                ),
+              ),
             );
           });
           return Stack(
@@ -300,7 +302,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               const MainPage(),
               if (!_sessionAuthenticated)
                 Positioned.fill(
-                  child: Container(color: Theme.of(context).colorScheme.surface),
+                  child: Container(
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
                 ),
             ],
           );

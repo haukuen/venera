@@ -44,8 +44,8 @@ class _AuthPinSettingState extends State<AuthPinSetting> {
     final auth = LocalAuthentication();
     bool canAuthenticate;
     try {
-      canAuthenticate = await auth.canCheckBiometrics ||
-          await auth.isDeviceSupported();
+      canAuthenticate =
+          await auth.canCheckBiometrics || await auth.isDeviceSupported();
     } catch (_) {
       canAuthenticate = false;
     }

@@ -35,8 +35,10 @@ class AuthStorage {
   }
 
   static Future<void> setPin(String pin) async {
-    final salt =
-        Random.secure().nextInt(0xFFFFFFFF).toRadixString(16).padLeft(8, '0');
+    final salt = Random.secure()
+        .nextInt(0xFFFFFFFF)
+        .toRadixString(16)
+        .padLeft(8, '0');
     final hash = sha256.convert(utf8.encode(salt + pin)).toString();
     _cache ??= {};
     _cache!['pinHash'] = hash;

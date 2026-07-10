@@ -35,7 +35,8 @@ class _AuthPageState extends State<AuthPage> {
     final localAuth = LocalAuthentication();
     bool canAuthenticate = false;
     try {
-      canAuthenticate = await localAuth.canCheckBiometrics ||
+      canAuthenticate =
+          await localAuth.canCheckBiometrics ||
           await localAuth.isDeviceSupported();
     } catch (e) {
       debugPrint("Failed to check biometrics: $e");
@@ -73,7 +74,9 @@ class _AuthPageState extends State<AuthPage> {
         _usePin = true;
       });
     } else {
-      context.showMessage(message: "Authentication failed, please try again".tl);
+      context.showMessage(
+        message: "Authentication failed, please try again".tl,
+      );
     }
   }
 
