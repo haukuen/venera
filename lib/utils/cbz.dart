@@ -61,6 +61,21 @@ class ComicChapter {
   ComicChapter({required this.title, required this.start, required this.end});
 }
 
+/// Result of a multi-volume CBZ export.
+class VolumeExportResult {
+  /// Successfully generated CBZ files, in production order.
+  final List<File> files;
+
+  /// Failure reasons, each formatted as "Vol<NN>: <reason>".
+  final List<String> errors;
+
+  VolumeExportResult({required this.files, required this.errors});
+
+  bool get allFailed => files.isEmpty && errors.isNotEmpty;
+
+  bool get partialSuccess => files.isNotEmpty && errors.isNotEmpty;
+}
+
 /// Comic Book Archive. Currently supports CBZ, ZIP and 7Z formats.
 abstract class CBZ {
   static Future<FileType> checkType(File file) async {
