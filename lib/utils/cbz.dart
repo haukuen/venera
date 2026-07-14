@@ -67,7 +67,7 @@ class VolumeExportResult {
   /// Successfully generated CBZ files, in production order.
   final List<File> files;
 
-  /// Failure reasons, each formatted as "Vol<NN>: <reason>".
+  /// Failure reasons, each formatted as "Vol`NN`: `reason`".
   final List<String> errors;
 
   VolumeExportResult({required this.files, required this.errors});
