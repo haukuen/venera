@@ -27,7 +27,26 @@ class LocalComicsPage extends StatefulWidget {
   State<LocalComicsPage> createState() => _LocalComicsPageState();
 }
 
-enum _LocalComicExportScope { entireComic, selectedChapters }
+enum _LocalComicExportScope { entireComic, selectedChapters, splitByGroups }
+
+/// Whether [comic] supports "Split by groups" export.
+///
+/// Requires grouped chapters with >= 2 non-empty groups (groups that have
+/// at least one downloaded chapter).
+bool _canSplitByGroups(LocalComic comic) {
+  final chapters = comic.chapters;
+  if (chapters == null || !chapters.isGrouped) return false;
+  final downloadedSet = comic.downloadedChapters.toSet();
+  var nonEmptyGroups = 0;
+  for (var i = 0; i < chapters.groupCount; i++) {
+    final group = chapters.getGroupByIndex(i);
+    if (group.keys.any((id) => downloadedSet.contains(id))) {
+      nonEmptyGroups++;
+      if (nonEmptyGroups >= 2) return true;
+    }
+  }
+  return false;
+}
 
 class _LocalComicsPageState extends State<LocalComicsPage> {
   late List<LocalComic> comics;
@@ -605,7 +624,12 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         icon: Icons.outbox_outlined,
         text: "Export as cbz".tl,
         onClick: () {
-          chooseExportScopeAndExport(comics, CBZ.export, ".cbz");
+          chooseExportScopeAndExport(
+            comics,
+            CBZ.export,
+            ".cbz",
+            allowSplitByGroups: true,
+          );
         },
       ),
       MenuEntry(
@@ -628,12 +652,16 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
   Future<void> chooseExportScopeAndExport(
     List<LocalComic> comics,
     ExportComicFunc export,
-    String ext,
-  ) async {
+    String ext, {
+    bool allowSplitByGroups = false,
+  }) async {
     final canSelectChapters =
         comics.length == 1 &&
         comics.first.chapters != null &&
         orderedDownloadedChapters(comics.first).isNotEmpty;
+    final canSplitByGroups = allowSplitByGroups &&
+        comics.length == 1 &&
+        _canSplitByGroups(comics.first);
     var scope = _LocalComicExportScope.entireComic;
 
     final selectedScope = await showDialog<_LocalComicExportScope>(
@@ -651,6 +679,10 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
                       !canSelectChapters) {
                     return;
                   }
+                  if (value == _LocalComicExportScope.splitByGroups &&
+                      !canSplitByGroups) {
+                    return;
+                  }
                   setState(() {
                     scope = value;
                   });
@@ -666,6 +698,11 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
                       title: Text("Select chapters".tl),
                       value: _LocalComicExportScope.selectedChapters,
                       enabled: canSelectChapters,
+                    ),
+                    RadioListTile<_LocalComicExportScope>(
+                      title: Text("Split by groups".tl),
+                      value: _LocalComicExportScope.splitByGroups,
+                      enabled: canSplitByGroups,
                     ),
                   ],
                 ),
@@ -693,6 +730,8 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         exportComics(comics, export, ext);
       case _LocalComicExportScope.selectedChapters:
         showExportChaptersPopWindow(comics.first, export, ext);
+      case _LocalComicExportScope.splitByGroups:
+        exportComicVolumesToDirectory(comics.first);
     }
   }
 
@@ -894,6 +933,11 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
     await saveFile(file: File(outFile), filename: "comics_export.zip");
     loadingController.close();
     File(outFile).deleteIgnoreError();
+  }
+
+  /// Temporary stub — real implementation in Task 6.
+  Future<void> exportComicVolumesToDirectory(LocalComic comic) async {
+    // Implemented in Task 6.
   }
 }
 
