@@ -224,32 +224,14 @@ abstract class CBZ {
         i++;
       }
     } else {
-      var availableChapters = <String>[];
-      var missingChapters = <String>[];
       // 按章节原始顺序遍历,而非 downloadedChapters(其顺序可能是完成顺序)。
       var downloadedSet = comic.downloadedChapters.toSet();
-      for (var c in comic.chapters!.ids) {
-        if (!downloadedSet.contains(c)) continue;
-        var chapterDir = Directory(
-          FilePath.join(comic.baseDir, LocalManager.getChapterDirectoryName(c)),
-        );
-        if (chapterDir.existsSync()) {
-          availableChapters.add(c);
-        } else {
-          missingChapters.add(c);
-        }
-      }
+      var orderedIds = comic.chapters!.ids.where((c) => downloadedSet.contains(c));
+      var availableChapters = _collectAvailableChapters(comic, orderedIds);
       if (availableChapters.isEmpty) {
         throw StateError(
           'No downloadable chapters found on disk for "${comic.title}". '
           'Please delete and re-download the comic.',
-        );
-      }
-      if (missingChapters.isNotEmpty) {
-        var missingTitles = missingChapters.map((c) => comic.chapters![c] ?? c);
-        Log.warning(
-          'CBZ',
-          'Skipped missing chapters for "${comic.title}": ${missingTitles.join(', ')}',
         );
       }
       var allImages = <String>[];
@@ -317,6 +299,35 @@ abstract class CBZ {
     Map<String, int> chapterPageCounts,
   ) {
     return _buildChapterRanges(chapterPageCounts.entries);
+  }
+
+  /// Collect chapters from [chapterIds] that are both downloaded and present
+  /// on disk, preserving the input order. Returns warnings for missing ones
+  /// via [Log.warning].
+  static List<String> _collectAvailableChapters(
+    LocalComic comic,
+    Iterable<String> chapterIds,
+  ) {
+    var availableChapters = <String>[];
+    var missingChapters = <String>[];
+    for (var c in chapterIds) {
+      var chapterDir = Directory(
+        FilePath.join(comic.baseDir, LocalManager.getChapterDirectoryName(c)),
+      );
+      if (chapterDir.existsSync()) {
+        availableChapters.add(c);
+      } else {
+        missingChapters.add(c);
+      }
+    }
+    if (missingChapters.isNotEmpty) {
+      var missingTitles = missingChapters.map((c) => comic.chapters![c] ?? c);
+      Log.warning(
+        'CBZ',
+        'Skipped missing chapters for "${comic.title}": ${missingTitles.join(', ')}',
+      );
+    }
+    return availableChapters;
   }
 
   static List<ComicChapter> _buildChapterRanges(
