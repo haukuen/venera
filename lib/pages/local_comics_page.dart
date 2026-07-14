@@ -935,9 +935,64 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
     File(outFile).deleteIgnoreError();
   }
 
-  /// Temporary stub — real implementation in Task 6.
+  /// Export a single grouped comic as multiple per-volume CBZ files into
+  /// a user-chosen directory. Does NOT re-compress into a zip.
   Future<void> exportComicVolumesToDirectory(LocalComic comic) async {
-    // Implemented in Task 6.
+    final picker = DirectoryPicker();
+    final picked = await picker.pickDirectory();
+    if (picked == null) return;
+    if (!mounted) return;
+    final outDir = picked.path;
+
+    var canceled = false;
+    final loadingController = showLoadingDialog(
+      context,
+      allowCancel: true,
+      message: "${"Exporting".tl} 0/?",
+      withProgress: true,
+      onCancel: () {
+        canceled = true;
+      },
+    );
+
+    try {
+      final result = await CBZ.exportVolumes(
+        comic,
+        outDir,
+        isCancelled: () => canceled,
+        onProgress: (completed, total, label) {
+          loadingController.setMessage(
+            "${"Exporting".tl} $completed/$total",
+          );
+          loadingController.setProgress(total > 0 ? completed / total : null);
+        },
+      );
+
+      loadingController.close();
+      if (!mounted) return;
+
+      if (result.allFailed) {
+        context.showMessage(
+          message: "${"Export failed".tl}: ${result.errors.join('; ')}",
+        );
+      } else if (result.partialSuccess) {
+        context.showMessage(
+          message:
+              "${"Export completed".tl}: ${result.files.length} ${"files saved".tl}, ${result.errors.length} ${"failed".tl}",
+        );
+      } else {
+        context.showMessage(
+          message:
+              "${"Export completed".tl}: ${result.files.length} ${"files saved".tl}",
+        );
+      }
+    } catch (e, s) {
+      Log.error("Export Volumes", e, s);
+      loadingController.close();
+      if (mounted) {
+        context.showMessage(message: e.toString());
+      }
+    }
   }
 }
 
