@@ -454,89 +454,67 @@ abstract class CBZ {
     return cbz;
   }
 
-  /// Export [comic] as multiple CBZ files, one per non-empty group in
-  /// [comic.chapters], into [outDir].
+  /// Export [comic] as multiple CBZ files, one per downloaded chapter, into
+  /// [outDir].
   ///
   /// - [outDir] must exist and be writable.
-  /// - [onProgress] is called before each volume with (completed, total,
-  ///   currentLabel) where total counts only non-empty groups.
-  /// - [isCancelled], if it returns true, stops before the next volume;
+  /// - [onProgress] is called before each chapter with (completed, total,
+  ///   currentLabel) where total counts only chapters with on-disk images.
+  /// - [isCancelled], if it returns true, stops before the next chapter;
   ///   already-produced files are kept.
-  /// - Empty groups (no available chapters) are skipped but the Vol number
-  ///   gap is preserved.
-  /// - Only the first non-empty volume includes the cover.
-  /// - A single volume failure does not abort the rest; failures are
+  /// - Only the first produced CBZ includes the cover.
+  /// - A single chapter failure does not abort the rest; failures are
   ///   recorded in [VolumeExportResult.errors].
-  /// - Throws [StateError] if [comic.chapters] is not grouped.
-  /// - Throws [StateError] if all groups are empty.
-  static Future<VolumeExportResult> exportVolumes(
+  /// - Throws [StateError] if [comic.chapters] is null.
+  /// - Throws [StateError] if no chapters have on-disk images.
+  static Future<VolumeExportResult> exportByChapters(
     LocalComic comic,
     String outDir, {
     void Function(int completed, int total, String currentLabel)? onProgress,
     bool Function()? isCancelled,
   }) async {
-    if (comic.chapters == null || !comic.chapters!.isGrouped) {
+    if (comic.chapters == null) {
       throw StateError(
-        'exportVolumes requires a comic with grouped chapters.',
+        'exportByChapters requires a comic with chapters.',
       );
     }
-    final groups = comic.chapters!.groups.toList();
     final downloadedSet = comic.downloadedChapters.toSet();
+    final orderedIds = comic.chapters!.ids.where(
+      (id) => downloadedSet.contains(id),
+    );
+    final availableChapters = _collectAvailableChapters(comic, orderedIds);
 
-    // Pre-compute available chapters per group index, to know total.
-    final groupAvailability = <int, List<String>>{};
-    for (var i = 0; i < groups.length; i++) {
-      final groupChapters = comic.chapters!.getGroupByIndex(i);
-      final orderedIds = groupChapters.keys.where(
-        (id) => downloadedSet.contains(id),
-      );
-      final available = _collectAvailableChapters(comic, orderedIds);
-      if (available.isNotEmpty) {
-        groupAvailability[i] = available;
-      }
-    }
-
-    if (groupAvailability.isEmpty) {
+    if (availableChapters.isEmpty) {
       throw StateError(
         'No downloadable chapters found on disk for "${comic.title}". '
         'Please delete and re-download the comic.',
       );
     }
 
-    final total = groupAvailability.length;
+    final total = availableChapters.length;
     final files = <File>[];
     final errors = <String>[];
     var completed = 0;
     var coverGiven = false;
 
-    for (final entry in groupAvailability.entries) {
-      final groupIndex = entry.key;
-      final chapterIds = entry.value;
-      final volNumber = groupIndex + 1;
-      final volLabel = 'Vol${volNumber.toString().padLeft(2, '0')}';
-      final groupName = groups[groupIndex];
+    for (var i = 0; i < availableChapters.length; i++) {
+      final chapterId = availableChapters[i];
+      final chapterTitle = comic.chapters![chapterId] ?? chapterId;
+      final epLabel = 'EP$chapterTitle';
 
       if (isCancelled?.call() == true) break;
 
-      onProgress?.call(completed, total, groupName.isEmpty ? volLabel : groupName);
+      onProgress?.call(completed, total, chapterTitle);
 
-      // Build volume-local ExportableChapter list for filename.
-      final exportableChapters = <ExportableChapter>[];
-      var position = 1;
-      for (final id in chapterIds) {
-        exportableChapters.add(
-          ExportableChapter(
-            id: id,
-            title: comic.chapters![id] ?? id,
-            position: position,
-          ),
-        );
-        position++;
-      }
-      final fileName = volumeExportFilename(
+      // Build single-chapter ExportableChapter for filename.
+      final exportableChapter = ExportableChapter(
+        id: chapterId,
+        title: chapterTitle,
+        position: i + 1,
+      );
+      final fileName = selectedChapterExportFilename(
         comic: comic,
-        volumeNumber: volNumber,
-        selectedChapters: exportableChapters,
+        selectedChapters: [exportableChapter],
         extension: '.cbz',
       );
       final outPath = FilePath.join(outDir, fileName);
@@ -547,7 +525,7 @@ abstract class CBZ {
       try {
         await _exportChaptersToCbz(
           comic,
-          chapterIds,
+          [chapterId],
           outPath,
           cache: cache,
           includeCover: !coverGiven,
@@ -555,7 +533,7 @@ abstract class CBZ {
         files.add(File(outPath));
         if (!coverGiven) coverGiven = true;
       } catch (e) {
-        errors.add('$volLabel: $e');
+        errors.add('$epLabel: $e');
       } finally {
         cache.deleteSync(recursive: true);
       }

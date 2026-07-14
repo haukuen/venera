@@ -3,19 +3,16 @@ import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/local.dart';
 
-// Mirror of the private _canSplitByGroups logic for direct testing.
-// The real function is private in local_comics_page.dart; we test the
-// same predicate here to lock the contract.
-bool canSplitByGroups(LocalComic comic) {
+// Mirror of the private _canSplitByChapters logic for direct testing.
+bool canSplitByChapters(LocalComic comic) {
   final chapters = comic.chapters;
-  if (chapters == null || !chapters.isGrouped) return false;
+  if (chapters == null) return false;
   final downloadedSet = comic.downloadedChapters.toSet();
-  var nonEmptyGroups = 0;
-  for (var i = 0; i < chapters.groupCount; i++) {
-    final group = chapters.getGroupByIndex(i);
-    if (group.keys.any((id) => downloadedSet.contains(id))) {
-      nonEmptyGroups++;
-      if (nonEmptyGroups >= 2) return true;
+  var count = 0;
+  for (final id in chapters.ids) {
+    if (downloadedSet.contains(id)) {
+      count++;
+      if (count >= 2) return true;
     }
   }
   return false;
@@ -44,27 +41,20 @@ LocalComic _comic({
 }
 
 void main() {
-  group('canSplitByGroups predicate', () {
+  group('canSplitByChapters predicate', () {
     test('returns false when chapters is null', () {
-      expect(canSplitByGroups(_comic(hasChapters: false)), isFalse);
+      expect(canSplitByChapters(_comic(hasChapters: false)), isFalse);
     });
 
-    test('returns false when chapters are flat (not grouped)', () {
-      expect(canSplitByGroups(_comic()), isFalse);
+    test('returns false when fewer than 2 chapters downloaded', () {
+      expect(canSplitByChapters(_comic(downloadedChapters: const ['1'])), isFalse);
     });
 
-    test('returns false when only one group has downloads', () {
-      final comic = _comic(
-        chapters: const ComicChapters.grouped({
-          'Volume 1': {'1': '001', '2': '002'},
-          'Volume 2': {'3': '003', '4': '004'},
-        }),
-        downloadedChapters: const ['1', '2'],
-      );
-      expect(canSplitByGroups(comic), isFalse);
+    test('returns true for flat comic with >= 2 downloaded chapters', () {
+      expect(canSplitByChapters(_comic()), isTrue);
     });
 
-    test('returns true when two groups each have downloads', () {
+    test('returns true for grouped comic with >= 2 downloaded chapters', () {
       final comic = _comic(
         chapters: const ComicChapters.grouped({
           'Volume 1': {'1': '001', '2': '002'},
@@ -72,18 +62,11 @@ void main() {
         }),
         downloadedChapters: const ['1', '3'],
       );
-      expect(canSplitByGroups(comic), isTrue);
+      expect(canSplitByChapters(comic), isTrue);
     });
 
-    test('returns false when grouped but nothing downloaded', () {
-      final comic = _comic(
-        chapters: const ComicChapters.grouped({
-          'Volume 1': {'1': '001'},
-          'Volume 2': {'2': '002'},
-        }),
-        downloadedChapters: const [],
-      );
-      expect(canSplitByGroups(comic), isFalse);
+    test('returns false when nothing downloaded', () {
+      expect(canSplitByChapters(_comic(downloadedChapters: const [])), isFalse);
     });
   });
 }

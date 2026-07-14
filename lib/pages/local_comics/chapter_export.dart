@@ -86,37 +86,3 @@ String selectedChapterExportFilename({
     fallback: 'comic',
   );
 }
-
-/// Generate the filename for a single volume CBZ.
-///
-/// - [comic] is the source comic.
-/// - [volumeNumber] is the 1-based original group index (may have gaps if
-///   earlier groups were empty/skipped).
-/// - [selectedChapters] are the chapters in this volume, in source order.
-/// - [extension] includes the leading dot, e.g. ".cbz".
-String volumeExportFilename({
-  required LocalComic comic,
-  required int volumeNumber,
-  required List<ExportableChapter> selectedChapters,
-  required String extension,
-}) {
-  if (selectedChapters.isEmpty) {
-    throw ArgumentError.value(
-      selectedChapters,
-      'selectedChapters',
-      'must not be empty',
-    );
-  }
-
-  final volLabel = 'Vol${volumeNumber.toString().padLeft(2, '0')}';
-  final middle = selectedChapters.length == 1
-      ? '_${volLabel}_EP${selectedChapters.first.title}_1chapter'
-      : '_${volLabel}_EP${selectedChapters.first.title}-EP${selectedChapters.last.title}_${selectedChapters.length}chapters';
-
-  return sanitizeFileNameWithSuffix(
-    comic.title,
-    middle: middle,
-    extension: extension,
-    fallback: 'comic',
-  );
-}

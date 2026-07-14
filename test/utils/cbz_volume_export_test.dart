@@ -104,27 +104,27 @@ void main() {
     });
   });
 
-  group('exportVolumes', () {
+  group('exportByChapters', () {
     // The native zip_flutter dynamic library cannot be loaded in flutter_test,
     // so swap in a stub compressor that just materializes the destination file.
     final realCompressor = CBZ.compressor;
     setUp(() {
       CBZ.compressor = (src, dst) async {
-        final f = File(dst);
-        await f.writeAsBytes([0]);
+        await File(dst).writeAsBytes([0]);
       };
     });
+
     tearDown(() {
       CBZ.compressor = realCompressor;
     });
 
-    test('produces one CBZ per non-empty group', () async {
+    test('produces one CBZ per available chapter', () async {
       final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
       try {
         App.dataPath = tmpRoot.path;
-        LocalManager().path = tmpRoot.path;
         App.cachePath = '${tmpRoot.path}/cache';
         await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
         final outDir = '${tmpRoot.path}/out';
         await Directory(outDir).create(recursive: true);
 
@@ -139,61 +139,52 @@ void main() {
         }
         final comic = _groupedComic();
 
-        final result = await CBZ.exportVolumes(comic, outDir);
+        final result = await CBZ.exportByChapters(comic, outDir);
 
-        expect(result.files, hasLength(3));
+        expect(result.files, hasLength(6));
         expect(result.errors, isEmpty);
-        final names = result.files.map((f) => f.path.split(Platform.pathSeparator).last).toList();
-        expect(names.any((n) => n.contains('Vol01')), isTrue);
-        expect(names.any((n) => n.contains('Vol02')), isTrue);
-        expect(names.any((n) => n.contains('Vol03')), isTrue);
       } finally {
         await tmpRoot.delete(recursive: true);
       }
     });
 
-    test('skips empty group but preserves Vol gap', () async {
+    test('skips chapters with missing dirs', () async {
       final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
       try {
         App.dataPath = tmpRoot.path;
-        LocalManager().path = tmpRoot.path;
         App.cachePath = '${tmpRoot.path}/cache';
         await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
         final outDir = '${tmpRoot.path}/out';
         await Directory(outDir).create(recursive: true);
 
         final comicDir = Directory('${tmpRoot.path}/grouped-dir');
         await comicDir.create(recursive: true);
         await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
-        // Only create dirs for groups 1 and 3; group 2 empty.
-        for (final name in ['1', '2', '5', '6']) {
+        // Only create dirs for chapters 1,2,4,5,6; skip 3
+        for (final name in ['1', '2', '4', '5', '6']) {
           final d = Directory('${comicDir.path}/$name');
           await d.create();
           await File('${d.path}/1.jpg').writeAsBytes([1]);
         }
-        final comic = _groupedComic(
-          downloadedChapters: const ['1', '2', '5', '6'],
-        );
+        final comic = _groupedComic();
 
-        final result = await CBZ.exportVolumes(comic, outDir);
+        final result = await CBZ.exportByChapters(comic, outDir);
 
-        expect(result.files, hasLength(2));
-        final names = result.files.map((f) => f.path.split(Platform.pathSeparator).last).join(',');
-        expect(names.contains('Vol01'), isTrue);
-        expect(names.contains('Vol03'), isTrue);
-        expect(names.contains('Vol02'), isFalse);
+        expect(result.files, hasLength(5));
+        expect(result.errors, isEmpty);
       } finally {
         await tmpRoot.delete(recursive: true);
       }
     });
 
-    test('throws StateError when all groups empty', () async {
+    test('throws StateError when no chapters on disk', () async {
       final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
       try {
         App.dataPath = tmpRoot.path;
-        LocalManager().path = tmpRoot.path;
         App.cachePath = '${tmpRoot.path}/cache';
         await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
         final outDir = '${tmpRoot.path}/out';
         await Directory(outDir).create(recursive: true);
         final comicDir = Directory('${tmpRoot.path}/grouped-dir');
@@ -201,7 +192,7 @@ void main() {
         final comic = _groupedComic(downloadedChapters: const []);
 
         expect(
-          () => CBZ.exportVolumes(comic, outDir),
+          () => CBZ.exportByChapters(comic, outDir),
           throwsStateError,
         );
       } finally {
@@ -209,11 +200,10 @@ void main() {
       }
     });
 
-    test('throws StateError for non-grouped comic', () async {
+    test('throws StateError for chapterless comic', () async {
       final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
       try {
         App.dataPath = tmpRoot.path;
-        LocalManager().path = tmpRoot.path;
         final outDir = '${tmpRoot.path}/out';
         await Directory(outDir).create(recursive: true);
         final comic = LocalComic(
@@ -222,15 +212,15 @@ void main() {
           subtitle: '',
           tags: const [],
           directory: 'flat-dir',
-          chapters: const ComicChapters({'1': '001'}),
+          chapters: null,
           cover: 'cover.jpg',
           comicType: ComicType.local,
-          downloadedChapters: const ['1'],
+          downloadedChapters: const [],
           createdAt: DateTime.fromMillisecondsSinceEpoch(0),
         );
 
         expect(
-          () => CBZ.exportVolumes(comic, outDir),
+          () => CBZ.exportByChapters(comic, outDir),
           throwsStateError,
         );
       } finally {
@@ -238,17 +228,18 @@ void main() {
       }
     });
 
-    test('stops at cancellation before next volume', () async {
+    test('stops at cancellation before next chapter', () async {
       final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
       try {
         App.dataPath = tmpRoot.path;
-        LocalManager().path = tmpRoot.path;
         App.cachePath = '${tmpRoot.path}/cache';
         await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
         final outDir = '${tmpRoot.path}/out';
         await Directory(outDir).create(recursive: true);
         final comicDir = Directory('${tmpRoot.path}/grouped-dir');
         await comicDir.create(recursive: true);
+        await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
         for (final name in ['1', '2', '3', '4', '5', '6']) {
           final d = Directory('${comicDir.path}/$name');
           await d.create();
@@ -257,17 +248,56 @@ void main() {
         final comic = _groupedComic();
 
         var cancelled = false;
-        final result = await CBZ.exportVolumes(
+        final result = await CBZ.exportByChapters(
           comic,
           outDir,
           isCancelled: () => cancelled,
           onProgress: (completed, total, label) {
-            // Cancel right after first volume starts processing.
             if (completed >= 1) cancelled = true;
           },
         );
 
         expect(result.files.length, lessThanOrEqualTo(2));
+      } finally {
+        await tmpRoot.delete(recursive: true);
+      }
+    });
+
+    test('works for flat (non-grouped) chaptered comic', () async {
+      final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
+      try {
+        App.dataPath = tmpRoot.path;
+        App.cachePath = '${tmpRoot.path}/cache';
+        await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
+        final outDir = '${tmpRoot.path}/out';
+        await Directory(outDir).create(recursive: true);
+
+        final comicDir = Directory('${tmpRoot.path}/flat-dir');
+        await comicDir.create(recursive: true);
+        await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
+        for (final name in ['1', '2', '3']) {
+          final d = Directory('${comicDir.path}/$name');
+          await d.create();
+          await File('${d.path}/1.jpg').writeAsBytes([1]);
+        }
+        final comic = LocalComic(
+          id: 'flat-id',
+          title: 'Flat Comic',
+          subtitle: 'Author',
+          tags: const ['tag'],
+          directory: 'flat-dir',
+          chapters: const ComicChapters({'1': '001', '2': '002', '3': '003'}),
+          cover: 'cover.jpg',
+          comicType: ComicType.local,
+          downloadedChapters: const ['1', '2', '3'],
+          createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+        );
+
+        final result = await CBZ.exportByChapters(comic, outDir);
+
+        expect(result.files, hasLength(3));
+        expect(result.errors, isEmpty);
       } finally {
         await tmpRoot.delete(recursive: true);
       }
