@@ -518,6 +518,11 @@ abstract class CBZ {
         extension: '.cbz',
       );
       final outPath = FilePath.join(outDir, fileName);
+      // Compress to a cache-local temp path first, then copy to outPath.
+      // On Android/iOS the outDir may be a SAF/security-scoped path that
+      // native zip (and plain dart:io outside overrideIO) cannot write to
+      // directly. The cache is always natively writable.
+      final tempCbzPath = FilePath.join(App.cachePath, 'cbz_export_tmp.cbz');
 
       var cache = Directory(FilePath.join(App.cachePath, 'cbz_export'));
       if (cache.existsSync()) cache.deleteSync(recursive: true);
@@ -526,16 +531,22 @@ abstract class CBZ {
         await _exportChaptersToCbz(
           comic,
           [chapterId],
-          outPath,
+          tempCbzPath,
           cache: cache,
           includeCover: !coverGiven,
         );
+        // Copy the finished CBZ to the user-chosen directory via overrideIO
+        // so SAF/security-scoped paths are handled correctly.
+        await overrideIO(() async {
+          await File(tempCbzPath).copyMem(outPath);
+        });
         files.add(File(outPath));
         if (!coverGiven) coverGiven = true;
       } catch (e) {
         errors.add('$epLabel: $e');
       } finally {
         cache.deleteSync(recursive: true);
+        File(tempCbzPath).deleteIgnoreError();
       }
       completed++;
     }
