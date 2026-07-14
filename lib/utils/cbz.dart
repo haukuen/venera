@@ -408,9 +408,7 @@ abstract class CBZ {
     bool includeCover = true,
   }) async {
     if (chapterIds.isEmpty) {
-      throw StateError(
-        'No chapters to export for "${comic.title}".',
-      );
+      throw StateError('No chapters to export for "${comic.title}".');
     }
     var allImages = <String>[];
     final chapterPageCounts = <MapEntry<String, int>>[];
@@ -474,9 +472,7 @@ abstract class CBZ {
     bool Function()? isCancelled,
   }) async {
     if (comic.chapters == null) {
-      throw StateError(
-        'exportByChapters requires a comic with chapters.',
-      );
+      throw StateError('exportByChapters requires a comic with chapters.');
     }
     final downloadedSet = comic.downloadedChapters.toSet();
     final orderedIds = comic.chapters!.ids.where(

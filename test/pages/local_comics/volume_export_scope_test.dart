@@ -31,7 +31,12 @@ LocalComic _comic({
     directory: 'd',
     chapters: hasChapters
         ? chapters ??
-              const ComicChapters({'1': '001', '2': '002', '3': '003', '4': '004'})
+              const ComicChapters({
+                '1': '001',
+                '2': '002',
+                '3': '003',
+                '4': '004',
+              })
         : null,
     cover: 'cover.jpg',
     comicType: ComicType.local,
@@ -47,7 +52,10 @@ void main() {
     });
 
     test('returns false when fewer than 2 chapters downloaded', () {
-      expect(canSplitByChapters(_comic(downloadedChapters: const ['1'])), isFalse);
+      expect(
+        canSplitByChapters(_comic(downloadedChapters: const ['1'])),
+        isFalse,
+      );
     });
 
     test('returns true for flat comic with >= 2 downloaded chapters', () {

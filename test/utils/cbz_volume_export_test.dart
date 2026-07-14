@@ -46,10 +46,12 @@ void main() {
         }
         final comic = _groupedComic();
 
-        final result = CBZ.collectAvailableChaptersForTesting(
-          comic,
-          const ['1', '2', '3', '4'],
-        );
+        final result = CBZ.collectAvailableChaptersForTesting(comic, const [
+          '1',
+          '2',
+          '3',
+          '4',
+        ]);
 
         expect(result, ['1', '2', '3', '4']);
       } finally {
@@ -72,10 +74,12 @@ void main() {
         }
         final comic = _groupedComic();
 
-        final result = CBZ.collectAvailableChaptersForTesting(
-          comic,
-          const ['1', '2', '3', '4'],
-        );
+        final result = CBZ.collectAvailableChaptersForTesting(comic, const [
+          '1',
+          '2',
+          '3',
+          '4',
+        ]);
 
         expect(result, ['1', '3']);
       } finally {
@@ -92,10 +96,10 @@ void main() {
         await comicDir.create(recursive: true);
         final comic = _groupedComic();
 
-        final result = CBZ.collectAvailableChaptersForTesting(
-          comic,
-          const ['1', '2'],
-        );
+        final result = CBZ.collectAvailableChaptersForTesting(comic, const [
+          '1',
+          '2',
+        ]);
 
         expect(result, isEmpty);
       } finally {
@@ -191,10 +195,7 @@ void main() {
         await comicDir.create(recursive: true);
         final comic = _groupedComic(downloadedChapters: const []);
 
-        expect(
-          () => CBZ.exportByChapters(comic, outDir),
-          throwsStateError,
-        );
+        expect(() => CBZ.exportByChapters(comic, outDir), throwsStateError);
       } finally {
         await tmpRoot.delete(recursive: true);
       }
@@ -219,10 +220,7 @@ void main() {
           createdAt: DateTime.fromMillisecondsSinceEpoch(0),
         );
 
-        expect(
-          () => CBZ.exportByChapters(comic, outDir),
-          throwsStateError,
-        );
+        expect(() => CBZ.exportByChapters(comic, outDir), throwsStateError);
       } finally {
         await tmpRoot.delete(recursive: true);
       }
