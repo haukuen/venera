@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 import 'package:flutter_7zip/flutter_7zip.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
@@ -536,12 +535,11 @@ abstract class CBZ {
           cache: cache,
           includeCover: !coverGiven,
         );
-        // Copy the finished CBZ to the user-chosen directory in an isolate
-        // via overrideIO, so SAF/security-scoped paths are handled correctly
-        // without blocking the UI isolate on large files.
-        await Isolate.run(
-          () => overrideIO(() => File(tempCbzPath).copyMem(outPath)),
-        );
+        // Copy the finished CBZ to the user-chosen directory via overrideIO
+        // so SAF/security-scoped paths are handled correctly.
+        await overrideIO(() async {
+          await File(tempCbzPath).copyMem(outPath);
+        });
         files.add(File(outPath));
         if (!coverGiven) coverGiven = true;
       } catch (e) {
