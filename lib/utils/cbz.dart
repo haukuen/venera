@@ -512,9 +512,9 @@ abstract class CBZ {
         title: chapterTitle,
         position: i + 1,
       );
-      final fileName = selectedChapterExportFilename(
+      final fileName = singleChapterExportFilename(
         comic: comic,
-        selectedChapters: [exportableChapter],
+        chapter: exportableChapter,
         extension: '.cbz',
       );
       final outPath = FilePath.join(outDir, fileName);

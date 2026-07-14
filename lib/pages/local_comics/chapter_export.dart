@@ -86,3 +86,22 @@ String selectedChapterExportFilename({
     fallback: 'comic',
   );
 }
+
+/// Generate the filename for a single-chapter CBZ in split-by-chapter mode.
+///
+/// Produces `Title_EP001.cbz` — no chapter-count suffix since each file is
+/// always exactly one chapter by definition.
+String singleChapterExportFilename({
+  required LocalComic comic,
+  required ExportableChapter chapter,
+  required String extension,
+}) {
+  final middle = '_EP${chapter.title}';
+
+  return sanitizeFileNameWithSuffix(
+    comic.title,
+    middle: middle,
+    extension: extension,
+    fallback: 'comic',
+  );
+}
