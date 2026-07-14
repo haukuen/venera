@@ -77,6 +77,10 @@ class VolumeExportResult {
   bool get partialSuccess => files.isNotEmpty && errors.isNotEmpty;
 }
 
+/// Image extensions accepted when packing a CBZ. Mirrors the filter used by
+/// [CBZ.import]. Lower-cased, without the leading dot.
+const _cbzImageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'jpe'];
+
 /// Comic Book Archive. Currently supports CBZ, ZIP and 7Z formats.
 abstract class CBZ {
   static Future<FileType> checkType(File file) async {
@@ -130,8 +134,8 @@ abstract class CBZ {
     }
     var files = cache.listSync().whereType<File>().toList();
     files.removeWhere((e) {
-      var ext = e.path.split('.').last;
-      return !['jpg', 'jpeg', 'png', 'webp', 'gif', 'jpe'].contains(ext);
+      var ext = e.path.split('.').last.toLowerCase();
+      return !_cbzImageExtensions.contains(ext);
     });
     if (files.isEmpty) {
       cache.deleteSync(recursive: true);
@@ -379,6 +383,12 @@ abstract class CBZ {
         if (entity.name.startsWith('.')) {
           continue;
         }
+        // Skip non-image files (metadata.json, Thumbs.db, etc.) that may
+        // exist alongside the pages. Mirrors [CBZ.import]'s filter.
+        final ext = entity.path.split('.').last.toLowerCase();
+        if (!_cbzImageExtensions.contains(ext)) {
+          continue;
+        }
         files.add(entity);
       }
     }
@@ -413,10 +423,10 @@ abstract class CBZ {
     var allImages = <String>[];
     final chapterPageCounts = <MapEntry<String, int>>[];
     for (var c in chapterIds) {
-      var chapterName = comic.chapters![c];
+      final chapterName = comic.chapters![c] ?? c;
       var images = await _listChapterImages(comic, c);
       allImages.addAll(images);
-      chapterPageCounts.add(MapEntry(chapterName!, images.length));
+      chapterPageCounts.add(MapEntry(chapterName, images.length));
     }
     final chapters = _buildChapterRanges(chapterPageCounts);
     final pageCount = allImages.length;

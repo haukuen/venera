@@ -990,17 +990,23 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
 
       if (result.allFailed) {
         context.showMessage(
-          message: "${"Export failed".tl}: ${result.errors.join('; ')}",
+          message: "Export failed: @errors".tlParams({
+            'errors': result.errors.join('; '),
+          }),
         );
       } else if (result.partialSuccess) {
         context.showMessage(
-          message:
-              "${"Export completed".tl}: ${result.files.length} ${"files saved".tl}, ${result.errors.length} ${"failed".tl}",
+          message: "Export completed: @success files saved, @failed failed"
+              .tlParams({
+                'success': result.files.length.toString(),
+                'failed': result.errors.length.toString(),
+              }),
         );
       } else {
         context.showMessage(
-          message:
-              "${"Export completed".tl}: ${result.files.length} ${"files saved".tl}",
+          message: "Export completed: @count files saved".tlParams({
+            'count': result.files.length.toString(),
+          }),
         );
       }
     } catch (e, s) {
