@@ -203,81 +203,74 @@ abstract class CBZ {
     var cache = Directory(FilePath.join(App.cachePath, 'cbz_export'));
     if (cache.existsSync()) cache.deleteSync(recursive: true);
     cache.createSync();
-    List<ComicChapter>? chapters;
-    var pageCount = 0;
-    if (comic.chapters == null) {
-      var images = await LocalManager().getImages(comic.id, comic.comicType, 1);
-      if (images.isEmpty) {
-        throw StateError(
-          'No images found on disk for "${comic.title}". '
-          'The comic may not have been fully downloaded. '
-          'Please delete and re-download.',
-        );
-      }
-      pageCount = images.length;
-      int i = 1;
-      for (var image in images) {
-        var src = File(_localFilePathFromImageUri(image));
-        var dstName = compatiblePageFileName(i, image.split('.').last);
-        var dst = File(FilePath.join(cache.path, dstName));
-        await src.copyMem(dst.path);
-        i++;
-      }
-    } else {
-      // 按章节原始顺序遍历,而非 downloadedChapters(其顺序可能是完成顺序)。
-      var downloadedSet = comic.downloadedChapters.toSet();
-      var orderedIds = comic.chapters!.ids.where((c) => downloadedSet.contains(c));
-      var availableChapters = _collectAvailableChapters(comic, orderedIds);
-      if (availableChapters.isEmpty) {
-        throw StateError(
-          'No downloadable chapters found on disk for "${comic.title}". '
-          'Please delete and re-download the comic.',
-        );
-      }
-      var allImages = <String>[];
-      final chapterPageCounts = <MapEntry<String, int>>[];
-      for (var c in availableChapters) {
-        var chapterName = comic.chapters![c];
+    try {
+      if (comic.chapters == null) {
         var images = await LocalManager().getImages(
           comic.id,
           comic.comicType,
-          c,
+          1,
         );
-        allImages.addAll(images);
-        chapterPageCounts.add(MapEntry(chapterName!, images.length));
+        if (images.isEmpty) {
+          throw StateError(
+            'No images found on disk for "${comic.title}". '
+            'The comic may not have been fully downloaded. '
+            'Please delete and re-download.',
+          );
+        }
+        var pageCount = images.length;
+        int i = 1;
+        for (var image in images) {
+          var src = File(_localFilePathFromImageUri(image));
+          var dstName = compatiblePageFileName(i, image.split('.').last);
+          var dst = File(FilePath.join(cache.path, dstName));
+          await src.copyMem(dst.path);
+          i++;
+        }
+        var cover = comic.coverFile;
+        await cover.copyMem(
+          FilePath.join(cache.path, 'cover.${cover.path.split('.').last}'),
+        );
+        final metaData = ComicMetaData(
+          title: comic.title,
+          author: comic.subtitle,
+          tags: comic.tags,
+          chapters: null,
+        );
+        await File(
+          FilePath.join(cache.path, 'metadata.json'),
+        ).writeAsString(jsonEncode(metaData));
+        await File(
+          FilePath.join(cache.path, 'ComicInfo.xml'),
+        ).writeAsString(_buildComicInfoXml(metaData, pageCount: pageCount));
+        var cbz = File(outFilePath);
+        if (cbz.existsSync()) cbz.deleteSync();
+        await _compress(cache.path, cbz.path);
+        return cbz;
+      } else {
+        // 按章节原始顺序遍历,而非 downloadedChapters(其顺序可能是完成顺序)。
+        var downloadedSet = comic.downloadedChapters.toSet();
+        var orderedIds = comic.chapters!.ids.where(
+          (c) => downloadedSet.contains(c),
+        );
+        var availableChapters = _collectAvailableChapters(comic, orderedIds);
+        if (availableChapters.isEmpty) {
+          throw StateError(
+            'No downloadable chapters found on disk for "${comic.title}". '
+            'Please delete and re-download the comic.',
+          );
+        }
+        var cbz = await _exportChaptersToCbz(
+          comic,
+          availableChapters,
+          outFilePath,
+          cache: cache,
+          includeCover: true,
+        );
+        return cbz;
       }
-      chapters = _buildChapterRanges(chapterPageCounts);
-      pageCount = allImages.length;
-      int i = 1;
-      for (var image in allImages) {
-        var src = File(_localFilePathFromImageUri(image));
-        var dstName = compatiblePageFileName(i, image.split('.').last);
-        var dst = File(FilePath.join(cache.path, dstName));
-        await src.copyMem(dst.path);
-        i++;
-      }
+    } finally {
+      cache.deleteSync(recursive: true);
     }
-    var cover = comic.coverFile;
-    await cover.copyMem(
-      FilePath.join(cache.path, 'cover.${cover.path.split('.').last}'),
-    );
-    final metaData = ComicMetaData(
-      title: comic.title,
-      author: comic.subtitle,
-      tags: comic.tags,
-      chapters: chapters,
-    );
-    await File(
-      FilePath.join(cache.path, 'metadata.json'),
-    ).writeAsString(jsonEncode(metaData));
-    await File(
-      FilePath.join(cache.path, 'ComicInfo.xml'),
-    ).writeAsString(_buildComicInfoXml(metaData, pageCount: pageCount));
-    var cbz = File(outFilePath);
-    if (cbz.existsSync()) cbz.deleteSync();
-    await _compress(cache.path, cbz.path);
-    cache.deleteSync(recursive: true);
-    return cbz;
   }
 
   static String compatiblePageFileName(int pageIndex, String extension) {
@@ -328,6 +321,71 @@ abstract class CBZ {
       );
     }
     return availableChapters;
+  }
+
+  /// Export a subset of [comic]'s chapters as a single CBZ file.
+  ///
+  /// - Pages are numbered from 0001 within this CBZ.
+  /// - metadata.json and ComicInfo.xml only contain [chapterIds]' chapters.
+  /// - [includeCover] controls whether cover.* is written.
+  /// - [cache] must be an existing empty directory owned by the caller;
+  ///   the caller is responsible for creating and deleting it.
+  static Future<File> _exportChaptersToCbz(
+    LocalComic comic,
+    List<String> chapterIds,
+    String outFilePath, {
+    required Directory cache,
+    bool includeCover = true,
+  }) async {
+    if (chapterIds.isEmpty) {
+      throw StateError(
+        'No chapters to export for "${comic.title}".',
+      );
+    }
+    var allImages = <String>[];
+    final chapterPageCounts = <MapEntry<String, int>>[];
+    for (var c in chapterIds) {
+      var chapterName = comic.chapters![c];
+      var images = await LocalManager().getImages(
+        comic.id,
+        comic.comicType,
+        c,
+      );
+      allImages.addAll(images);
+      chapterPageCounts.add(MapEntry(chapterName!, images.length));
+    }
+    final chapters = _buildChapterRanges(chapterPageCounts);
+    final pageCount = allImages.length;
+    int i = 1;
+    for (var image in allImages) {
+      var src = File(_localFilePathFromImageUri(image));
+      var dstName = compatiblePageFileName(i, image.split('.').last);
+      var dst = File(FilePath.join(cache.path, dstName));
+      await src.copyMem(dst.path);
+      i++;
+    }
+    if (includeCover) {
+      var cover = comic.coverFile;
+      await cover.copyMem(
+        FilePath.join(cache.path, 'cover.${cover.path.split('.').last}'),
+      );
+    }
+    final metaData = ComicMetaData(
+      title: comic.title,
+      author: comic.subtitle,
+      tags: comic.tags,
+      chapters: chapters,
+    );
+    await File(
+      FilePath.join(cache.path, 'metadata.json'),
+    ).writeAsString(jsonEncode(metaData));
+    await File(
+      FilePath.join(cache.path, 'ComicInfo.xml'),
+    ).writeAsString(_buildComicInfoXml(metaData, pageCount: pageCount));
+    var cbz = File(outFilePath);
+    if (cbz.existsSync()) cbz.deleteSync();
+    await _compress(cache.path, cbz.path);
+    return cbz;
   }
 
   static List<ComicChapter> _buildChapterRanges(
