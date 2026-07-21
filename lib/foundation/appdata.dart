@@ -238,6 +238,7 @@ class Settings with ChangeNotifier {
     'enableTapToTurnPages': true,
     'reverseTapToTurnPages': false,
     'enablePageAnimation': true,
+    'pageUpAndDownAction': 'chapter', // chapter, page, disabled
     'language': 'system', // system, zh-CN, zh-TW, en-US
     'cacheSize': 2048, // in MB
     'downloadThreads': 5,

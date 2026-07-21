@@ -181,6 +181,21 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
           useDeviceSettings: useDeviceSpecificSettings,
         ).toSliver(),
+        SelectSetting(
+          title: "Page Up/Down Action".tl,
+          settingKey: "pageUpAndDownAction",
+          optionTranslation: {
+            "chapter": "Switch chapter".tl,
+            "page": "Turn page".tl,
+            "disabled": "Disabled".tl,
+          },
+          onChanged: () {
+            widget.onChanged?.call("pageUpAndDownAction");
+          },
+          comicId: isEnabledSpecificSettings ? widget.comicId : null,
+          comicSource: isEnabledSpecificSettings ? widget.comicSource : null,
+          useDeviceSettings: useDeviceSpecificSettings,
+        ).toSliver(),
         _SwitchSetting(
           title: "Page animation".tl,
           settingKey: "enablePageAnimation",

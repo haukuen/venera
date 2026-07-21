@@ -319,11 +319,35 @@ class _ReaderState extends State<Reader>
         toPage(maxPage);
         return;
       } else if (key == LogicalKeyboardKey.pageUp) {
-        toPrevChapter(toLastPage: true);
-        return;
+        final action =
+            appdata.settings.getDeviceReaderSetting('pageUpAndDownAction')
+                as String? ??
+            'chapter';
+        if (action == 'disabled') {
+          // Fall through to _imageViewController below.
+        } else if (action == 'page') {
+          if (!toPage(page - 1) && !isFirstChapterOfGroup) {
+            toPrevChapter(toLastPage: true);
+          }
+        } else {
+          toPrevChapter(toLastPage: true);
+        }
+        if (action != 'disabled') return;
       } else if (key == LogicalKeyboardKey.pageDown) {
-        toNextChapter();
-        return;
+        final action =
+            appdata.settings.getDeviceReaderSetting('pageUpAndDownAction')
+                as String? ??
+            'chapter';
+        if (action == 'disabled') {
+          // Fall through to _imageViewController below.
+        } else if (action == 'page') {
+          if (!toPage(page + 1) && !isLastChapterOfGroup) {
+            toNextChapter();
+          }
+        } else {
+          toNextChapter();
+        }
+        if (action != 'disabled') return;
       } else if (key == LogicalKeyboardKey.keyB) {
         if (!isLoading) {
           _scaffoldState?.addImageFavorite();
