@@ -320,9 +320,12 @@ class _ReaderState extends State<Reader>
         return;
       } else if (key == LogicalKeyboardKey.pageUp) {
         final action =
-            appdata.settings.getDeviceReaderSetting('pageUpAndDownAction')
-                as String? ??
-            'chapter';
+            appdata.settings.getReaderSetting(
+                  cid,
+                  type.sourceKey,
+                  'pageUpAndDownAction',
+                )
+                as String;
         if (action == 'disabled') {
           // Fall through to _imageViewController below.
         } else if (action == 'page') {
@@ -335,9 +338,12 @@ class _ReaderState extends State<Reader>
         if (action != 'disabled') return;
       } else if (key == LogicalKeyboardKey.pageDown) {
         final action =
-            appdata.settings.getDeviceReaderSetting('pageUpAndDownAction')
-                as String? ??
-            'chapter';
+            appdata.settings.getReaderSetting(
+                  cid,
+                  type.sourceKey,
+                  'pageUpAndDownAction',
+                )
+                as String;
         if (action == 'disabled') {
           // Fall through to _imageViewController below.
         } else if (action == 'page') {
