@@ -900,12 +900,53 @@ class _SelectDownloadChapter extends StatefulWidget {
 class _SelectDownloadChapterState extends State<_SelectDownloadChapter> {
   List<int> selected = [];
 
+  List<int> get optionalIndices => [
+    for (int i = 0; i < widget.eps.length; i++)
+      if (!widget.downloadedEps.contains(i)) i,
+  ];
+
+  void selectAll() {
+    setState(() {
+      selected = optionalIndices;
+    });
+  }
+
+  void deSelect() {
+    setState(() {
+      selected = [];
+    });
+  }
+
+  void invertSelection() {
+    setState(() {
+      final optional = optionalIndices;
+      selected = optional.where((i) => !selected.contains(i)).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: Appbar(
         title: Text("Download".tl),
         backgroundColor: context.colorScheme.surfaceContainerLow,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.select_all),
+            tooltip: "Select All".tl,
+            onPressed: selectAll,
+          ),
+          IconButton(
+            icon: const Icon(Icons.deselect),
+            tooltip: "Deselect".tl,
+            onPressed: deSelect,
+          ),
+          IconButton(
+            icon: const Icon(Icons.flip),
+            tooltip: "Invert Selection".tl,
+            onPressed: invertSelection,
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
