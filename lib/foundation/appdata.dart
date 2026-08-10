@@ -245,6 +245,10 @@ class Settings with ChangeNotifier {
     'enableLongPressToZoom': true,
     'longPressZoomPosition': "press", // press, center
     'checkUpdateOnStart': false,
+    // 漫画更新，区别于 APP 版本的 checkUpdateOnStart
+    'comicUpdateCheckOnStart': true,
+    'comicUpdateCheckInterval': '24', // 1/6/12/24/48/72 小时，字符串
+    'skipCheckIfHasNewUpdate': true,
     'limitImageWidth': true,
     'webdav': [], // empty means not configured
     'webdavProxyEnabled': true,

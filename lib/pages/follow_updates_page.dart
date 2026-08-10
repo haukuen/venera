@@ -50,6 +50,13 @@ class _FollowUpdatesWidgetState
   void initState() {
     super.initState();
     getCount();
+    LocalFavoritesManager().addListener(updateCount);
+  }
+
+  @override
+  void dispose() {
+    LocalFavoritesManager().removeListener(updateCount);
+    super.dispose();
   }
 
   @override
@@ -134,6 +141,13 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
       sortComics();
       updatedComics = allComics.where((c) => c.hasNewUpdate).toList();
     }
+    LocalFavoritesManager().addListener(updateComics);
+  }
+
+  @override
+  void dispose() {
+    LocalFavoritesManager().removeListener(updateComics);
+    super.dispose();
   }
 
   @override
@@ -205,10 +219,6 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
             ListTile(leading: Icon(Icons.stars_outlined), title: Text(folder!)),
             Text(
               "Automatic update checking enabled.".tl,
-              style: ts.s14,
-            ).paddingHorizontal(16),
-            Text(
-              "The app will check for updates at most once a day.".tl,
               style: ts.s14,
             ).paddingHorizontal(16),
             const SizedBox(height: 8),
@@ -557,7 +567,9 @@ abstract class FollowUpdatesService {
   static void initChecker() {
     if (_isInitialized) return;
     _isInitialized = true;
-    _check();
+    if (appdata.settings['comicUpdateCheckOnStart'] == true) {
+      _check();
+    }
     DataSync().addListener(updateFollowUpdatesUI);
     // A short interval will not affect the performance since every comic has a check time.
     Timer.periodic(const Duration(minutes: 10), (timer) {

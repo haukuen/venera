@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/utils/channel.dart';
@@ -111,11 +112,22 @@ void updateFolderBase(
     if (!ignoreCheckTime) {
       var lastCheckTime = comic.lastCheckTime;
       if (lastCheckTime != null &&
-          DateTime.now().difference(lastCheckTime).inDays < 1) {
+          DateTime.now().difference(lastCheckTime).inHours <
+              (int.tryParse(
+                    appdata.settings['comicUpdateCheckInterval']?.toString() ??
+                        '24',
+                  ) ??
+                  24)) {
         current++;
         stream.add(UpdateProgress(total, current, errors, updated));
         continue;
       }
+    }
+    if (appdata.settings['skipCheckIfHasNewUpdate'] == true &&
+        comic.hasNewUpdate) {
+      current++;
+      stream.add(UpdateProgress(total, current, errors, updated));
+      continue;
     }
     comicsToUpdate.add(comic);
   }
