@@ -172,6 +172,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
   bool? localIsFavorite;
   final Map<String, bool> _itemLoading = {};
   late List<double> _skeletonWidths;
+  StreamSubscription<FavoriteChange>? _favoriteChanges;
 
   @override
   void initState() {
@@ -186,6 +187,29 @@ class _NetworkSectionState extends State<_NetworkSection> {
     } else {
       isLoadingFolders = false;
     }
+    _favoriteChanges = SourceOperationCoordinator.instance.favoriteChanges
+        .where(
+          (change) =>
+              change.source == widget.comicSource.key &&
+              (change.comicId == null || change.comicId == widget.cid),
+        )
+        .listen((change) {
+          if (!mounted) return;
+          if (widget.comicSource.favoriteData!.loadFolders != null) {
+            loadFolders();
+          } else if (change.comicId == widget.cid) {
+            setState(() {
+              if (change.operation == 'add') localIsFavorite = true;
+              if (change.operation == 'remove') localIsFavorite = false;
+            });
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _favoriteChanges?.cancel();
+    super.dispose();
   }
 
   void loadFolders() async {
@@ -193,6 +217,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
     if (res.error) {
       if (!mounted) return;
       context.showMessage(message: res.errorMessage!);
+      if (!mounted) return;
       setState(() {
         isLoadingFolders = false;
       });
@@ -328,10 +353,22 @@ class _NetworkSectionState extends State<_NetworkSection> {
                       isLoading = true;
                     });
 
-                    var res = await widget
-                        .comicSource
-                        .favoriteData!
-                        .addOrDelFavorite!(widget.cid, '', !isFavorite, null);
+                    var res = await SourceOperationCoordinator.instance
+                        .guiFavoriteWrite<bool>(
+                          source: widget.comicSource.key,
+                          operation: isFavorite ? 'remove' : 'add',
+                          comicId: widget.cid,
+                          write: () =>
+                              widget
+                                  .comicSource
+                                  .favoriteData!
+                                  .addOrDelFavorite!(
+                                widget.cid,
+                                '',
+                                !isFavorite,
+                                null,
+                              ),
+                        );
                     if (res.success) {
                       setState(() {
                         localIsFavorite = !isFavorite;
@@ -418,13 +455,24 @@ class _NetworkSectionState extends State<_NetworkSection> {
                       setState(() {
                         _itemLoading[id] = true;
                       });
-                      var res = await widget
-                          .comicSource
-                          .favoriteData!
-                          .addOrDelFavorite!(widget.cid, id, !isAdded, null);
+                      var res = await SourceOperationCoordinator.instance
+                          .guiFavoriteWrite<bool>(
+                            source: widget.comicSource.key,
+                            operation: isAdded ? 'remove' : 'add',
+                            comicId: widget.cid,
+                            folderId: id,
+                            write: () =>
+                                widget
+                                    .comicSource
+                                    .favoriteData!
+                                    .addOrDelFavorite!(
+                                  widget.cid,
+                                  id,
+                                  !isAdded,
+                                  null,
+                                ),
+                          );
                       if (res.success) {
-                        // Invalidate network cache so folders/pages reload with fresh data
-                        NetworkCacheManager().clear();
                         setState(() {
                           if (isAdded) {
                             addedFolders.remove(id);

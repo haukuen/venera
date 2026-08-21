@@ -2,6 +2,9 @@
 #include <flutter/flutter_view_controller.h>
 #include <windows.h>
 
+#include <algorithm>
+#include <cstdlib>
+
 #include "flutter_window.h"
 #include "utils.h"
 
@@ -17,10 +20,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // plugins.
   ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-  flutter::DartProject project(L"data");
-
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
+  if (std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                "--headless") != command_line_arguments.end()) {
+    wchar_t count_buffer[16] = {};
+    const DWORD count_length = ::GetEnvironmentVariableW(
+        L"FLUTTER_ENGINE_SWITCHES", count_buffer, 16);
+    const int count = count_length == 0 ? 0 : _wtoi(count_buffer);
+    const std::wstring next_count = std::to_wstring(count + 1);
+    const std::wstring switch_name =
+        L"FLUTTER_ENGINE_SWITCH_" + next_count;
+    ::SetEnvironmentVariableW(L"FLUTTER_ENGINE_SWITCHES",
+                              next_count.c_str());
+    ::SetEnvironmentVariableW(switch_name.c_str(),
+                              L"disable-vm-service=true");
+  }
+
+  flutter::DartProject project(L"data");
 
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
