@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/log.dart';
@@ -172,7 +171,7 @@ class Appdata with Init {
 
   @override
   Future<void> doInit() async {
-    var dataPath = (await getApplicationSupportDirectory()).path;
+    var dataPath = App.dataPath;
     var file = File(FilePath.join(dataPath, 'appdata.json'));
     if (!await file.exists()) {
       return;

@@ -706,14 +706,15 @@ class ComicSourceParser {
         var value = split.join("-");
         map[key] = value;
       }
-      options.add(
-        SearchOptions(
-          map,
-          element["label"],
-          element['type'] ?? 'select',
-          element['default'] == null ? null : jsonEncode(element['default']),
-        ),
-      );
+      var type = element['type'] ?? 'select';
+      var rawDefault = element['default'];
+      String? defaultValue;
+      if (rawDefault != null) {
+        defaultValue = type == 'multi-select'
+            ? jsonEncode(rawDefault)
+            : rawDefault.toString();
+      }
+      options.add(SearchOptions(map, element["label"], type, defaultValue));
     }
 
     SearchFunction? loadPage;
@@ -802,6 +803,9 @@ class ComicSourceParser {
     final bool? singleFolderForSingleComic = _getValue(
       "favorites.singleFolderForSingleComic",
     );
+    final String? allFavoritesId = _checkExists("favorites.allFavoritesId")
+        ? _getValue("favorites.allFavoritesId")
+        : null;
 
     Future<Res<T>> retryZone<T>(Future<Res<T>> Function() func) async {
       if (!ComicSource.find(_key!)!.isLogged) {
@@ -819,26 +823,38 @@ class ComicSourceParser {
       return res;
     }
 
-    Future<Res<bool>> addOrDelFavFunc(
+    Future<Res<bool>> addOrDelFavOnce(
       String comicId,
       String folderId,
       bool isAdding,
       String? favId,
     ) async {
-      func() async {
-        try {
-          await JsEngine().runCode("""
-            ComicSource.sources.$_key.favorites.addOrDelFavorite(
-              ${jsonEncode(comicId)}, ${jsonEncode(folderId)}, ${jsonEncode(isAdding)})
-          """);
-          return const Res(true);
-        } catch (e, s) {
-          Log.error("Network", "$e\n$s");
-          return Res<bool>.error(e.toString());
-        }
+      if (!ComicSource.find(_key!)!.isLogged) {
+        return const Res.error("Not login");
       }
+      try {
+        await JsEngine().runCode("""
+            ComicSource.sources.$_key.favorites.addOrDelFavorite(
+              ${jsonEncode(comicId)}, ${jsonEncode(folderId)}, ${jsonEncode(isAdding)}, ${jsonEncode(favId)})
+          """);
+        return const Res(true);
+      } catch (e, s) {
+        Log.error("Network", "$e\n$s");
+        return Res<bool>.error(e.toString());
+      }
+    }
 
-      return retryZone(func);
+    Future<Res<bool>> addOrDelFavFunc(
+      String comicId,
+      String folderId,
+      bool isAdding,
+      String? favId,
+    ) {
+      // Preserve the GUI's existing login-recovery behavior. The CLI uses the
+      // one-shot function below after its own read-only preflight.
+      return retryZone(
+        () => addOrDelFavOnce(comicId, folderId, isAdding, favId),
+      );
     }
 
     Future<Res<List<Comic>>> Function(int page, [String? folder])? loadComic;
@@ -958,7 +974,9 @@ class ComicSourceParser {
       loadFolders: loadFolders,
       addFolder: addFolder,
       deleteFolder: deleteFolder,
+      allFavoritesId: allFavoritesId,
       addOrDelFavorite: addOrDelFavFunc,
+      addOrDelFavoriteOnce: addOrDelFavOnce,
       isOldToNewSort: isOldToNewSort,
       singleFolderForSingleComic: singleFolderForSingleComic ?? false,
     );
