@@ -5,13 +5,41 @@ import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/js_engine.dart';
+import 'package:venera/headless/execution_context.dart';
 
 import 'components.dart';
 
 mixin class JsUiApi {
   final Map<int, LoadingDialogController> _loadingDialogControllers = {};
+  int _headlessLoadingId = 0;
 
   dynamic handleUIMessage(Map<String, dynamic> message) {
+    var cli = CliExecutionContext.current;
+    if (cli != null && !cli.canUseGui) {
+      switch (message['function']) {
+        case 'showMessage':
+          var value = message['message']?.toString() ?? '';
+          if (value.isNotEmpty) {
+            cli.reporter.warning('source_message', value);
+          }
+          return null;
+        case 'showLoading':
+          cli.reporter.progress(
+            message['message']?.toString() ?? 'Source operation in progress.',
+          );
+          return _headlessLoadingId++;
+        case 'cancelLoading':
+          return null;
+        case 'showDialog':
+        case 'showInputDialog':
+        case 'showSelectDialog':
+        case 'launchUrl':
+          var error =
+              'The comic source requested ${message['function']}. Re-run with --allow-gui while the GUI is open.';
+          cli.markInteractiveRequired(error);
+          throw CliInteractiveRequiredException(error);
+      }
+    }
     switch (message['function']) {
       case 'showMessage':
         var m = message['message'];

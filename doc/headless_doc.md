@@ -1,180 +1,214 @@
 # Venera Headless Mode
 
-Venera's headless mode allows you to run key features from the command line, making it easy to automate tasks and integrate with other tools. This document outlines the available commands and their usage.
+Venera exposes its existing comic-source runtime through the desktop executable. The CLI loads the same installed QuickJS sources, source data, cookies, settings, and remote accounts as the GUI; it does not implement source-specific HTTP clients.
 
-## How to Use
+Reading comic pages remains a GUI-only operation. The CLI does not return chapter images or comment content.
 
-To activate headless mode, use the `--headless` flag when running the Venera executable, followed by the desired command.
+## Usage
 
 ```bash
-venera --headless <command> [subcommand] [options]
+venera --headless [global options] <resource> <command> [options]
 ```
 
-## Global Options
+The executable location depends on the installation method. On macOS, for example:
 
-- **`--ignore-disheadless-log`**: Suppresses log output, providing a cleaner output for scripting.
+```bash
+/Applications/venera.app/Contents/MacOS/venera --headless --version
+```
 
-## Commands
+Use `venera --headless --help` for the command inventory. Global options can appear before or after a command.
 
-### `webdav`
+## Global options
 
-Manage WebDAV data synchronization.
+| Option | Description |
+| --- | --- |
+| `--json` | Print exactly one schema-versioned JSON envelope to stdout. Progress and warnings use stderr. |
+| `--timeout <duration>` | Cancel after a duration such as `500ms`, `30s`, `2m`, or `1h`. Default: `2m`. |
+| `--allow-gui` | Allow a running GUI to handle source-requested interaction and wait for GUI unlock. |
+| `--record-history` | Record search terms in Venera search history. Searches do not record history by default. |
+| `--quiet` | Suppress progress output. |
+| `--no-color` | Disable ANSI colors in human-readable errors. |
+| `--ignore-disheadless-log` | Preserve the legacy option that mutes application logs. |
+| `--help`, `-h` | Print help without initializing the application profile. |
+| `--version` | Print the application and protocol version without initializing the profile. |
 
-- **`webdav up`**: Uploads your local configuration to the WebDAV server.
-- **`webdav down`**: Downloads and applies the remote configuration from the WebDAV server.
+## Comic-source commands
 
-**Example:**
+### Source discovery
+
+```bash
+venera --headless source list
+venera --headless source show <source-key>
+```
+
+`source list` includes both ready sources and scripts that failed to parse. Capabilities in the result determine which other commands a source supports.
+
+### Search and comic metadata
+
+```bash
+venera --headless comic search "keyword" --source <source-key>
+venera --headless comic search "keyword" --source <a> --source <b> --allow-partial
+venera --headless comic search "keyword" --all-sources
+venera --headless comic show --source <source-key> --id <comic-id>
+venera --headless comic chapters --source <source-key> --id <comic-id>
+venera --headless comic tags --source <source-key> --id <comic-id>
+```
+
+Without `--source`, search uses the sources selected in Venera settings. Repeating `--source` preserves the requested source order. Results remain grouped by source and are not deduplicated.
+
+Source search options can be supplied as a full JSON array or by zero-based index:
+
+```bash
+venera --headless comic search "keyword" --source <source-key> \
+  --options-json '["new","all"]'
+venera --headless comic search "keyword" --source <source-key> \
+  --option 0=popular
+```
+
+For a multi-source search, use `--source-options-json` with an object keyed by source:
+
+```bash
+venera --headless comic search "keyword" --source <a> --source <b> \
+  --source-options-json '{"a":["new"],"b":["all"]}'
+```
+
+Comic details retain `commentCount` when supplied by the source, but omit comment bodies.
+
+### Categories, rankings, and explore pages
+
+```bash
+venera --headless category list --source <source-key>
+venera --headless category options --source <source-key> --category <category> [--param <value>]
+venera --headless category comics --source <source-key> --category <category> [--param <value>]
+
+venera --headless ranking list --source <source-key>
+venera --headless ranking comics --source <source-key> [--ranking <value>]
+
+venera --headless explore list --source <source-key>
+venera --headless explore show --source <source-key> --index <one-based-index>
+venera --headless explore show --source <source-key> --title <exact-title>
+```
+
+Category comic options use the same `--options-json` and `--option INDEX=VALUE` forms as a single-source search. Random category groups are listed in full so discovery is stable. Explore pages with a custom GUI override return `unsupported`.
+
+### Pagination
+
+All numeric CLI pages are one-based. A source may expose either page or cursor pagination; the response identifies the kind.
+
+```bash
+--page <number>
+--cursor <opaque-cursor>
+--all --max-pages <count>
+--all --limit <comic-count>
+```
+
+Aggregated search does not accept a shared page or cursor. Bound it per source instead:
+
+```bash
+--all --max-pages-per-source <count>
+--all --limit-per-source <comic-count>
+```
+
+Unbounded `--all` is rejected.
+
+## Remote favorites
+
+Remote favorite commands are available only when the selected source declares the corresponding capability.
+
+```bash
+venera --headless favorite remote list --source <source-key> [--folder <folder-id>]
+venera --headless favorite remote status --source <source-key> --id <comic-id>
+
+venera --headless favorite remote add --source <source-key> --id <comic-id> \
+  [--folder <folder-id>] [--favorite-id <opaque-id>] [--dry-run]
+venera --headless favorite remote remove --source <source-key> --id <comic-id> \
+  [--folder <folder-id>] [--favorite-id <opaque-id>] [--dry-run]
+
+venera --headless favorite remote folder list --source <source-key>
+venera --headless favorite remote folder create --source <source-key> \
+  --name <name> [--dry-run]
+venera --headless favorite remote folder delete --source <source-key> \
+  --folder <folder-id> [--dry-run] --yes [--force-non-empty]
+```
+
+Favorite writes use a strict preflight and post-write verification:
+
+- a write is never automatically retried;
+- an unknown preflight state is refused instead of risking a toggle;
+- moving a favorite between folders is not inferred;
+- aggregate “all favorites” folders cannot be write or delete targets;
+- folder deletion needs `--yes`, plus `--force-non-empty` unless the folder is proven empty;
+- `--dry-run` reports whether the operation is allowed and which flags are missing;
+- if the remote outcome cannot be verified, the command returns `outcome_unknown`.
+
+`--verify-max-pages <count>` bounds folder scans for add/remove and defaults to 3.
+
+## GUI coexistence and source interaction
+
+Only one Venera runtime may own an application profile at a time.
+
+- If the GUI is not running, the CLI acquires the profile lock and runs the source directly.
+- If the GUI is running, the CLI forwards the job to an authenticated loopback IPC endpoint. It does not open a second database or QuickJS runtime.
+- If the application is locked, the command returns `app_locked`. With `--allow-gui`, Venera brings the GUI forward and waits for the user to unlock it.
+- Non-interactive source messages become progress events. Source dialogs, text input, selection, and URL launches return `interactive_required` unless a running GUI is explicitly allowed.
+
+The IPC endpoint binds to `127.0.0.1` on a random port and uses a per-session bearer token. Runtime descriptor files are private to the current OS user. The IPC protocol is internal; scripts should depend on command flags, JSON schema, and exit codes instead.
+
+Normal source queries may update the same cookies, tokens, or source `.data` that the GUI would update. Search history changes only with `--record-history`. Remote favorite reads bypass the normal response cache.
+
+## JSON output
+
+With `--json`, stdout contains exactly one final object. Nullable fields are retained.
+
+```json
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "comic.search",
+  "data": {},
+  "error": null,
+  "warnings": [],
+  "meta": {
+    "appVersion": "1.15.0",
+    "protocolVersion": 1,
+    "transport": "direct",
+    "partial": false,
+    "requestId": "..."
+  }
+}
+```
+
+`meta.transport` is `direct` or `ipc`. Errors use the same envelope with `ok: false` and a structured `error`. Credentials, cookies, authorization values, and secret URL parameters are redacted from CLI and IPC diagnostics.
+
+## Exit codes
+
+| Code | Meaning |
+| ---: | --- |
+| 0 | Success |
+| 2 | Invalid arguments |
+| 3 | Authentication, locked app, or GUI interaction required |
+| 4 | Unsupported source capability |
+| 5 | Source, comic, or folder not found |
+| 6 | State conflict, unsafe mutation, or confirmation required |
+| 7 | Partial aggregate failure |
+| 8 | Cancelled or timed out |
+| 10 | Comic-source error |
+| 69 | Runtime IPC or protocol error |
+| 70 | Internal error |
+| 130 | Forced termination after a second Ctrl-C |
+
+The first Ctrl-C requests cooperative cancellation. A favorite write already dispatched to a remote service is verified once before Venera reports the observed result.
+
+## Legacy commands
+
+The existing commands remain available:
 
 ```bash
 venera --headless webdav up
-```
-
-### `updatescript`
-
-Update comic source scripts.
-
-- **`updatescript all`**: Checks for and applies all available updates for your comic source scripts.
-
-**Example:**
-
-```bash
+venera --headless webdav down
 venera --headless updatescript all
-```
-
-**Output Format:**
-
-The `updatescript` command provides detailed progress and a final summary.
-
-**Progress Logs:**
-
-- **`Progress`**: Indicates a successful update for a single script.
-- **`ProgressError`**: Indicates a failure during a script update.
-
-**Example `Progress` Log:**
-
-```json
-{
-  "status": "running",
-  "message": "Progress",
-  "data": {
-    "current": 1,
-    "total": 5,
-    "source": {
-      "key": "source-key",
-      "name": "Source Name",
-      "version": "1.0.0",
-      "url": "https://example.com/source.js"
-    }
-  }
-}
-```
-
-**Final Summary:**
-
-A summary is provided at the end, detailing the total number of scripts, how many were updated, and how many failed.
-
-```json
-{
-  "status": "success",
-  "message": "All scripts updated.",
-  "data": {
-    "total": 5,
-    "updated": 4,
-    "errors": 1
-  }
-}
-```
-
-### `updatesubscribe`
-
-Update your subscribed comics and retrieve a list of updated comics.
-
-- **`updatesubscribe`**: Checks all subscribed comics for updates.
-- **`updatesubscribe --update-comic-by-id-type <id> <type>`**: Updates a single comic specified by its `id` and `type`.
-
-**Example:**
-
-```bash
-# Update all subscriptions
 venera --headless updatesubscribe
-
-# Update a single comic
-venera --headless updatesubscribe --update-comic-by-id-type "comic-id" "source-key"
+venera --headless updatesubscribe --update-comic-by-id-type <id> <source-key>
 ```
 
-## Output Format
-
-All headless commands output JSON objects prefixed with `[CLI PRINT]`. This structured format allows for easy parsing in automated scripts. The JSON object always contains a `status` and a `message`. For commands that return data, a `data` field will also be present.
-
-### `updatesubscribe` Output
-
-The `updatesubscribe` command provides detailed progress and final results in JSON format.
-
-**Progress Logs:**
-
-During an update, you will receive `Progress` or `ProgressError` messages.
-
-- **`Progress`**: Indicates a successful step in the update process.
-- **`ProgressError`**: Indicates an error occurred while updating a specific comic.
-
-**Example `Progress` Log:**
-
-```json
-{
-  "status": "running",
-  "message": "Progress",
-  "data": {
-    "current": 1,
-    "total": 10,
-    "comic": {
-      "id": "some-comic-id",
-      "name": "Some Comic Name",
-      "coverUrl": "https://example.com/cover.jpg",
-      "author": "Author Name",
-      "type": "source-key",
-      "updateTime": "2023-10-27T12:00:00Z",
-      "tags": ["tag1", "tag2"]
-    }
-  }
-}
-```
-
-**Example `ProgressError` Log:**
-
-```json
-{
-  "status": "running",
-  "message": "ProgressError",
-  "data": {
-    "current": 2,
-    "total": 10,
-    "comic": {
-      "id": "another-comic-id",
-      "name": "Another Comic Name",
-      ...
-    },
-    "error": "Error message here"
-  }
-}
-```
-
-**Final Output:**
-
-Once the update process is complete, a final JSON object is returned with a list of all comics that have been updated.
-
-```json
-{
-  "status": "success",
-  "message": "Updated comics list.",
-  "data": [
-    {
-      "id": "some-comic-id",
-      "name": "Some Comic Name",
-      "coverUrl": "https://example.com/cover.jpg",
-      "author": "Author Name",
-      "type": "source-key",
-      "updateTime": "2023-10-27T12:00:00Z",
-      "tags": ["tag1", "tag2"]
-    }
-  ]
-}
+Without `--json`, these commands preserve their historical `[CLI PRINT]` records and `0`/`1` exit status. Adding `--json` selects the common JSON envelope and exit-code taxonomy described above.

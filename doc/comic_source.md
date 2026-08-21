@@ -385,9 +385,13 @@ If `load` function is implemented, `loadNext` function will be ignored.
     favorites = {
         // whether support multi folders
         multiFolder: false,
+        // [Optional] id of the synthetic "all favorites" folder. It is never
+        // treated as a deletable user folder.
+        allFavoritesId: null,
         /**
          * add or delete favorite.
-         * throw `Login expired` to indicate login expired, App will automatically re-login and re-add/delete favorite
+         * throw `Login expired` to indicate login expired. The GUI may automatically
+         * re-login and retry; headless mode never replays a favorite mutation.
          * @param comicId {string}
          * @param folderId {string}
          * @param isAdding {boolean} - true for add, false for delete
