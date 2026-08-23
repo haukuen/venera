@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:venera/foundation/appdata.dart';
 import 'package:venera/utils/data_sync.dart';
 
 void main() {
@@ -147,6 +148,56 @@ void main() {
 
       expect(result.error, isTrue);
       expect(result.errorMessage, contains('401 Unauthorized'));
+    });
+  });
+
+  group('DataSync transfer authorization', () {
+    late Object? previousConfig;
+    late bool hadAutoSyncSetting;
+    late Object? previousAutoSync;
+
+    setUp(() {
+      previousConfig = appdata.settings['webdav'];
+      hadAutoSyncSetting = appdata.implicitData.containsKey('webdavAutoSync');
+      previousAutoSync = appdata.implicitData['webdavAutoSync'];
+    });
+
+    tearDown(() {
+      appdata.settings['webdav'] = previousConfig;
+      if (hadAutoSyncSetting) {
+        appdata.implicitData['webdavAutoSync'] = previousAutoSync;
+      } else {
+        appdata.implicitData.remove('webdavAutoSync');
+      }
+    });
+
+    test('skips automatic transfers when Auto Sync is disabled', () async {
+      appdata.settings['webdav'] = const ['invalid'];
+      appdata.implicitData['webdavAutoSync'] = false;
+      final sync = DataSync.forTesting();
+
+      final upload = await sync.uploadData();
+      final download = await sync.downloadData();
+
+      expect(upload.success, isTrue);
+      expect(download.success, isTrue);
+      expect(sync.isUploading, isFalse);
+      expect(sync.isDownloading, isFalse);
+      expect(sync.lastError, isNull);
+    });
+
+    test('keeps explicit manual transfers available when disabled', () async {
+      appdata.settings['webdav'] = const ['invalid'];
+      appdata.implicitData['webdavAutoSync'] = false;
+      final sync = DataSync.forTesting();
+
+      final upload = await sync.uploadDataManually();
+      final download = await sync.downloadDataManually();
+
+      expect(upload.error, isTrue);
+      expect(upload.errorMessage, 'Invalid WebDAV configuration');
+      expect(download.error, isTrue);
+      expect(download.errorMessage, 'Invalid WebDAV configuration');
     });
   });
 }
