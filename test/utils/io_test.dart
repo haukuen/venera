@@ -202,17 +202,16 @@ void main() {
       );
     });
 
-    test('preserves trailing whitespace inside middle byte-faithfully', () {
-      // Middle ends with a legitimate space; not invalid-char-derived.
-      // The sanitizer must not strip it.
-      const middle = '_EP1_P1 ';
+    test('trims whitespace at both ends of middle', () {
+      // Trailing/leading whitespace in middle is stripped (#148 rename fix);
+      // inner whitespace between segments is preserved byte-faithfully.
       final filename = sanitizeFileNameWithSuffix(
         'title',
-        middle: middle,
+        middle: ' _EP1_ 第1话 _P1 ',
         extension: '.png',
       );
 
-      expect(filename, 'title$middle.png');
+      expect(filename, 'title_EP1_ 第1话 _P1.png');
     });
 
     test('handles a long title combined with a long middle', () {
