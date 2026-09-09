@@ -150,6 +150,19 @@ class _AppSettingsState extends State<AppSettings> {
           },
           actionTitle: 'Export'.tl,
         ).toSliver(),
+        SelectSetting(
+          title: "Chapter Export Naming Format".tl,
+          settingKey: "chapterExportNamingFormat",
+          optionTranslation: const {
+            "ep": "EP001",
+            "chinese": "第001话",
+            "volume": "v01",
+            "number": "001",
+          },
+          help:
+              "Naming format of the chapter segment in split-chapter export filenames, e.g. Title_第001话_Chapter.cbz"
+                  .tl,
+        ).toSliver(),
         _CallbackSetting(
           title: "Import App Data".tl,
           callback: () async {

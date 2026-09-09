@@ -249,4 +249,102 @@ void main() {
       expect(filename, 'Test Comic_EP番外篇.cbz');
     });
   });
+
+  group('singleChapterExportFilename naming formats', () {
+    final comic = _comic(
+      chapters: const ComicChapters({'1': '温泉节', '2': '番外篇'}),
+    );
+
+    test('ep format (default) produces EP001 segment', () {
+      final chapter = orderedDownloadedChapters(comic).first;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+        format: ChapterExportNamingFormat.ep,
+      );
+
+      expect(filename, 'Test Comic_EP001_温泉节.cbz');
+    });
+
+    test('chinese format produces 第001话 segment (Kavita-compatible)', () {
+      final chapter = orderedDownloadedChapters(comic).first;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+        format: ChapterExportNamingFormat.chinese,
+      );
+
+      expect(filename, 'Test Comic_第001话_温泉节.cbz');
+    });
+
+    test('volume format produces 2-digit v01 segment', () {
+      final chapter = orderedDownloadedChapters(comic).first;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+        format: ChapterExportNamingFormat.volume,
+      );
+
+      expect(filename, 'Test Comic_v01_温泉节.cbz');
+    });
+
+    test('number format produces bare 001 segment', () {
+      final chapter = orderedDownloadedChapters(comic).first;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+        format: ChapterExportNamingFormat.number,
+      );
+
+      expect(filename, 'Test Comic_001_温泉节.cbz');
+    });
+
+    test('all formats stay unique for duplicate chapter titles', () {
+      final dupComic = _comic(
+        chapters: const ComicChapters({'1': '番外篇', '2': '番外篇'}),
+      );
+      final chapters = orderedDownloadedChapters(dupComic);
+
+      for (final format in ChapterExportNamingFormat.values) {
+        final names = chapters
+            .map(
+              (c) => singleChapterExportFilename(
+                comic: dupComic,
+                chapter: c,
+                extension: '.cbz',
+                format: format,
+              ),
+            )
+            .toSet();
+        expect(names, hasLength(2), reason: format.name);
+      }
+    });
+
+    test(
+      'chinese format omits title segment when title sanitizes to empty',
+      () {
+        final emptyTitleComic = _comic(
+          chapters: const ComicChapters({'1': '///:::'}),
+        );
+        final chapter = orderedDownloadedChapters(emptyTitleComic).single;
+
+        final filename = singleChapterExportFilename(
+          comic: emptyTitleComic,
+          chapter: chapter,
+          extension: '.cbz',
+          format: ChapterExportNamingFormat.chinese,
+        );
+
+        expect(filename, 'Test Comic_第001话.cbz');
+      },
+    );
+  });
 }
