@@ -151,8 +151,8 @@ const _defaultFallback = 'file';
 /// [sanitizeFileNameWithSuffix].
 final _invalidFileNameChars = RegExp(r'[<>:"/\\|?*]');
 
-/// Replace invalid characters with a space (matches [sanitizeFileName]).
-String _replaceInvalidChars(String value) =>
+/// Replace invalid path characters (`<>:"/\|?*`) with spaces.
+String replaceInvalidFileNameChars(String value) =>
     value.replaceAll(_invalidFileNameChars, ' ');
 
 /// Sanitize the file name. Remove invalid characters and trim the file name.
@@ -167,7 +167,7 @@ String sanitizeFileName(String fileName, {String? dir, int? maxLength}) {
     }
     length -= dir.length;
   }
-  var trimmedFileName = _replaceInvalidChars(fileName).trim();
+  var trimmedFileName = replaceInvalidFileNameChars(fileName).trim();
   if (trimmedFileName.isEmpty) {
     throw Exception('Invalid File Name: Empty length.');
   }
@@ -205,8 +205,8 @@ String _truncateUtf8(String value, int maxBytes) {
 /// Build an export filename of the form `{title}{middle}{extension}`.
 ///
 /// - Invalid path characters in [middle] and [extension] are replaced with
-///   spaces. The chapter title contained in [middle] is user-controlled data
-///   and may contain `/`, `:`, `*`, etc.
+///   spaces; [middle] is additionally trimmed. The chapter title contained in
+///   [middle] is user-controlled data and may contain `/`, `:`, `*`, etc.
 /// - [extension] is preserved whenever possible: if [middle] + [extension] fits
 ///   within [maxUtf8Bytes] the extension is appended verbatim (modulo invalid
 ///   chars). If they together overflow [maxUtf8Bytes] the title is dropped and
@@ -223,8 +223,8 @@ String sanitizeFileNameWithSuffix(
   int maxUtf8Bytes = maxExportFileNameUtf8Bytes,
   String fallback = _defaultFallback,
 }) {
-  final cleanMiddle = _replaceInvalidChars(middle);
-  final cleanExtension = _replaceInvalidChars(extension);
+  final cleanMiddle = replaceInvalidFileNameChars(middle).trim();
+  final cleanExtension = replaceInvalidFileNameChars(extension);
   final extensionBytes = utf8.encode(cleanExtension).length;
 
   if (extensionBytes >= maxUtf8Bytes) {

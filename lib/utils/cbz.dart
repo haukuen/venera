@@ -466,6 +466,10 @@ abstract class CBZ {
   /// [outDir].
   ///
   /// - [outDir] must exist and be writable.
+  /// - Output filenames embed each chapter's 1-based index in the full chapter
+  ///   table (see [singleChapterExportFilename]), so chapters sharing the same
+  ///   title never overwrite each other; any residual collision is broken with
+  ///   a ` (2)`, ` (3)`... suffix.
   /// - [onProgress] is called before each chapter with (completed, total,
   ///   currentLabel) where total counts only chapters with on-disk images.
   /// - [isCancelled], if it returns true, stops before the next chapter;
@@ -502,6 +506,18 @@ abstract class CBZ {
     final errors = <String>[];
     var completed = 0;
     var coverGiven = false;
+    // Positions are the chapters' 1-based indices in the full chapter table,
+    // so filenames stay stable (and collision-free for duplicate titles) no
+    // matter which subset is exported.
+    final chapterPositions = <String, int>{};
+    var position = 0;
+    for (var id in comic.chapters!.ids) {
+      position++;
+      if (!chapterPositions.containsKey(id)) {
+        chapterPositions[id] = position;
+      }
+    }
+    final usedFileNames = <String>{};
 
     for (var i = 0; i < availableChapters.length; i++) {
       final chapterId = availableChapters[i];
@@ -516,13 +532,22 @@ abstract class CBZ {
       final exportableChapter = ExportableChapter(
         id: chapterId,
         title: chapterTitle,
-        position: i + 1,
+        position: chapterPositions[chapterId] ?? 0,
       );
-      final fileName = singleChapterExportFilename(
+      var fileName = singleChapterExportFilename(
         comic: comic,
         chapter: exportableChapter,
         extension: '.cbz',
       );
+      // Guarantee uniqueness within this export even if sanitization or byte
+      // truncation made two different chapters produce the same name.
+      if (!usedFileNames.add(fileName)) {
+        var dedupIndex = 2;
+        while (!usedFileNames.add('$fileName ($dedupIndex)')) {
+          dedupIndex++;
+        }
+        fileName = '$fileName ($dedupIndex)';
+      }
       final outPath = FilePath.join(outDir, fileName);
       // Compress to a cache-local temp path first, then copy to outPath.
       // On Android/iOS the outDir may be a SAF/security-scoped path that

@@ -89,14 +89,35 @@ String selectedChapterExportFilename({
 
 /// Generate the filename for a single-chapter CBZ in split-by-chapter mode.
 ///
-/// Produces `Title_EP001.cbz` — no chapter-count suffix since each file is
-/// always exactly one chapter by definition.
+/// Produces `Title_EP001.cbz` when [chapter.title] is empty, or
+/// `Title_EP001_Chapter Title.cbz` otherwise. `001` is [chapter.position]
+/// zero-padded to 3 digits — the chapter's 1-based index in the full chapter
+/// table, not the index within the current export batch. Including the index
+/// keeps files unique when consecutive chapters share the same title, and
+/// zero-padding makes filename sort order match chapter order.
+///
+/// When [chapter.position] is not positive, falls back to exporting the raw
+/// [chapter.title] without an index.
 String singleChapterExportFilename({
   required LocalComic comic,
   required ExportableChapter chapter,
   required String extension,
 }) {
-  final middle = '_EP${chapter.title}';
+  final paddedIndex = chapter.position > 0
+      ? chapter.position.toString().padLeft(3, '0')
+      : null;
+
+  final String middle;
+  if (paddedIndex == null) {
+    middle = '_EP${chapter.title}';
+  } else if (chapter.title.trim().isEmpty) {
+    middle = '_EP$paddedIndex';
+  } else {
+    final cleanTitle = replaceInvalidFileNameChars(chapter.title).trim();
+    middle = cleanTitle.isEmpty
+        ? '_EP$paddedIndex'
+        : '_EP${paddedIndex}_$cleanTitle';
+  }
 
   return sanitizeFileNameWithSuffix(
     comic.title,

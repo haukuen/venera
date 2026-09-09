@@ -155,4 +155,98 @@ void main() {
       expect(filename.length, lessThanOrEqualTo(255));
     });
   });
+
+  group('singleChapterExportFilename', () {
+    test('embeds zero-padded chapter position and title', () {
+      final comic = _comic();
+      final chapter = orderedDownloadedChapters(comic).first;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+      );
+
+      expect(filename, 'Test Comic_EP001_001.cbz');
+    });
+
+    test('produces distinct filenames for duplicate chapter titles', () {
+      final comic = _comic(
+        chapters: const ComicChapters({'1': '番外篇', '2': '番外篇', '3': '番外篇'}),
+        downloadedChapters: const ['1', '2', '3'],
+      );
+      final chapters = orderedDownloadedChapters(comic);
+
+      final filenames = chapters
+          .map(
+            (chapter) => singleChapterExportFilename(
+              comic: comic,
+              chapter: chapter,
+              extension: '.cbz',
+            ),
+          )
+          .toList();
+
+      expect(filenames, hasLength(3));
+      expect(filenames.toSet().length, 3);
+      expect(filenames[0], 'Test Comic_EP001_番外篇.cbz');
+      expect(filenames[1], 'Test Comic_EP002_番外篇.cbz');
+      expect(filenames[2], 'Test Comic_EP003_番外篇.cbz');
+    });
+
+    test('uses full-table position, not export-batch order', () {
+      final comic = _comic(
+        chapters: const ComicChapters({'1': '001', '2': '002', '3': '003'}),
+        downloadedChapters: const ['3'],
+      );
+      final chapter = orderedDownloadedChapters(comic).single;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+      );
+
+      expect(filename, 'Test Comic_EP003_003.cbz');
+    });
+
+    test('omits title segment when chapter title sanitizes to empty', () {
+      final comic = _comic(chapters: const ComicChapters({'1': '///:::'}));
+      final chapter = orderedDownloadedChapters(comic).single;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+      );
+
+      expect(filename, 'Test Comic_EP001.cbz');
+    });
+
+    test('sanitizes invalid characters in chapter title', () {
+      final comic = _comic(chapters: const ComicChapters({'1': '第1话/前篇:序'}));
+      final chapter = orderedDownloadedChapters(comic).single;
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+      );
+
+      expect(filename, 'Test Comic_EP001_第1话 前篇 序.cbz');
+    });
+
+    test('falls back to raw title when position is not positive', () {
+      final comic = _comic();
+      const chapter = ExportableChapter(id: 'x', title: '番外篇', position: 0);
+
+      final filename = singleChapterExportFilename(
+        comic: comic,
+        chapter: chapter,
+        extension: '.cbz',
+      );
+
+      expect(filename, 'Test Comic_EP番外篇.cbz');
+    });
+  });
 }

@@ -300,5 +300,53 @@ void main() {
         await tmpRoot.delete(recursive: true);
       }
     });
+
+    // Regression test for #148: chapters sharing the same title used to
+    // produce identical filenames and silently overwrite each other.
+    test('duplicate chapter titles do not overwrite each other', () async {
+      final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
+      try {
+        App.dataPath = tmpRoot.path;
+        App.cachePath = '${tmpRoot.path}/cache';
+        await Directory(App.cachePath).create(recursive: true);
+        LocalManager().path = tmpRoot.path;
+        final outDir = '${tmpRoot.path}/out';
+        await Directory(outDir).create(recursive: true);
+
+        final comicDir = Directory('${tmpRoot.path}/grouped-dir');
+        await comicDir.create(recursive: true);
+        await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
+        for (final name in ['1', '2', '3', '4']) {
+          final d = Directory('${comicDir.path}/$name');
+          await d.create();
+          // Distinct bytes per chapter so the surviving file(s) can be
+          // identified even if overwriting regressed.
+          await File('${d.path}/1.jpg').writeAsBytes([int.parse(name)]);
+        }
+        final comic = _groupedComic(
+          grouped: const {
+            'Volume 1': {'1': '番外篇', '2': '番外篇'},
+            'Volume 2': {'3': '番外篇', '4': '番外篇'},
+          },
+        );
+
+        final result = await CBZ.exportByChapters(comic, outDir);
+
+        expect(result.errors, isEmpty);
+        expect(result.files, hasLength(4));
+        // Filenames embed the full-table chapter index, so all four differ
+        // despite identical titles.
+        final names = result.files.map((f) => f.path).toSet();
+        expect(names, hasLength(4));
+        // The files really exist on disk, one per chapter.
+        final onDisk = Directory(
+          outDir,
+        ).listSync().whereType<File>().map((f) => f.path).toList();
+        expect(onDisk, hasLength(4));
+        expect(names, containsAll(onDisk));
+      } finally {
+        await tmpRoot.delete(recursive: true);
+      }
+    });
   });
 }
