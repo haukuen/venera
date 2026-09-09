@@ -110,10 +110,17 @@ void main() {
 
   group('exportByChapters', () {
     // The native zip_flutter dynamic library cannot be loaded in flutter_test,
-    // so swap in a stub compressor that just materializes the destination file.
+    // so swap in a stub compressor that captures the staged ComicInfo.xml
+    // contents before materializing the destination file.
     final realCompressor = CBZ.compressor;
+    final capturedComicInfos = <String>[];
     setUp(() {
+      capturedComicInfos.clear();
       CBZ.compressor = (src, dst) async {
+        final comicInfo = File('$src/ComicInfo.xml');
+        if (await comicInfo.exists()) {
+          capturedComicInfos.add(await comicInfo.readAsString());
+        }
         await File(dst).writeAsBytes([0]);
       };
     });
@@ -348,5 +355,88 @@ void main() {
         await tmpRoot.delete(recursive: true);
       }
     });
+
+    test(
+      'single-chapter CBZs write chapter title and number into ComicInfo',
+      () async {
+        final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
+        try {
+          App.dataPath = tmpRoot.path;
+          App.cachePath = '${tmpRoot.path}/cache';
+          await Directory(App.cachePath).create(recursive: true);
+          LocalManager().path = tmpRoot.path;
+          final outDir = '${tmpRoot.path}/out';
+          await Directory(outDir).create(recursive: true);
+
+          final comicDir = Directory('${tmpRoot.path}/grouped-dir');
+          await comicDir.create(recursive: true);
+          await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
+          for (final name in ['1', '2', '3']) {
+            final d = Directory('${comicDir.path}/$name');
+            await d.create();
+            await File('${d.path}/1.jpg').writeAsBytes([1]);
+          }
+          final comic = _groupedComic(
+            title: '测试漫画',
+            grouped: const {
+              'Volume 1': {'1': '序章', '2': '间章', '3': '尾声(未完)'},
+            },
+          );
+
+          await CBZ.exportByChapters(comic, outDir);
+
+          expect(capturedComicInfos, hasLength(3));
+          // Chapter titles land in <Title>, comic title stays in <Series>, and
+          // the full-table position lands in <Number>.
+          expect(capturedComicInfos[0], contains('<Title>序章</Title>'));
+          expect(capturedComicInfos[0], contains('<Series>测试漫画</Series>'));
+          expect(capturedComicInfos[0], contains('<Number>1</Number>'));
+          expect(capturedComicInfos[1], contains('<Title>间章</Title>'));
+          expect(capturedComicInfos[1], contains('<Number>2</Number>'));
+          expect(capturedComicInfos[2], contains('<Title>尾声(未完)</Title>'));
+          expect(capturedComicInfos[2], contains('<Number>3</Number>'));
+        } finally {
+          await tmpRoot.delete(recursive: true);
+        }
+      },
+    );
+
+    test(
+      'untitled chapter falls back to "comic title 第N话" in ComicInfo Title',
+      () async {
+        final tmpRoot = await Directory.systemTemp.createTemp('cbz_test_');
+        try {
+          App.dataPath = tmpRoot.path;
+          App.cachePath = '${tmpRoot.path}/cache';
+          await Directory(App.cachePath).create(recursive: true);
+          LocalManager().path = tmpRoot.path;
+          final outDir = '${tmpRoot.path}/out';
+          await Directory(outDir).create(recursive: true);
+
+          final comicDir = Directory('${tmpRoot.path}/grouped-dir');
+          await comicDir.create(recursive: true);
+          await File('${comicDir.path}/cover.jpg').writeAsBytes([0]);
+          for (final name in ['1', '2']) {
+            final d = Directory('${comicDir.path}/$name');
+            await d.create();
+            await File('${d.path}/1.jpg').writeAsBytes([1]);
+          }
+          final comic = _groupedComic(
+            title: '测试漫画',
+            grouped: const {
+              'Volume 1': {'1': '   ', '2': '终章'},
+            },
+          );
+
+          await CBZ.exportByChapters(comic, outDir);
+
+          expect(capturedComicInfos, hasLength(2));
+          expect(capturedComicInfos[0], contains('<Title>测试漫画 第1话</Title>'));
+          expect(capturedComicInfos[0], contains('<Number>1</Number>'));
+        } finally {
+          await tmpRoot.delete(recursive: true);
+        }
+      },
+    );
   });
 }

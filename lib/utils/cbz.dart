@@ -407,6 +407,13 @@ abstract class CBZ {
   ///
   /// - Pages are numbered from 0001 within this CBZ.
   /// - metadata.json and ComicInfo.xml only contain [chapterIds]' chapters.
+  /// - When exactly one chapter is exported, ComicInfo.xml writes the chapter
+  ///   title into `<Title>` (falling back to "`comic.title` 第N话" when the
+  ///   chapter has no title) and the chapter's 1-based index in the full
+  ///   chapter table into `<Number>`, so servers like Kavita can identify and
+  ///   sort the chapter without relying on the filename. `<Series>` always
+  ///   stays the comic title. Multi-chapter exports keep `<Title>` as the
+  ///   comic title with the chapter map in `<Notes>`.
   /// - [includeCover] controls whether cover.* is written.
   /// - [cache] must be an existing empty directory owned by the caller;
   ///   the caller is responsible for creating and deleting it.
@@ -420,6 +427,9 @@ abstract class CBZ {
     if (chapterIds.isEmpty) {
       throw StateError('No chapters to export for "${comic.title}".');
     }
+    final singleChapterPosition = chapterIds.length == 1
+        ? _chapterPosition(comic, chapterIds.single)
+        : null;
     var allImages = <String>[];
     final chapterPageCounts = <MapEntry<String, int>>[];
     for (var c in chapterIds) {
@@ -453,9 +463,20 @@ abstract class CBZ {
     await File(
       FilePath.join(cache.path, 'metadata.json'),
     ).writeAsString(jsonEncode(metaData));
-    await File(
-      FilePath.join(cache.path, 'ComicInfo.xml'),
-    ).writeAsString(_buildComicInfoXml(metaData, pageCount: pageCount));
+    await File(FilePath.join(cache.path, 'ComicInfo.xml')).writeAsString(
+      _buildComicInfoXml(
+        metaData,
+        pageCount: pageCount,
+        titleOverride: singleChapterPosition == null
+            ? null
+            : _singleChapterComicInfoTitle(
+                comic,
+                chapters.single.title,
+                singleChapterPosition,
+              ),
+        chapterNumber: singleChapterPosition,
+      ),
+    );
     var cbz = File(outFilePath);
     if (cbz.existsSync()) cbz.deleteSync();
     await _compress(cache.path, cbz.path);
@@ -585,6 +606,39 @@ abstract class CBZ {
     return VolumeExportResult(files: files, errors: errors);
   }
 
+  /// The `<Title>` value for a single-chapter ComicInfo.xml: the chapter's
+  /// own title, or "`comicTitle` 第N话" when the chapter has no title. Never
+  /// the bare comic title — servers like Kavita show this per chapter.
+  static String _singleChapterComicInfoTitle(
+    LocalComic comic,
+    String chapterTitle,
+    int chapterPosition,
+  ) {
+    final trimmed = chapterTitle.trim();
+    if (trimmed.isNotEmpty) {
+      return trimmed;
+    }
+    return '${comic.title} 第${_formatChapterNumber(chapterPosition)}话';
+  }
+
+  /// Format a chapter number for display: integers plainly (3), doubles
+  /// trimmed (2.5, and 2.0 becomes 2).
+  static String _formatChapterNumber(num value) {
+    final text = value.toString();
+    return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
+  }
+
+  /// The 1-based index of [chapterId] in the comic's full chapter table,
+  /// or null when the chapter cannot be located (metadata loss).
+  static int? _chapterPosition(LocalComic comic, String chapterId) {
+    var position = 0;
+    for (var id in comic.chapters!.ids) {
+      position++;
+      if (id == chapterId) return position;
+    }
+    return null;
+  }
+
   static List<ComicChapter> _buildChapterRanges(
     Iterable<MapEntry<String, int>> chapterPageCounts,
   ) {
@@ -602,13 +656,26 @@ abstract class CBZ {
   static String buildComicInfoXmlForTesting(
     ComicMetaData data, {
     required int pageCount,
+    String? titleOverride,
+    num? chapterNumber,
   }) {
-    return _buildComicInfoXml(data, pageCount: pageCount);
+    return _buildComicInfoXml(
+      data,
+      pageCount: pageCount,
+      titleOverride: titleOverride,
+      chapterNumber: chapterNumber,
+    );
   }
 
+  /// Build a ComicInfo.xml. [titleOverride] replaces `<Title>` (but never
+  /// `<Series>`) — used by single-chapter exports to write the chapter title
+  /// instead of the comic title. [chapterNumber], when set, is emitted as
+  /// `<Number>` so servers can identify and sort the chapter.
   static String _buildComicInfoXml(
     ComicMetaData data, {
     required int pageCount,
+    String? titleOverride,
+    num? chapterNumber,
   }) {
     final buffer = StringBuffer();
     buffer.writeln('<?xml version="1.0" encoding="utf-8"?>');
@@ -616,8 +683,16 @@ abstract class CBZ {
       '<ComicInfo xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">',
     );
 
-    buffer.writeln('  <Title>${_escapeXml(data.title)}</Title>');
+    buffer.writeln(
+      '  <Title>${_escapeXml(titleOverride ?? data.title)}</Title>',
+    );
     buffer.writeln('  <Series>${_escapeXml(data.title)}</Series>');
+
+    if (chapterNumber != null) {
+      buffer.writeln(
+        '  <Number>${_escapeXml(_formatChapterNumber(chapterNumber))}</Number>',
+      );
+    }
 
     final comicInfoTags = _buildComicInfoTags(data);
 

@@ -26,6 +26,7 @@ void main() {
         expect(xml, contains('<Writer>Author &quot;A&quot; &amp; Co</Writer>'));
         expect(xml, contains('<Tags>tag &lt;one&gt;, tag &amp; two</Tags>'));
         expect(xml, isNot(contains('<Genre>')));
+        expect(xml, isNot(contains('<Number>')));
         expect(xml, contains('<PageCount>3</PageCount>'));
         expect(xml, contains('<Manga>Unknown</Manga>'));
         expect(xml, contains('<BlackAndWhite>Unknown</BlackAndWhite>'));
@@ -35,6 +36,56 @@ void main() {
         expect(xml, isNot(contains('Type="FrontCover"')));
       },
     );
+
+    test('single-chapter ComicInfo writes chapter title and number', () {
+      final xml = CBZ.buildComicInfoXmlForTesting(
+        ComicMetaData(
+          title: '测试漫画',
+          author: '',
+          tags: [],
+          chapters: [ComicChapter(title: '间章 2026-05-31', start: 1, end: 20)],
+        ),
+        pageCount: 20,
+        titleOverride: '间章 2026-05-31',
+        chapterNumber: 3,
+      );
+
+      // Kavita reads Title as the per-chapter display name.
+      expect(xml, contains('<Title>间章 2026-05-31</Title>'));
+      expect(xml, contains('<Series>测试漫画</Series>'));
+      expect(xml, contains('<Number>3</Number>'));
+    });
+
+    test('chapter number supports decimals like 2.5', () {
+      final xml = CBZ.buildComicInfoXmlForTesting(
+        ComicMetaData(title: 'Comic', author: '', tags: []),
+        pageCount: 1,
+        titleOverride: 'Extra',
+        chapterNumber: 2.5,
+      );
+
+      expect(xml, contains('<Number>2.5</Number>'));
+    });
+
+    test('multi-chapter ComicInfo keeps comic title and Notes map', () {
+      final xml = CBZ.buildComicInfoXmlForTesting(
+        ComicMetaData(
+          title: 'Comic',
+          author: '',
+          tags: [],
+          chapters: [
+            ComicChapter(title: '第1话', start: 1, end: 2),
+            ComicChapter(title: '第2话', start: 3, end: 5),
+          ],
+        ),
+        pageCount: 5,
+      );
+
+      expect(xml, contains('<Title>Comic</Title>'));
+      expect(xml, contains('<Series>Comic</Series>'));
+      expect(xml, isNot(contains('<Number>')));
+      expect(xml, contains('<Notes>Chapters: 第1话: 1-2; 第2话: 3-5</Notes>'));
+    });
 
     test('buildChapterRangesForTesting calculates contiguous page ranges', () {
       final chapters = CBZ.buildChapterRangesForTesting({
