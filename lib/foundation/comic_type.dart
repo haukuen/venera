@@ -15,7 +15,7 @@ class ComicType {
     if (this == local) {
       return "local";
     } else {
-      return comicSource!.key;
+      return comicSource?.key ?? "Unknown:$value";
     }
   }
 
