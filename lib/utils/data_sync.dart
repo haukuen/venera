@@ -20,6 +20,8 @@ import 'package:venera/utils/translations.dart';
 
 import 'io.dart';
 
+enum _DataSyncTransferOrigin { automatic, manual }
+
 class DataSyncStatusSnapshot {
   const DataSyncStatusSnapshot({
     required this.isEnabled,
@@ -97,7 +99,8 @@ class WebDavConnectionTester {
 }
 
 class DataSync with ChangeNotifier {
-  DataSync._() {
+  DataSync._({bool initialize = true}) {
+    if (!initialize) return;
     if (isEnabled) {
       downloadData();
     }
@@ -113,6 +116,9 @@ class DataSync with ChangeNotifier {
       });
     }
   }
+
+  @visibleForTesting
+  DataSync.forTesting() : this._(initialize: false);
 
   void onDataChanged() {
     _uploadDebounce?.cancel();
@@ -319,9 +325,28 @@ class DataSync with ChangeNotifier {
     return WebDavConnectionTester.test(config ?? appdata.settings['webdav']);
   }
 
-  Future<Res<bool>> uploadData() async {
+  bool _isTransferAllowed(_DataSyncTransferOrigin origin) {
+    return origin == _DataSyncTransferOrigin.manual || isEnabled;
+  }
+
+  /// Uploads data only when automatic synchronization is enabled.
+  Future<Res<bool>> uploadData() {
+    return _uploadData(_DataSyncTransferOrigin.automatic);
+  }
+
+  /// Uploads data for an explicit user or headless request.
+  Future<Res<bool>> uploadDataManually() {
+    return _uploadData(_DataSyncTransferOrigin.manual);
+  }
+
+  Future<Res<bool>> _uploadData(_DataSyncTransferOrigin origin) async {
+    if (!_isTransferAllowed(origin)) return const Res(true);
     if (_isDownloading) return const Res(true);
     await _acquireLock();
+    if (!_isTransferAllowed(origin)) {
+      _releaseLock();
+      return const Res(true);
+    }
     _isUploading = true;
     _lastError = null;
     notifyListeners();
@@ -411,9 +436,24 @@ class DataSync with ChangeNotifier {
     }
   }
 
-  Future<Res<bool>> downloadData() async {
+  /// Downloads data only when automatic synchronization is enabled.
+  Future<Res<bool>> downloadData() {
+    return _downloadData(_DataSyncTransferOrigin.automatic);
+  }
+
+  /// Downloads data for an explicit user or headless request.
+  Future<Res<bool>> downloadDataManually() {
+    return _downloadData(_DataSyncTransferOrigin.manual);
+  }
+
+  Future<Res<bool>> _downloadData(_DataSyncTransferOrigin origin) async {
+    if (!_isTransferAllowed(origin)) return const Res(true);
     if (_isUploading) return const Res(true);
     await _acquireLock();
+    if (!_isTransferAllowed(origin)) {
+      _releaseLock();
+      return const Res(true);
+    }
     _isDownloading = true;
     _lastError = null;
     notifyListeners();
