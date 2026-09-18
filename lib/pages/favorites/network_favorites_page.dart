@@ -32,20 +32,25 @@ Future<bool> _deleteComic(
                   setState(() {
                     loading = true;
                   });
-                  var res = await source.favoriteData!.addOrDelFavorite!(
-                    cid,
-                    fid ?? '',
-                    false,
-                    favId,
-                  );
+                  var res = await SourceOperationCoordinator.instance
+                      .guiFavoriteWrite<bool>(
+                        source: sourceKey,
+                        operation: 'remove',
+                        comicId: cid,
+                        folderId: fid,
+                        write: () => source.favoriteData!.addOrDelFavorite!(
+                          cid,
+                          fid ?? '',
+                          false,
+                          favId,
+                        ),
+                      );
                   if (res.success) {
-                    // Invalidate network cache so next loads fetch fresh data
-                    NetworkCacheManager().clear();
                     if (!context.mounted) return;
                     context.showMessage(message: "Deleted".tl);
                     result = true;
                     context.pop();
-                    if (!context.mounted) return;
+                  } else {
                     setState(() {
                       loading = false;
                     });
@@ -89,6 +94,21 @@ class _NormalFavoritePage extends StatefulWidget {
 
 class _NormalFavoritePageState extends State<_NormalFavoritePage> {
   final comicListKey = GlobalKey<ComicListState>();
+  StreamSubscription<FavoriteChange>? _favoriteChanges;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteChanges = SourceOperationCoordinator.instance.favoriteChanges
+        .where((change) => change.source == widget.data.key)
+        .listen((_) => comicListKey.currentState?.refresh());
+  }
+
+  @override
+  void dispose() {
+    _favoriteChanges?.cancel();
+    super.dispose();
+  }
 
   void showFolders() {
     context
@@ -208,6 +228,28 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
 
   Map<String, String>? folders;
 
+  StreamSubscription<FavoriteChange>? _favoriteChanges;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteChanges = SourceOperationCoordinator.instance.favoriteChanges
+        .where((change) => change.source == widget.data.key)
+        .listen((_) {
+          if (!mounted) return;
+          setState(() {
+            _loading = true;
+            _errorMessage = null;
+          });
+        });
+  }
+
+  @override
+  void dispose() {
+    _favoriteChanges?.cancel();
+    super.dispose();
+  }
+
   void showFolders() {
     context
         .findAncestorStateOfType<_FavoritesPageState>()!
@@ -216,6 +258,7 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
 
   void loadPage() async {
     var res = await widget.data.loadFolders!();
+    if (!mounted) return;
     _loading = false;
     if (res.error) {
       setState(() {
@@ -324,7 +367,13 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
                     onTap: () => openFolder(keys[i], folders![keys[i]]!),
                     deleteFolder: widget.data.deleteFolder == null
                         ? null
-                        : () => widget.data.deleteFolder!(keys[i]),
+                        : () => SourceOperationCoordinator.instance
+                              .guiFavoriteWrite<bool>(
+                                source: widget.data.key,
+                                operation: 'folder_delete',
+                                folderId: keys[i],
+                                write: () => widget.data.deleteFolder!(keys[i]),
+                              ),
                     updateState: () => setState(() {
                       _loading = true;
                     }),
@@ -336,7 +385,13 @@ class _MultiFolderFavoritesPageState extends State<_MultiFolderFavoritesPage> {
                   onTap: () => openFolder(keys[i], folders![keys[i]]!),
                   deleteFolder: widget.data.deleteFolder == null
                       ? null
-                      : () => widget.data.deleteFolder!(keys[i]),
+                      : () => SourceOperationCoordinator.instance
+                            .guiFavoriteWrite<bool>(
+                              source: widget.data.key,
+                              operation: 'folder_delete',
+                              folderId: keys[i],
+                              write: () => widget.data.deleteFolder!(keys[i]),
+                            ),
                   updateState: () => setState(() {
                     _loading = true;
                   }),
@@ -524,20 +579,26 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
             setState(() {
               loading = true;
             });
-            widget.data.addFolder!(controller.text).then((b) {
-              if (b.error) {
-                if (!context.mounted) return;
-                context.showMessage(message: b.errorMessage!);
-                setState(() {
-                  loading = false;
+            SourceOperationCoordinator.instance
+                .guiFavoriteWrite<bool>(
+                  source: widget.data.key,
+                  operation: 'folder_create',
+                  write: () => widget.data.addFolder!(controller.text),
+                )
+                .then((b) {
+                  if (b.error) {
+                    if (!context.mounted) return;
+                    context.showMessage(message: b.errorMessage!);
+                    setState(() {
+                      loading = false;
+                    });
+                  } else {
+                    if (!context.mounted) return;
+                    context.pop();
+                    context.showMessage(message: "Created successfully".tl);
+                    widget.updateState();
+                  }
                 });
-              } else {
-                if (!context.mounted) return;
-                context.pop();
-                context.showMessage(message: "Created successfully".tl);
-                widget.updateState();
-              }
-            });
           },
           child: Text("Submit".tl),
         ),
@@ -546,8 +607,8 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
   }
 }
 
-class _FavoriteFolder extends StatelessWidget {
-  _FavoriteFolder(this.data, this.folderID, this.title);
+class _FavoriteFolder extends StatefulWidget {
+  const _FavoriteFolder(this.data, this.folderID, this.title);
 
   final FavoriteData data;
 
@@ -555,7 +616,31 @@ class _FavoriteFolder extends StatelessWidget {
 
   final String title;
 
+  @override
+  State<_FavoriteFolder> createState() => _FavoriteFolderState();
+}
+
+class _FavoriteFolderState extends State<_FavoriteFolder> {
   final comicListKey = GlobalKey<ComicListState>();
+  StreamSubscription<FavoriteChange>? _favoriteChanges;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoriteChanges = SourceOperationCoordinator.instance.favoriteChanges
+        .where(
+          (change) =>
+              change.source == widget.data.key &&
+              (change.folderId == null || change.folderId == widget.folderID),
+        )
+        .listen((_) => comicListKey.currentState?.refresh());
+  }
+
+  @override
+  void dispose() {
+    _favoriteChanges?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -563,7 +648,7 @@ class _FavoriteFolder extends StatelessWidget {
       key: comicListKey,
       enablePageStorage: true,
       leadingSliver: SliverAppbar(
-        title: Text(title),
+        title: Text(widget.title),
         actions: [
           MenuButton(
             entries: [
@@ -571,20 +656,25 @@ class _FavoriteFolder extends StatelessWidget {
                 icon: Icons.sync,
                 text: "Convert to local".tl,
                 onClick: () {
-                  importNetworkFolder(data.key, 9999999, title, folderID);
+                  importNetworkFolder(
+                    widget.data.key,
+                    9999999,
+                    widget.title,
+                    widget.folderID,
+                  );
                 },
               ),
             ],
           ),
         ],
       ),
-      errorLeading: Appbar(title: Text(title)),
-      loadPage: data.loadComic == null
+      errorLeading: Appbar(title: Text(widget.title)),
+      loadPage: widget.data.loadComic == null
           ? null
-          : (i) => data.loadComic!(i, folderID),
-      loadNext: data.loadNext == null
+          : (i) => widget.data.loadComic!(i, widget.folderID),
+      loadNext: widget.data.loadNext == null
           ? null
-          : (next) => data.loadNext!(next, folderID),
+          : (next) => widget.data.loadNext!(next, widget.folderID),
       menuBuilder: (comic) {
         return [
           MenuEntry(
@@ -593,7 +683,7 @@ class _FavoriteFolder extends StatelessWidget {
             onClick: () async {
               var res = await _deleteComic(
                 comic.id,
-                null,
+                widget.folderID,
                 comic.sourceKey,
                 comic.favoriteId,
               );

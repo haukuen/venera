@@ -19,8 +19,8 @@ import 'package:venera/foundation/image_provider/cached_image.dart';
 import 'package:venera/foundation/local.dart';
 import 'package:venera/foundation/read_later.dart';
 import 'package:venera/foundation/res.dart';
+import 'package:venera/headless/source_coordinator.dart';
 import 'package:venera/network/download.dart';
-import 'package:venera/network/cache.dart';
 import 'package:venera/pages/favorites/favorites_page.dart';
 import 'package:venera/pages/reader/reader.dart';
 import 'package:venera/utils/file_type.dart';
@@ -80,6 +80,8 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
 
   bool showFAB = false;
 
+  StreamSubscription<FavoriteChange>? _favoriteChanges;
+
   @override
   void onReadEnd() {
     history ??= HistoryManager().find(
@@ -130,6 +132,26 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
   void initState() {
     scrollController.addListener(onScroll);
     ReadLaterManager().addListener(update);
+    _favoriteChanges = SourceOperationCoordinator.instance.favoriteChanges
+        .where(
+          (change) =>
+              change.source == widget.sourceKey &&
+              (change.comicId == null || change.comicId == widget.id),
+        )
+        .listen((change) {
+          if (!mounted || data == null) return;
+          if (change.comicId == widget.id) {
+            if (change.isFavorited != null) {
+              isFavorite = change.isFavorited!;
+            } else if (change.operation == 'add') {
+              isFavorite = true;
+            } else if (change.operation == 'remove' &&
+                change.folderId == null) {
+              isFavorite = false;
+            }
+            update();
+          }
+        });
     super.initState();
   }
 
@@ -137,6 +159,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
   void dispose() {
     scrollController.removeListener(onScroll);
     ReadLaterManager().removeListener(update);
+    _favoriteChanges?.cancel();
     super.dispose();
   }
 

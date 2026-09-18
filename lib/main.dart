@@ -7,6 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/log.dart';
+import 'package:venera/headless/command_runner.dart';
+import 'package:venera/headless/gui_session.dart';
+import 'package:venera/headless/ipc.dart';
+import 'package:venera/headless/runtime_lock.dart';
 import 'package:venera/pages/auth_page.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/main_page.dart';
@@ -25,45 +29,191 @@ import 'init.dart';
 
 void main(List<String> args) {
   if (args.contains('--headless')) {
-    runHeadlessMode(args);
+    unawaited(_runHeadlessProcess(args));
     return;
   }
   if (runWebViewTitleBarWidget(args)) return;
   overrideIO(() {
     runZonedGuarded(
       () async {
-        WidgetsFlutterBinding.ensureInitialized();
-        await init();
-        runApp(const MyApp());
-        if (App.isDesktop) {
-          await windowManager.ensureInitialized();
-          windowManager.waitUntilReadyToShow().then((_) async {
-            await windowManager.setTitleBarStyle(
-              TitleBarStyle.hidden,
-              windowButtonVisibility: App.isMacOS,
-            );
-            if (App.isLinux) {
-              await windowManager.setBackgroundColor(Colors.transparent);
-            }
-            await windowManager.setMinimumSize(const Size(500, 600));
-            var placement = await WindowPlacement.loadFromFile();
-            if (App.isLinux) {
-              await windowManager.show();
-              await placement.applyToWindow();
-            } else {
-              await placement.applyToWindow();
-              await windowManager.show();
-            }
-
-            WindowPlacement.loop();
-          });
-        }
+        await _startGui();
       },
       (error, stack) {
         Log.error("Unhandled Exception", error, stack);
       },
     );
   });
+}
+
+CliIpcServer? _cliIpcServer;
+
+Future<void> _runHeadlessProcess(List<String> args) async {
+  var code = await runHeadlessMode(args);
+  await stdout.flush();
+  await stderr.flush();
+  exit(code);
+}
+
+Future<void> _startGui() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await App.init();
+  if (!App.isDesktop) {
+    await init();
+    runApp(const MyApp());
+    return;
+  }
+
+  var lease = await CliRuntimeLock.tryAcquire();
+  if (lease == null) {
+    runApp(
+      _RuntimeConflictApp(
+        onRetry: () async {
+          var retryLease = await CliRuntimeLock.tryAcquire();
+          if (retryLease == null) return false;
+          await _launchDesktopGui(retryLease);
+          return true;
+        },
+      ),
+    );
+    await _showConflictWindow();
+    return;
+  }
+  await _launchDesktopGui(lease);
+}
+
+Future<void> _launchDesktopGui(CliRuntimeLease lease) async {
+  try {
+    await lease.clearStaleDescriptor();
+    await windowManager.ensureInitialized();
+    await init();
+    var authorizationRequired =
+        appdata.settings['authorizationRequired'] == true;
+    CliGuiSession.instance.configure(
+      authorizationRequired: authorizationRequired,
+      authenticated: !authorizationRequired,
+    );
+    CliGuiSession.instance.registerUnlockRequester(_focusGui);
+    _cliIpcServer = CliIpcServer(
+      lease: lease,
+      runner: CliCommandRunner(),
+      authorize: CliGuiSession.instance.authorize,
+    );
+    await _cliIpcServer!.start(appVersion: App.version);
+    runApp(const MyApp());
+    await _prepareDesktopWindow();
+  } catch (_) {
+    await lease.release();
+    rethrow;
+  }
+}
+
+Future<void> _focusGui() async {
+  if (!App.isDesktop) return;
+  await windowManager.show();
+  await windowManager.focus();
+}
+
+Future<void> _showConflictWindow() async {
+  await windowManager.ensureInitialized();
+  await windowManager.waitUntilReadyToShow();
+  await windowManager.setMinimumSize(const Size(420, 260));
+  await windowManager.show();
+  await windowManager.focus();
+}
+
+Future<void> _prepareDesktopWindow() async {
+  await windowManager.ensureInitialized();
+  await windowManager.waitUntilReadyToShow();
+  await windowManager.setTitleBarStyle(
+    TitleBarStyle.hidden,
+    windowButtonVisibility: App.isMacOS,
+  );
+  if (App.isLinux) {
+    await windowManager.setBackgroundColor(Colors.transparent);
+  }
+  await windowManager.setMinimumSize(const Size(500, 600));
+  var placement = await WindowPlacement.loadFromFile();
+  if (App.isLinux) {
+    await windowManager.show();
+    await placement.applyToWindow();
+  } else {
+    await placement.applyToWindow();
+    await windowManager.show();
+  }
+  WindowPlacement.loop();
+}
+
+class _RuntimeConflictApp extends StatefulWidget {
+  const _RuntimeConflictApp({required this.onRetry});
+
+  final Future<bool> Function() onRetry;
+
+  @override
+  State<_RuntimeConflictApp> createState() => _RuntimeConflictAppState();
+}
+
+class _RuntimeConflictAppState extends State<_RuntimeConflictApp> {
+  bool retrying = false;
+  String? message;
+
+  Future<void> retry() async {
+    if (retrying) return;
+    setState(() {
+      retrying = true;
+      message = null;
+    });
+    try {
+      if (!await widget.onRetry() && mounted) {
+        setState(() => message = 'The profile is still in use.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => message = error.toString());
+    } finally {
+      if (mounted) setState(() => retrying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Another Venera process is using this profile.',
+                  textAlign: TextAlign.center,
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 12),
+                  Text(message!, textAlign: TextAlign.center),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FilledButton(
+                      onPressed: retrying ? null : retry,
+                      child: Text(retrying ? 'Retrying…' : 'Retry'),
+                    ),
+                    const SizedBox(width: 12),
+                    TextButton(
+                      onPressed: () => windowManager.close(),
+                      child: const Text('Quit'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatefulWidget {
@@ -79,6 +229,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     App.registerForceRebuild(forceRebuild);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WidgetsBinding.instance.addObserver(this);
+    CliGuiSession.instance.registerUnlockRequester(_requestCliUnlock);
     checkUpdates();
     if (App.isMobile) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,6 +239,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
   }
 
+  @override
+  void dispose() {
+    CliGuiSession.instance.registerUnlockRequester(null);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
   bool isAuthPageActive = false;
   bool _sessionAuthenticated = false;
 
@@ -95,6 +253,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached && App.isDesktop) {
+      var server = _cliIpcServer;
+      _cliIpcServer = null;
+      if (server != null) unawaited(server.close());
+    }
     if (state == AppLifecycleState.resumed && App.isMobile) {
       _checkClipboardForVeneraLink();
       // 重新同步后台下载前台服务：OS 可能在后台期间杀掉了它。
@@ -102,6 +265,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       BackgroundDownload.instance.onAppResumed();
     }
     if (!App.isMobile || !appdata.settings['authorizationRequired']) {
+      super.didChangeAppLifecycleState(state);
       return;
     }
     if (state == AppLifecycleState.inactive && hideContentOverlay == null) {
@@ -126,11 +290,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         !isAuthPageActive &&
         !IO.isSelectingFiles) {
       _sessionAuthenticated = false;
+      CliGuiSession.instance.markAuthenticated(false);
       isAuthPageActive = true;
       App.rootContext.to(
         () => AuthPage(
           onSuccessfulAuth: () {
             _sessionAuthenticated = true;
+            CliGuiSession.instance.markAuthenticated(true);
             App.rootContext.pop();
             isAuthPageActive = false;
           },
@@ -138,6 +304,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
     super.didChangeAppLifecycleState(state);
+  }
+
+  Future<void> _requestCliUnlock() async {
+    await _focusGui();
+    if (!mounted || appdata.settings['authorizationRequired'] != true) return;
+    setState(() {});
   }
 
   void _checkClipboardForVeneraLink() async {
@@ -275,8 +447,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    var authorizationRequired =
+        appdata.settings['authorizationRequired'] == true;
+    CliGuiSession.instance.configure(
+      authorizationRequired: authorizationRequired,
+      authenticated: _sessionAuthenticated,
+    );
     Widget home;
-    if (appdata.settings['authorizationRequired']) {
+    if (authorizationRequired) {
       // AuthPage 不是直接作为 home，而是通过 Builder 延迟 push，
       // 确保 Navigator 从子树内部执行 push/pop，冷启动时过渡动画正常。
       home = Builder(
@@ -289,6 +467,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 builder: (_) => AuthPage(
                   onSuccessfulAuth: () {
                     _sessionAuthenticated = true;
+                    CliGuiSession.instance.markAuthenticated(true);
                     Navigator.of(context).pop();
                     isAuthPageActive = false;
                     forceRebuild();

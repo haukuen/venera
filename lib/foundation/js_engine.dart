@@ -25,6 +25,7 @@ import 'package:uuid/uuid.dart';
 import 'package:venera/components/js_ui.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/js_pool.dart';
+import 'package:venera/headless/execution_context.dart';
 import 'package:venera/network/app_dio.dart';
 import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/network/proxy.dart';
@@ -97,7 +98,14 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
         ),
       );
       _closed = false;
-      _engine = FlutterQjs();
+      _engine = FlutterQjs(
+        hostPromiseRejectionHandler: (reason) {
+          // flutter_qjs otherwise prints unhandled rejections directly to
+          // stdout, which breaks machine-readable headless output.
+          if (reason.toString().contains('interactive_required:')) return;
+          Log.error('JavaScript Promise', reason);
+        },
+      );
       _engine!.dispatch();
       var setGlobalFunc = _engine!.evaluate(
         "(key, value) => { this[key] = value; }",
@@ -186,7 +194,17 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
           case "delay":
             return Future.delayed(Duration(milliseconds: message["time"]));
           case "UI":
-            return handleUIMessage(Map.from(message));
+            try {
+              return handleUIMessage(Map.from(message));
+            } on CliInteractiveRequiredException catch (error) {
+              // Throwing a Dart exception through flutter_qjs first creates an
+              // unhandled JS promise rejection, which can leak a stack trace to
+              // stdout before the CLI emits its JSON result. Return an internal
+              // marker and let the JS API throw inside the source promise.
+              return {
+                '__veneraCliError': 'interactive_required: ${error.message}',
+              };
+            }
           case "getLocale":
             return "${App.locale.languageCode}_${App.locale.countryCode}";
           case "getPlatform":

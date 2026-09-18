@@ -1339,6 +1339,19 @@ class Image {
  * UI related apis
  * @since 1.2.0
  */
+function unwrapUIResult(value) {
+    const check = (result) => {
+        if (result?.__veneraCliError) {
+            throw new Error(result.__veneraCliError)
+        }
+        return result
+    }
+    if (value?.then) {
+        return value.then(check)
+    }
+    return check(value)
+}
+
 let UI = {
     /**
      * Show a message
@@ -1361,13 +1374,13 @@ let UI = {
      * @since 1.2.1
      */
     showDialog: (title, content, actions) => {
-        sendMessage({
+        return unwrapUIResult(sendMessage({
             method: 'UI',
             function: 'showDialog',
             title: title,
             content: content,
             actions: actions,
-        })
+        }))
     },
 
     /**
@@ -1375,11 +1388,11 @@ let UI = {
      * @param url {string}
      */
     launchUrl: (url) => {
-        sendMessage({
+        return unwrapUIResult(sendMessage({
             method: 'UI',
             function: 'launchUrl',
             url: url,
-        })
+        }))
     },
 
     /**
@@ -1417,13 +1430,13 @@ let UI = {
      * @returns {Promise<string | null>} - The input value. If the dialog is canceled, return null.
      */
     showInputDialog: (title, validator, image) => {
-        return sendMessage({
+        return unwrapUIResult(sendMessage({
             method: 'UI',
             function: 'showInputDialog',
             title: title,
             image: image,
             validator: validator
-        })
+        }))
     },
 
     /**
@@ -1434,13 +1447,13 @@ let UI = {
      * @returns {Promise<number | null>} - The selected index. If the dialog is canceled, return null.
      */
     showSelectDialog: (title, options, initialIndex) => {
-        return sendMessage({
+        return unwrapUIResult(sendMessage({
             method: 'UI',
             function: 'showSelectDialog',
             title: title,
             options: options,
             initialIndex: initialIndex
-        })
+        }))
     }
 }
 

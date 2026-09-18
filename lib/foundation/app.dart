@@ -36,6 +36,13 @@ class _App {
   // If current Isolate is main Isolate, this value is always true.
   bool isInitialized = false;
 
+  /// Test-only data root injected with
+  /// `--dart-define=VENERA_TEST_DATA_PATH=/absolute/path`.
+  ///
+  /// Release builds deliberately ignore this value so a packaged Venera
+  /// binary cannot be redirected to an arbitrary profile by environment.
+  static const _testDataPath = String.fromEnvironment('VENERA_TEST_DATA_PATH');
+
   Locale get locale {
     Locale deviceLocale = PlatformDispatcher.instance.locale;
     if (deviceLocale.languageCode == "zh" &&
@@ -84,15 +91,25 @@ class _App {
   }
 
   Future<void> init() async {
+    if (isInitialized) return;
     var packageInfo = await PackageInfo.fromPlatform();
     version = packageInfo.version;
-    cachePath = (await getApplicationCacheDirectory()).path;
-    dataPath = (await getApplicationSupportDirectory()).path;
+    if (!_isReleaseBuild && _testDataPath.isNotEmpty) {
+      dataPath = _testDataPath;
+      cachePath = '$_testDataPath/cache';
+      await Directory(dataPath).create(recursive: true);
+      await Directory(cachePath).create(recursive: true);
+    } else {
+      cachePath = (await getApplicationCacheDirectory()).path;
+      dataPath = (await getApplicationSupportDirectory()).path;
+    }
     if (isAndroid) {
       externalStoragePath = (await getExternalStorageDirectory())!.path;
     }
     isInitialized = true;
   }
+
+  static const bool _isReleaseBuild = bool.fromEnvironment('dart.vm.product');
 
   Future<void> initComponents() async {
     await Future.wait([

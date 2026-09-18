@@ -5,6 +5,7 @@
 #include <gdk/gdkx.h>
 #endif
 
+#include <cstdlib>
 #include <iostream>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -113,6 +114,18 @@ static gboolean my_application_local_command_line(GApplication* application, gch
   MyApplication* self = MY_APPLICATION(application);
   // Strip out the first argument as it is the binary name.
   self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
+
+  for (gchar** argument = *arguments + 1; *argument != nullptr; argument++) {
+    if (g_strcmp0(*argument, "--headless") != 0) continue;
+    const gchar* raw_count = g_getenv("FLUTTER_ENGINE_SWITCHES");
+    const gint count = raw_count == nullptr ? 0 : std::atoi(raw_count);
+    g_autofree gchar* next_count = g_strdup_printf("%d", count + 1);
+    g_autofree gchar* switch_name =
+        g_strdup_printf("FLUTTER_ENGINE_SWITCH_%d", count + 1);
+    g_setenv("FLUTTER_ENGINE_SWITCHES", next_count, TRUE);
+    g_setenv(switch_name, "disable-vm-service=true", TRUE);
+    break;
+  }
 
   g_autoptr(GError) error = nullptr;
   if (!g_application_register(application, nullptr, &error)) {
