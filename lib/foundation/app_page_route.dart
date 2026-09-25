@@ -59,7 +59,9 @@ mixin _AppRouteTransitionMixin<T> on PageRoute<T> {
   Widget buildContent(BuildContext context);
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 300);
+  Duration get transitionDuration => App.isIOS
+      ? const Duration(milliseconds: 300)
+      : const Duration(milliseconds: 450);
 
   @override
   Color? get barrierColor => null;
@@ -125,8 +127,11 @@ mixin _AppRouteTransitionMixin<T> on PageRoute<T> {
     PageTransitionsBuilder builder;
     if (App.isAndroid) {
       builder = PredictiveBackPageTransitionsBuilder();
-    } else {
+    } else if (App.isIOS) {
+      // Cupertino slide; the iOS back-gesture wrapper is applied below.
       builder = SlidePageTransitionBuilder();
+    } else {
+      builder = FadeForwardPageTransitionBuilder();
     }
 
     return builder.buildTransitions(
@@ -479,6 +484,102 @@ class _BackSwipeRecognizer extends OneSequenceGestureRecognizer {
   void didStopTrackingLastPointer(int pointer) {}
 }
 
+/// A fade-forward transition in the style of the M3 Expressive
+/// `FadeForwardsPageTransitionsBuilder`: the incoming page fades in from a
+/// slight offset while the outgoing page recedes.
+class FadeForwardPageTransitionBuilder extends PageTransitionsBuilder {
+  static const Curve _transitionCurve = Curves.easeInOutCubicEmphasized;
+
+  // The new page slides in from right to left.
+  static final Animatable<Offset> _forwardTranslationTween = Tween<Offset>(
+    begin: const Offset(0.25, 0.0),
+    end: Offset.zero,
+  ).chain(CurveTween(curve: _transitionCurve));
+
+  // The old page slides back from left to right.
+  static final Animatable<Offset> _backwardTranslationTween = Tween<Offset>(
+    begin: Offset.zero,
+    end: const Offset(0.25, 0.0),
+  ).chain(CurveTween(curve: _transitionCurve));
+
+  // The page below slides from right to left as the current page appears.
+  static final Animatable<Offset> _secondaryBackwardTranslationTween =
+      Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-0.25, 0.0),
+      ).chain(CurveTween(curve: _transitionCurve));
+
+  // The page below slides from left to right as the current page disappears.
+  static final Animatable<Offset> _secondaryForwardTranslationTween =
+      Tween<Offset>(
+        begin: const Offset(-0.25, 0.0),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: _transitionCurve));
+
+  // The fade in transition when the new page appears.
+  static final Animatable<double> _fadeInTransition = Tween<double>(
+    begin: 0.0,
+    end: 1.0,
+  ).chain(CurveTween(curve: const Interval(0.0, 0.75)));
+
+  // The fade out transition of the old page when the new page appears.
+  // Must start at 1.0: at rest (animation value 0) the page is fully visible.
+  static final Animatable<double> _fadeOutTransition = Tween<double>(
+    begin: 1.0,
+    end: 0.0,
+  ).chain(CurveTween(curve: const Interval(0.0, 0.25)));
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return DualTransitionBuilder(
+      animation: animation,
+      forwardBuilder: (context, animation, child) => FadeTransition(
+        opacity: _fadeInTransition.animate(animation),
+        child: SlideTransition(
+          position: _forwardTranslationTween.animate(animation),
+          child: child,
+        ),
+      ),
+      reverseBuilder: (context, animation, child) => IgnorePointer(
+        ignoring: animation.status == AnimationStatus.forward,
+        child: FadeTransition(
+          opacity: _fadeOutTransition.animate(animation),
+          child: SlideTransition(
+            position: _backwardTranslationTween.animate(animation),
+            child: child,
+          ),
+        ),
+      ),
+      child: DualTransitionBuilder(
+        animation: ReverseAnimation(secondaryAnimation),
+        forwardBuilder: (context, animation, child) => FadeTransition(
+          opacity: _fadeInTransition.animate(animation),
+          child: SlideTransition(
+            position: _secondaryForwardTranslationTween.animate(animation),
+            child: child,
+          ),
+        ),
+        reverseBuilder: (context, animation, child) => FadeTransition(
+          opacity: _fadeOutTransition.animate(animation),
+          child: SlideTransition(
+            position: _secondaryBackwardTranslationTween.animate(animation),
+            child: child,
+          ),
+        ),
+        child: child,
+      ),
+    );
+  }
+}
+
+/// The full-screen Cupertino slide, used on iOS where the back-swipe gesture
+/// wrapper below drives the same animation interactively.
 class SlidePageTransitionBuilder extends PageTransitionsBuilder {
   @override
   Widget buildTransitions<T>(
@@ -488,30 +589,17 @@ class SlidePageTransitionBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final Animation<double> primaryAnimation = App.isIOS
-        ? animation
-        : CurvedAnimation(parent: animation, curve: Curves.ease);
-    final Animation<double> secondaryCurve = App.isIOS
-        ? secondaryAnimation
-        : CurvedAnimation(parent: secondaryAnimation, curve: Curves.ease);
-
     return SlideTransition(
       position: Tween<Offset>(
         begin: const Offset(1, 0),
         end: Offset.zero,
-      ).animate(primaryAnimation),
+      ).animate(animation),
       child: SlideTransition(
         position: Tween<Offset>(
           begin: Offset.zero,
           end: const Offset(-0.4, 0),
-        ).animate(secondaryCurve),
-        child: PhysicalModel(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.zero,
-          clipBehavior: Clip.hardEdge,
-          elevation: 6,
-          child: Material(child: child),
-        ),
+        ).animate(secondaryAnimation),
+        child: child,
       ),
     );
   }

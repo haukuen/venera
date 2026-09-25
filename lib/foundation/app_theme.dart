@@ -24,6 +24,28 @@ abstract final class AppRadius {
   static const double full = 999;
 }
 
+/// Motion tokens from the Material 3 spec: durations by component size and
+/// the emphasized easing family.
+///
+/// Use these instead of hardcoded Durations and ad-hoc Curves.
+abstract final class AppMotion {
+  /// Small components (chips, buttons): 50-200ms. short4 = 200ms.
+  static const Duration short = Duration(milliseconds: 200);
+
+  /// Medium components (sheet, FAB): 250-400ms. medium2 = 300ms.
+  static const Duration medium = Duration(milliseconds: 300);
+
+  /// Large regions (page transitions): 450-600ms. long2 = 500ms.
+  static const Duration long = Duration(milliseconds: 500);
+
+  /// The M3 emphasized easing: starts slow, accelerates, settles slowly.
+  /// Preferred for large on-screen motion (pages, panes).
+  static const Curve emphasized = Curves.easeInOutCubicEmphasized;
+
+  /// A standard decelerating curve for elements entering the screen.
+  static const Curve decelerate = Curves.easeOutCubic;
+}
+
 /// Builds the application [ThemeData].
 ///
 /// This is the single source of truth for the app's Material 3 design system.
