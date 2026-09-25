@@ -61,7 +61,11 @@ class _ToastOverlay extends StatelessWidget {
                     Expanded(
                       child: Text(
                         message,
+                        // Roles from the app theme carry their own onSurface
+                        // color, which would override the Material's
+                        // onInverseSurface default here.
                         style: context.textTheme.bodyLarge?.copyWith(
+                          color: context.colorScheme.onInverseSurface,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 3,

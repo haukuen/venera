@@ -344,4 +344,93 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('theme roles must not override their surface color', () {
+    testWidgets('toast text stays readable on the inverse surface', (
+      tester,
+    ) async {
+      // Not wrapped in the scrolling harness: Overlay cannot size itself under
+      // the unbounded height a SingleChildScrollView provides.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: Scaffold(
+            body: OverlayWidget(
+              Builder(
+                builder: (context) => Center(
+                  child: ElevatedButton(
+                    onPressed: () => showToast(
+                      message: 'Saved successfully',
+                      context: context,
+                    ),
+                    child: const Text('open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await tester.pump();
+      // Theme text roles carry their own onSurface color; the toast paints on
+      // inverseSurface, so the text must re-assert onInverseSurface.
+      final scheme = Theme.of(
+        tester.element(find.text('Saved successfully')),
+      ).colorScheme;
+      final style = tester.widget<Text>(find.text('Saved successfully')).style;
+      expect(style?.color, scheme.onInverseSurface);
+      expect(style?.color, isNot(scheme.onSurface));
+      // Fire the auto-dismiss timer so no timer is pending at test end.
+      await tester.pump(const Duration(seconds: 3));
+    });
+
+    testWidgets('bottom navigation selected icon stays visible on its pill', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(400, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: NaviPane(
+            paneItems: [
+              PaneItemEntry(
+                label: 'Home',
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home,
+              ),
+              PaneItemEntry(
+                label: 'Explore',
+                icon: Icons.explore_outlined,
+                activeIcon: Icons.explore,
+              ),
+            ],
+            paneActions: const [],
+            pageBuilder: (page) => const SizedBox(),
+            observer: NaviObserver(),
+            navigatorKey: GlobalKey<NavigatorState>(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final scheme = Theme.of(
+        tester.element(find.byType(NaviPane)),
+      ).colorScheme;
+      // At phone width the side rail is still in the tree (parked off-screen),
+      // so the selected activeIcon exists in both nav forms; each paints on a
+      // secondaryContainer pill and must use its "on" color to stay visible.
+      final selectedIcons = tester
+          .widgetList<Icon>(find.byIcon(Icons.home))
+          .toList();
+      expect(selectedIcons, isNotEmpty);
+      for (final icon in selectedIcons) {
+        expect(icon.color, isNot(scheme.secondaryContainer));
+        expect(icon.color, scheme.onSecondaryContainer);
+      }
+    });
+  });
 }

@@ -529,11 +529,15 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
     final value = controller.value;
     final colorScheme = Theme.of(context).colorScheme;
     final navTheme = Theme.of(context).navigationBarTheme;
+    final indicator = navTheme.indicatorColor ?? colorScheme.secondaryContainer;
+    // The icon sits on top of the indicator pill, so it must use the "on"
+    // color — the same pairing the side rail and navigationBarTheme use.
+    final onIndicator =
+        navTheme.iconTheme?.resolve({WidgetState.selected})?.color ??
+        colorScheme.onSecondaryContainer;
     final icon = Icon(
       widget.enabled ? widget.entry.activeIcon : widget.entry.icon,
-      color: value != 0
-          ? navTheme.indicatorColor ?? colorScheme.secondaryContainer
-          : null,
+      color: value != 0 ? onIndicator : null,
     );
     return Center(
       child: Container(
@@ -551,9 +555,7 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
               borderRadius: const BorderRadius.all(
                 Radius.circular(AppRadius.full),
               ),
-              color: value != 0
-                  ? navTheme.indicatorColor ?? colorScheme.secondaryContainer
-                  : Colors.transparent,
+              color: value != 0 ? indicator : Colors.transparent,
             ),
             child: Center(child: icon),
           ),
