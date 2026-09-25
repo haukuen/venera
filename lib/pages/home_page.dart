@@ -66,9 +66,9 @@ class _SearchBar extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Material(
           color: context.colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           child: InkWell(
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             onTap: () {
               context.to(() => const SearchPage());
             },
@@ -77,7 +77,7 @@ class _SearchBar extends StatelessWidget {
                 const SizedBox(width: 16),
                 const Icon(Icons.search),
                 const SizedBox(width: 8),
-                Text('Search'.tl, style: ts.s16),
+                Text('Search'.tl, style: context.textTheme.bodyLarge),
                 const Spacer(),
               ],
             ),
@@ -143,7 +143,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(color: Theme.of(context).colorScheme.primary),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: ListTile(
             leading: const Icon(Icons.sync),
@@ -163,7 +163,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
             border: Border.all(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -176,14 +176,17 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(syncStatus.title.tl, style: ts.s16),
+                      Text(
+                        syncStatus.title.tl,
+                        style: context.textTheme.bodyLarge,
+                      ),
                       buildSyncStatusSubtitle(syncStatus),
                     ],
                   ),
                 ),
                 if (syncStatus.lastError != null)
                   InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                     onTap: () {
                       showDialogMessage(
                         App.rootContext,
@@ -198,7 +201,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
                       ),
                       decoration: BoxDecoration(
                         color: context.colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
                       ),
                       child: Icon(
                         Icons.error_outline,
@@ -232,7 +235,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
             border: Border.all(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           child: ListTile(
             leading: const Icon(Icons.sync),
@@ -243,7 +246,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
               children: [
                 if (syncStatus.lastError != null)
                   InkWell(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                     onTap: () {
                       showDialogMessage(
                         App.rootContext,
@@ -258,7 +261,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
                       ),
                       decoration: BoxDecoration(
                         color: context.colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
                       ),
                       child: Row(
                         children: [
@@ -268,7 +271,10 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
                             size: 18,
                           ),
                           const SizedBox(width: 4),
-                          Text('Error'.tl, style: ts.s12),
+                          Text(
+                            'Error'.tl,
+                            style: context.textTheme.labelMedium,
+                          ),
                         ],
                       ),
                     ),
@@ -527,7 +533,7 @@ class _ComicArchiveWidgetState extends State<_ComicArchiveWidget> {
           border: Border.all(
             color: Theme.of(context).colorScheme.outlineVariant,
           ),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: ListTile(
           leading: const Icon(Icons.archive_outlined),
@@ -1027,7 +1033,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
           borderRadius: BorderRadius.circular(radius),
         ),
         duration: const Duration(milliseconds: 200),
-        child: Center(child: Text(text, style: ts.s16)),
+        child: Center(child: Text(text, style: context.textTheme.bodyLarge)),
       ),
     );
   }
@@ -1116,7 +1122,7 @@ class __ChartLineState extends State<_ChartLine>
     return Row(
       children: [
         InkWell(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           onTap: () {
             widget.onTap?.call(widget.text);
           },
@@ -1138,7 +1144,7 @@ class __ChartLineState extends State<_ChartLine>
                     width: width * _controller.value,
                     height: 18,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       gradient: LinearGradient(
                         colors: context.isDarkMode
                             ? [Colors.blue.shade800, Colors.blue.shade500]
@@ -1154,7 +1160,7 @@ class __ChartLineState extends State<_ChartLine>
         const SizedBox(width: 8),
         Text(
           widget.count.toString(),
-          style: ts.s12,
+          style: context.textTheme.labelMedium,
         ).fixWidth(context.width > 600 ? 60 : 30),
       ],
     ).fixHeight(28);

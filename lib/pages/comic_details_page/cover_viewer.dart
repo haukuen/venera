@@ -94,7 +94,7 @@ class _CoverViewerState extends State<_CoverViewer> {
               Expanded(
                 child: Text(
                   widget.title,
-                  style: const TextStyle(fontSize: 18),
+                  style: context.textTheme.titleMedium,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

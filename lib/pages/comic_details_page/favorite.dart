@@ -225,7 +225,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             "Network Favorites".tl,
-            style: ts.s14.copyWith(
+            style: context.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: context.colorScheme.primary,
             ),
@@ -245,7 +245,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: context.colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
                     ),
                   ),
@@ -255,7 +255,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
                   width: 60 + (index * 2),
                   decoration: BoxDecoration(
                     color: context.colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
                 ),
               );
@@ -290,7 +290,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             "Network Favorites".tl,
-            style: ts.s14.copyWith(
+            style: context.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: context.colorScheme.primary,
             ),
@@ -309,9 +309,9 @@ class _NetworkSectionState extends State<_NetworkSection> {
                   ),
                   decoration: BoxDecoration(
                     color: context.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                   ),
-                  child: Text("Added".tl, style: ts.s12),
+                  child: Text("Added".tl, style: context.textTheme.labelMedium),
                 ),
             ],
           ),
@@ -368,7 +368,7 @@ class _NetworkSectionState extends State<_NetworkSection> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             "Network Favorites".tl,
-            style: ts.s14.copyWith(
+            style: context.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: context.colorScheme.primary,
             ),
@@ -399,9 +399,12 @@ class _NetworkSectionState extends State<_NetworkSection> {
                     ),
                     decoration: BoxDecoration(
                       color: context.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
-                    child: Text("Added".tl, style: ts.s12),
+                    child: Text(
+                      "Added".tl,
+                      style: context.textTheme.labelMedium,
+                    ),
                   ),
               ],
             ),
@@ -503,7 +506,7 @@ class _LocalSectionState extends State<_LocalSection> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
             "Local Favorites".tl,
-            style: ts.s14.copyWith(
+            style: context.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
               color: context.colorScheme.primary,
             ),
@@ -525,9 +528,12 @@ class _LocalSectionState extends State<_LocalSection> {
                     ),
                     decoration: BoxDecoration(
                       color: context.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                     ),
-                    child: Text("Added".tl, style: ts.s12),
+                    child: Text(
+                      "Added".tl,
+                      style: context.textTheme.labelMedium,
+                    ),
                   ),
               ],
             ),
@@ -625,11 +631,11 @@ class _HoverButtonState extends State<_HoverButton> {
                       ? (isHovered ? removeHoverColor : removeColor)
                       : (isHovered ? addHoverColor : addColor))
                 : context.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Text(
             widget.isFavorite ? "Remove".tl : "Add".tl,
-            style: ts.s12.copyWith(
+            style: context.textTheme.labelMedium?.copyWith(
               color: widget.enabled
                   ? context.colorScheme.onPrimary
                   : context.colorScheme.onSurfaceVariant,

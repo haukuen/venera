@@ -121,6 +121,7 @@ class Appdata with Init {
     "lastSyncTime",
     "imageFavoritesDisplayType",
     "commentFontSize",
+    "uiFontScale",
   ];
 
   static const _archiveSyncFields = ["backupWebdav", "backupWebdavPath"];
@@ -297,6 +298,7 @@ class Settings with ChangeNotifier {
     'imageFavoritesDisplayType': 0, // 0=Tags, 1=Authors, 2=Comics
     'showImageFavoritesChart':
         true, // show chart in image favorites card on home page
+    'uiFontScale': 1.0, // UI text scale multiplier, 0.85 - 1.30
   };
 
   operator [](String key) {

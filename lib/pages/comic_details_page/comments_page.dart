@@ -152,7 +152,10 @@ class _CommentsPageState extends State<CommentsPage> {
                                   ),
                                 ),
                               ),
-                              child: Text("Replies".tl, style: ts.s18),
+                              child: Text(
+                                "Replies".tl,
+                                style: context.textTheme.titleMedium,
+                              ),
                             ),
                           ],
                         );
@@ -205,7 +208,7 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
       child: Material(
         color: context.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: Row(
           children: [
             Expanded(
@@ -318,7 +321,7 @@ class _CommentTileState extends State<_CommentTile> {
               height: 36,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 color: Theme.of(context).colorScheme.secondaryContainer,
               ),
               child: widget.comment.avatar == null
@@ -336,7 +339,10 @@ class _CommentTileState extends State<_CommentTile> {
               children: [
                 Text(widget.comment.userName, style: ts.bold),
                 if (widget.comment.time != null)
-                  Text(widget.comment.time!, style: ts.s12),
+                  Text(
+                    widget.comment.time!,
+                    style: context.textTheme.bodySmall,
+                  ),
                 const SizedBox(height: 4),
                 CommentContent(text: widget.comment.content),
                 buildActions(),
@@ -380,10 +386,10 @@ class _CommentTileState extends State<_CommentTile> {
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         onTap: () {
           showSideBar(
             context,
@@ -421,10 +427,10 @@ class _CommentTileState extends State<_CommentTile> {
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         onTap: () async {
           if (isLiking) return;
           setState(() {
@@ -530,7 +536,7 @@ class _CommentTileState extends State<_CommentTile> {
     return Container(
       margin: const EdgeInsets.only(left: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,

@@ -189,44 +189,28 @@ class FlyoutContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IntrinsicWidth(
-      child: BlurEffect(
-        borderRadius: BorderRadius.circular(8),
-        child: Material(
-          borderRadius: BorderRadius.circular(8),
-          type: MaterialType.card,
-          color: context.colorScheme.surface.toOpacity(0.82),
-          child: Container(
-            constraints: const BoxConstraints(minWidth: minFlyoutWidth),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: context.brightness == ui.Brightness.dark
-                  ? Border.all(color: context.colorScheme.outlineVariant)
-                  : null,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                if (content != null) content!,
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [const Spacer(), ...actions],
-                ),
-              ],
-            ),
+      child: PopoverSurface(
+        radius: AppRadius.md,
+        opacity: 0.82,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: minFlyoutWidth),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: context.textTheme.titleSmall),
+              if (content != null) content!,
+              const SizedBox(height: 12),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [const Spacer(), ...actions],
+              ),
+            ],
           ),
-        ).paddingAll(4),
-      ),
+        ),
+      ).paddingAll(4),
     );
   }
 }

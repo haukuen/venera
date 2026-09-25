@@ -175,10 +175,10 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
             goPhotoView(image);
           }
         },
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: isSelected
                 ? Border.all(
                     color: Theme.of(context).colorScheme.primary,
@@ -194,7 +194,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   color: Theme.of(context).colorScheme.secondaryContainer,
                 ),
                 clipBehavior: Clip.antiAlias,
@@ -238,8 +238,8 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(8),
-                      bottomRight: Radius.circular(8),
+                      bottomLeft: Radius.circular(AppRadius.md),
+                      bottomRight: Radius.circular(AppRadius.md),
                     ),
                     color: Theme.of(context).colorScheme.surface.toOpacity(0.7),
                   ),
@@ -249,7 +249,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
                   ),
                   child: Text(
                     pageText,
-                    style: const TextStyle(fontSize: 10),
+                    style: context.textTheme.labelSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -308,7 +308,7 @@ class _ImageFavoritesGalleryPageState extends State<ImageFavoritesGalleryPage> {
       child: Scrollbar(
         controller: scrollController,
         thickness: App.isDesktop ? 8 : 12,
-        radius: const Radius.circular(8),
+        radius: const Radius.circular(AppRadius.md),
         interactive: true,
         child: ScrollConfiguration(
           behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),

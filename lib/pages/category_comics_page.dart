@@ -168,7 +168,7 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
             padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
             child: Text(
               optionList.label.ts(sourceKey),
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              style: context.textTheme.labelLarge,
             ),
           ),
         );

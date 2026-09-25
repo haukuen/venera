@@ -43,11 +43,11 @@ class HomeSectionCard extends StatelessWidget {
   }
 
   Widget _buildTitleRow(BuildContext context) {
-    return SizedBox(
-      height: 56,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
       child: Row(
         children: [
-          Center(child: Text(title, style: ts.s18)),
+          Center(child: Text(title, style: context.textTheme.titleMedium)),
           if (count != null)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
@@ -59,7 +59,12 @@ class HomeSectionCard extends StatelessWidget {
                 color: context.colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
-              child: Text(count.toString(), style: ts.s12),
+              child: Text(
+                count.toString(),
+                style: context.textTheme.labelMedium?.copyWith(
+                  color: context.colorScheme.onSecondaryContainer,
+                ),
+              ),
             ),
           const Spacer(),
           trailing ?? const Icon(Icons.chevron_right),

@@ -23,7 +23,7 @@ class _AboutSettingsState extends State<AboutSettings> {
               width: 112,
               height: 112,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(136),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               clipBehavior: Clip.antiAlias,
               child: const Image(
@@ -36,7 +36,7 @@ class _AboutSettingsState extends State<AboutSettings> {
         Column(
           children: [
             const SizedBox(height: 8),
-            Text("V${App.version}", style: const TextStyle(fontSize: 16)),
+            Text("V${App.version}", style: context.textTheme.bodyLarge),
             Text("Venera is a free and open-source app for comic reading.".tl),
             const SizedBox(height: 8),
           ],

@@ -308,15 +308,14 @@ class _SuggestionsState extends State<_Suggestions> {
             if (!showMethod && showTranslation)
               Text(
                 subTitle,
-                style: TextStyle(
-                  fontSize: 14,
+                style: context.textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
               ),
           ],
         ),
         subtitle: (showMethod && showTranslation) ? Text(subTitle) : null,
-        trailing: Text(value.right.name, style: const TextStyle(fontSize: 13)),
+        trailing: Text(value.right.name, style: context.textTheme.labelMedium),
         onTap: () => onSelected(value.left, value.right),
       );
     }

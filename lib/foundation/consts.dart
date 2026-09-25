@@ -6,6 +6,11 @@ const changePoint = 600;
 /// If it is more than this value, it is considered as desktop.
 const changePoint2 = 1300;
 
+/// Minimum window width for a two-pane master/detail layout (e.g. a side
+/// list beside a detail pane). Shared by the favorites and settings shells so
+/// the two implementations cannot drift apart.
+const changePointTwoPane = 720;
+
 /// Default user agent for http requests.
 const webUA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36";

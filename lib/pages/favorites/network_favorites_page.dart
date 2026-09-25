@@ -417,13 +417,7 @@ class _FolderTile extends StatelessWidget {
               Expanded(
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  child: Text(name, style: context.textTheme.titleSmall),
                 ),
               ),
               if (deleteFolder != null)

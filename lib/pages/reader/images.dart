@@ -1461,7 +1461,13 @@ class _ProgressPainter extends CustomPainter {
       ..color = backgroundColor
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
-      RRect.fromLTRBR(0, 0, size.width, size.height, Radius.circular(16)),
+      RRect.fromLTRBR(
+        0,
+        0,
+        size.width,
+        size.height,
+        Radius.circular(AppRadius.xl),
+      ),
       paint,
     );
 
@@ -1472,7 +1478,7 @@ class _ProgressPainter extends CustomPainter {
         0,
         size.width * value,
         size.height,
-        Radius.circular(16),
+        Radius.circular(AppRadius.xl),
       ),
       paint,
     );

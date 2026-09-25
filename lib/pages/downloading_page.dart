@@ -7,6 +7,7 @@ import 'package:venera/network/download.dart';
 import 'package:venera/utils/background_download.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
+import 'package:venera/foundation/app_theme.dart';
 
 class DownloadingPage extends StatefulWidget {
   const DownloadingPage({super.key});
@@ -90,11 +91,14 @@ class _DownloadingPageState extends State<DownloadingPage> {
       child: Row(
         children: [
           if (first?.isPaused == true)
-            Text("Paused".tl, style: ts.s18.bold)
+            Text("Paused".tl, style: context.textTheme.titleMedium?.bold)
           else if (first?.isError == true)
-            Text("Error".tl, style: ts.s18.bold)
+            Text("Error".tl, style: context.textTheme.titleMedium?.bold)
           else
-            Text("${bytesToReadableString(speed)}/s", style: ts.s18.bold),
+            Text(
+              "${bytesToReadableString(speed)}/s",
+              style: context.textTheme.titleMedium?.bold,
+            ),
           const Spacer(),
           if (first?.isPaused == true || first?.isError == true)
             OutlinedButton(
@@ -180,7 +184,7 @@ class _DownloadTaskTileState extends State<_DownloadTaskTile> {
             width: 82,
             height: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               color: context.colorScheme.primaryContainer,
             ),
             clipBehavior: Clip.antiAlias,
@@ -228,7 +232,11 @@ class _DownloadTaskTileState extends State<_DownloadTaskTile> {
                 ),
                 const Spacer(),
                 if (!widget.task.isPaused || widget.task.isError)
-                  Text(widget.task.message, style: ts.s12, maxLines: 3),
+                  Text(
+                    widget.task.message,
+                    style: context.textTheme.bodySmall,
+                    maxLines: 3,
+                  ),
                 const SizedBox(height: 4),
                 LinearProgressIndicator(value: widget.task.progress),
                 const SizedBox(height: 8),

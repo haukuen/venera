@@ -1176,7 +1176,7 @@ class _ReorderComicsPageState extends State<_ReorderComicsPage> {
           widget.onReorder(comics);
         },
         dragChildBoxDecoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           color: lightenColor(
             Theme.of(context).splashColor.withAlpha(255),
             0.2,
@@ -1305,7 +1305,7 @@ class _LocalFavoritesFilterDialogState
   @override
   Widget build(BuildContext context) {
     Widget tabBar = Material(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       child: AppTabBar(
         key: PageStorageKey(optionTypes),
         tabs: optionTypes.map((e) => Tab(text: e.tl, key: Key(e))).toList(),

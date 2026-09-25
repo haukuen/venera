@@ -28,6 +28,7 @@ import 'package:venera/utils/io.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'package:venera/utils/translations.dart';
 import 'dart:math' as math;
+import 'package:venera/foundation/app_theme.dart';
 
 part 'comments_page.dart';
 
@@ -311,7 +312,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
               child: Container(
                 decoration: BoxDecoration(
                   color: context.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   boxShadow: [
                     BoxShadow(
                       color: context.colorScheme.outlineVariant,
@@ -340,15 +341,18 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SelectableText(comic.title, style: ts.s18),
+                SelectableText(
+                  comic.title,
+                  style: context.textTheme.titleMedium,
+                ),
                 if (comic.subTitle != null)
                   SelectableText(
                     comic.subTitle!,
-                    style: ts.s14,
+                    style: context.textTheme.bodyMedium,
                   ).paddingVertical(4),
                 Text(
                   (ComicSource.find(comic.sourceKey)?.name) ?? '',
-                  style: ts.s12,
+                  style: context.textTheme.bodySmall,
                 ),
               ],
             ),
@@ -474,7 +478,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: context.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(AppRadius.xxl),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -581,7 +585,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
         color = context.colorScheme.surfaceContainerLow;
       }
 
-      final borderRadius = BorderRadius.circular(12);
+      final borderRadius = BorderRadius.circular(AppRadius.lg);
 
       const padding = EdgeInsets.symmetric(horizontal: 16, vertical: 6);
 
@@ -849,7 +853,7 @@ class _ActionButton extends StatelessWidget {
       height: 36,
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(
           color: context.colorScheme.outlineVariant,
           width: 0.6,
@@ -862,7 +866,7 @@ class _ActionButton extends StatelessWidget {
           }
         },
         onLongPress: onLongPressed,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         child: IconTheme.merge(
           data: IconThemeData(size: 20, color: iconColor),
           child: Row(
@@ -1077,7 +1081,7 @@ class _ComicPageLoadingPlaceHolder extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (title != null)
-                      Text(title ?? "", style: ts.s18)
+                      Text(title ?? "", style: context.textTheme.titleMedium)
                     else
                       buildContainer(200, 25),
                     const SizedBox(height: 8),
@@ -1126,7 +1130,7 @@ class _ComicPageLoadingPlaceHolder extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: context.colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
               color: context.colorScheme.outlineVariant,

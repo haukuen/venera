@@ -207,8 +207,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
           children: [
             Text(
               text,
-              style: TextStyle(
-                fontSize: 14,
+              style: context.textTheme.bodyMedium?.copyWith(
                 foreground: Paint()
                   ..style = PaintingStyle.stroke
                   ..strokeWidth = 1.4
@@ -247,7 +246,10 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(widget.comic.title, style: TextStyle(fontSize: 18)),
+                child: Text(
+                  widget.comic.title,
+                  style: context.textTheme.titleMedium,
+                ),
               ),
               IconButton(icon: Icon(Icons.more_vert), onPressed: showMenu),
               const SizedBox(width: 8),

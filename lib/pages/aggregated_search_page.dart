@@ -6,6 +6,7 @@ import "package:venera/foundation/appdata.dart";
 import "package:venera/foundation/comic_source/comic_source.dart";
 import "package:venera/pages/search_result_page.dart";
 import "package:venera/utils/translations.dart";
+import 'package:venera/foundation/app_theme.dart';
 
 class AggregatedSearchPage extends StatefulWidget {
   const AggregatedSearchPage({super.key, required this.keyword});
@@ -148,7 +149,7 @@ class _SliverSearchResultState extends State<_SliverSearchResult>
       margin: const EdgeInsets.only(left: _kLeftPadding),
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
     );
   }

@@ -26,6 +26,16 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
             App.forceRebuild();
           },
         ).toSliver(),
+        _SliderSetting(
+          title: "UI font scale".tl,
+          settingsIndex: "uiFontScale",
+          interval: 0.05,
+          min: 0.85,
+          max: 1.30,
+          onChangeEnd: () {
+            App.forceRebuild();
+          },
+        ).toSliver(),
         SelectSetting(
           title: "Theme Color".tl,
           settingKey: "color",

@@ -147,8 +147,6 @@ class Button extends StatefulWidget {
 }
 
 class _ButtonState extends State<Button> {
-  bool isHover = false;
-
   bool isLoading = false;
 
   @override
@@ -157,6 +155,32 @@ class _ButtonState extends State<Button> {
       setState(() => isLoading = widget.isLoading);
     }
     super.didUpdateWidget(oldWidget);
+  }
+
+  /// The container color. Unlike the previous hover-swap, the base color is
+  /// constant and interaction is shown through the M3 state layer.
+  Color get _baseColor {
+    switch (widget.type) {
+      case ButtonType.filled:
+        return widget.color ?? context.colorScheme.primary;
+      case ButtonType.normal:
+        return widget.color ?? context.colorScheme.surfaceContainer;
+      case ButtonType.text:
+      case ButtonType.outlined:
+        return Colors.transparent;
+    }
+  }
+
+  Color get _foregroundColor {
+    switch (widget.type) {
+      case ButtonType.filled:
+        return context.colorScheme.onPrimary;
+      case ButtonType.normal:
+        return context.colorScheme.onSurface;
+      case ButtonType.text:
+      case ButtonType.outlined:
+        return widget.color ?? context.colorScheme.primary;
+    }
   }
 
   @override
@@ -170,10 +194,13 @@ class _ButtonState extends State<Button> {
     if (height != null) {
       height = height - padding.vertical;
     }
+    final foreground = _foregroundColor;
     Widget child = IconTheme(
-      data: IconThemeData(color: textColor),
+      data: IconThemeData(color: foreground),
       child: DefaultTextStyle(
-        style: TextStyle(color: textColor, fontSize: 14),
+        style:
+            context.textTheme.labelLarge?.copyWith(color: foreground) ??
+            DefaultTextStyle.of(context).style,
         child: isLoading
             ? CircularProgressIndicator(
                 color: widget.type == ButtonType.filled
@@ -187,94 +214,55 @@ class _ButtonState extends State<Button> {
     if (width != null || height != null) {
       child = child.toCenter();
     }
-    return MouseRegion(
-      onEnter: (_) => setState(() => isHover = true),
-      onExit: (_) => setState(() => isHover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          if (isLoading) return;
-          widget.onPressed();
-          if (widget.onPressedAt != null) {
-            var renderBox = context.findRenderObject() as RenderBox;
-            var offset = renderBox.localToGlobal(Offset.zero);
-            widget.onPressedAt!(offset);
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: padding,
+    const radius = BorderRadius.all(Radius.circular(16));
+    final isOutlined = widget.type == ButtonType.outlined;
+    return Material(
+      color: _baseColor,
+      // Material rejects both shape and borderRadius at once; the outlined
+      // variant carries its border in the shape.
+      shape: isOutlined
+          ? RoundedRectangleBorder(
+              borderRadius: radius,
+              side: BorderSide(
+                color: widget.color ?? context.colorScheme.outlineVariant,
+                width: 0.6,
+              ),
+            )
+          : null,
+      borderRadius: isOutlined ? null : radius,
+      clipBehavior: isOutlined ? Clip.antiAlias : Clip.none,
+      child: InkWell(
+        onTap: isLoading
+            ? null
+            : () {
+                widget.onPressed();
+                if (widget.onPressedAt != null) {
+                  var renderBox = context.findRenderObject() as RenderBox;
+                  var offset = renderBox.localToGlobal(Offset.zero);
+                  widget.onPressedAt!(offset);
+                }
+              },
+        customBorder: const RoundedRectangleBorder(borderRadius: radius),
+        overlayColor: AppTheme.stateLayer(foreground),
+        mouseCursor: isLoading
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.click,
+        child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 76, minHeight: 32),
-          decoration: BoxDecoration(
-            color: buttonColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow:
-                (isHover &&
-                    !isLoading &&
-                    (widget.type == ButtonType.filled ||
-                        widget.type == ButtonType.normal))
-                ? [
-                    BoxShadow(
-                      color: Colors.black.toOpacity(0.1),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-            border: widget.type == ButtonType.outlined
-                ? Border.all(
-                    color:
-                        widget.color ??
-                        Theme.of(context).colorScheme.outlineVariant,
-                    width: 0.6,
-                  )
-                : null,
-          ),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: Center(widthFactor: 1, child: child),
+          child: Padding(
+            padding: padding,
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 160),
+              child: SizedBox(
+                width: width,
+                height: height,
+                child: Center(widthFactor: 1, child: child),
+              ),
             ),
           ),
         ),
       ),
     );
-  }
-
-  Color get buttonColor {
-    if (widget.type == ButtonType.filled) {
-      var color = widget.color ?? context.colorScheme.primary;
-      if (isHover) {
-        return color.toOpacity(0.9);
-      } else {
-        return color;
-      }
-    }
-    if (widget.type == ButtonType.normal) {
-      var color = widget.color ?? context.colorScheme.surfaceContainer;
-      if (isHover) {
-        return color.toOpacity(0.9);
-      } else {
-        return color;
-      }
-    }
-    if (isHover) {
-      return context.colorScheme.outline.toOpacity(0.2);
-    }
-    return Colors.transparent;
-  }
-
-  Color get textColor {
-    if (widget.type == ButtonType.outlined) {
-      return widget.color ?? context.colorScheme.primary;
-    }
-    return widget.type == ButtonType.filled
-        ? context.colorScheme.onPrimary
-        : (widget.type == ButtonType.text
-              ? widget.color ?? context.colorScheme.primary
-              : context.colorScheme.onSurface);
   }
 }
 
@@ -309,44 +297,34 @@ class _IconButton extends StatefulWidget {
 }
 
 class _IconButtonState extends State<_IconButton> {
-  bool isHover = false;
-
   @override
   Widget build(BuildContext context) {
     var iconSize = widget.size ?? 24;
+    final color = widget.color ?? context.colorScheme.primary;
     Widget icon = IconTheme(
-      data: IconThemeData(
-        size: iconSize,
-        color: widget.color ?? context.colorScheme.primary,
-      ),
+      data: IconThemeData(size: iconSize, color: color),
       child: widget.icon,
     );
     if (widget.isLoading) {
-      icon = const CircularProgressIndicator(
+      icon = CircularProgressIndicator(
+        color: color,
         strokeWidth: 1.5,
       ).paddingAll(2).fixWidth(iconSize).fixHeight(iconSize);
     }
-    return MouseRegion(
-      onEnter: (_) => setState(() => isHover = true),
-      onExit: (_) => setState(() => isHover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        behavior: widget.behavior,
-        onTap: () {
-          if (widget.isLoading) return;
-          widget.onPressed();
-        },
-        child: Tooltip(
-          message: widget.tooltip ?? "",
-          child: Container(
-            decoration: BoxDecoration(
-              color: isHover
-                  ? Theme.of(context).colorScheme.outlineVariant.toOpacity(0.4)
-                  : null,
-              borderRadius: BorderRadius.circular((iconSize + 12) / 2),
-            ),
-            padding: const EdgeInsets.all(6),
-            child: icon,
+    return GestureDetector(
+      behavior: widget.behavior,
+      child: Tooltip(
+        message: widget.tooltip ?? '',
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: () {
+              if (widget.isLoading) return;
+              widget.onPressed();
+            },
+            customBorder: const CircleBorder(),
+            overlayColor: AppTheme.stateLayer(color),
+            child: Padding(padding: const EdgeInsets.all(6), child: icon),
           ),
         ),
       ),

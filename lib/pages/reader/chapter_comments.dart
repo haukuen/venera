@@ -101,8 +101,8 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("Chapter Comments".tl, style: ts.s18),
-            Text(widget.chapterTitle, style: ts.s12),
+            Text("Chapter Comments".tl, style: context.textTheme.titleMedium),
+            Text(widget.chapterTitle, style: context.textTheme.bodySmall),
           ],
         ),
         style: AppbarStyle.shadow,
@@ -167,7 +167,10 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
                                   ),
                                 ),
                               ),
-                              child: Text("Replies".tl, style: ts.s18),
+                              child: Text(
+                                "Replies".tl,
+                                style: context.textTheme.titleMedium,
+                              ),
                             ),
                           ],
                         );
@@ -221,7 +224,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
       ),
       child: Material(
         color: context.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: Row(
           children: [
             Expanded(
@@ -332,7 +335,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
               height: 36,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 color: Theme.of(context).colorScheme.secondaryContainer,
               ),
               child: widget.comment.avatar == null
@@ -350,7 +353,10 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
               children: [
                 Text(widget.comment.userName, style: ts.bold),
                 if (widget.comment.time != null)
-                  Text(widget.comment.time!, style: ts.s12),
+                  Text(
+                    widget.comment.time!,
+                    style: context.textTheme.bodySmall,
+                  ),
                 const SizedBox(height: 4),
                 CommentContent(text: widget.comment.content),
                 buildActions(),
@@ -396,10 +402,10 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         onTap: () {
           // Get the parent page's widget to access comicTitle and chapterTitle
           var parentState = context
@@ -441,10 +447,10 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         onTap: () async {
           if (isLiking) return;
           setState(() {
@@ -548,7 +554,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
     return Container(
       margin: const EdgeInsets.only(left: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         border: Border.all(
           color: Theme.of(context).colorScheme.outlineVariant,
           width: 0.6,
@@ -720,8 +726,11 @@ class _EmbeddedChapterCommentsPageState
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Chapter Comments".tl, style: ts.s18),
-                Text(widget.chapterTitle, style: ts.s12),
+                Text(
+                  "Chapter Comments".tl,
+                  style: context.textTheme.titleMedium,
+                ),
+                Text(widget.chapterTitle, style: context.textTheme.bodySmall),
               ],
             ),
           ),
@@ -746,7 +755,9 @@ class _EmbeddedChapterCommentsPageState
         withAppbar: false,
       );
     } else if (_comments == null || _comments!.isEmpty) {
-      return Center(child: Text("No comments yet".tl, style: ts.s14));
+      return Center(
+        child: Text("No comments yet".tl, style: context.textTheme.bodyMedium),
+      );
     } else {
       var showAvatar = _comments!.any((e) => e.avatar != null);
       return _buildCommentsList(showAvatar);
@@ -808,7 +819,7 @@ class _EmbeddedChapterCommentsPageState
       ),
       child: Material(
         color: context.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
         child: Row(
           children: [
             Expanded(

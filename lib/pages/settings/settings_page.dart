@@ -24,6 +24,8 @@ import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
 import 'package:yaml/yaml.dart';
 import 'package:pub_semver/pub_semver.dart';
+import 'package:venera/foundation/app_theme.dart';
+import 'package:venera/foundation/consts.dart';
 
 part 'reader.dart';
 part 'explore_settings.dart';
@@ -51,7 +53,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   ColorScheme get colors => Theme.of(context).colorScheme;
 
-  bool get enableTwoViews => context.width > 720;
+  bool get enableTwoViews => context.width > changePointTwoPane;
 
   final categories = <String>[
     "Explore",
@@ -162,7 +164,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
                 const SizedBox(width: 24),
-                Text("Settings".tl, style: ts.s20),
+                Text("Settings".tl, style: context.textTheme.titleLarge),
               ],
             ),
           ),
@@ -196,7 +198,7 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             Icon(icons[id]),
             const SizedBox(width: 16),
-            Text(name, style: ts.s16),
+            Text(name, style: context.textTheme.bodyLarge),
             const Spacer(),
             if (selected) const Icon(Icons.arrow_right),
           ],

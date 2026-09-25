@@ -255,6 +255,7 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
           WindowButton(
             icon: MinimizeIcon(color: color),
             hoverColor: hoverColor,
+            semanticLabel: "Minimize",
             onPressed: () async {
               bool isMinimized = await windowManager.isMinimized();
               if (isMinimized) {
@@ -268,6 +269,7 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
             WindowButton(
               icon: RestoreIcon(color: color),
               hoverColor: hoverColor,
+              semanticLabel: "Restore",
               onPressed: () {
                 windowManager.unmaximize();
               },
@@ -276,6 +278,7 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
             WindowButton(
               icon: MaximizeIcon(color: color),
               hoverColor: hoverColor,
+              semanticLabel: "Maximize",
               onPressed: () {
                 windowManager.maximize();
               },
@@ -284,6 +287,7 @@ class _WindowButtonsState extends State<_WindowButtons> with WindowListener {
             icon: CloseIcon(color: color),
             hoverIcon: CloseIcon(color: !dark ? Colors.white : Colors.black),
             hoverColor: Colors.red,
+            semanticLabel: "Close",
             onPressed: widget.onClose,
           ),
         ],
@@ -298,6 +302,7 @@ class WindowButton extends StatefulWidget {
     required this.onPressed,
     required this.hoverColor,
     this.hoverIcon,
+    this.semanticLabel,
     super.key,
   });
 
@@ -309,6 +314,9 @@ class WindowButton extends StatefulWidget {
 
   final Widget? hoverIcon;
 
+  /// Accessible name for this icon-only control.
+  final String? semanticLabel;
+
   @override
   State<WindowButton> createState() => _WindowButtonState();
 }
@@ -318,22 +326,28 @@ class _WindowButtonState extends State<WindowButton> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (event) => setState(() {
-        isHovering = true;
-      }),
-      onExit: (event) => setState(() {
-        isHovering = false;
-      }),
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: Container(
-          width: 46,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            color: isHovering ? widget.hoverColor : null,
+    return Semantics(
+      button: true,
+      label: widget.semanticLabel,
+      child: MouseRegion(
+        onEnter: (event) => setState(() {
+          isHovering = true;
+        }),
+        onExit: (event) => setState(() {
+          isHovering = false;
+        }),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: Container(
+            width: 46,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: isHovering ? widget.hoverColor : null,
+            ),
+            child: ExcludeSemantics(
+              child: isHovering ? widget.hoverIcon ?? widget.icon : widget.icon,
+            ),
           ),
-          child: isHovering ? widget.hoverIcon ?? widget.icon : widget.icon,
         ),
       ),
     );

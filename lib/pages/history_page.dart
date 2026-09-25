@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
-import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/translations.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -199,7 +197,7 @@ class _HistoryPageState extends State<HistoryPage> {
             padding: const EdgeInsets.only(left: 16, top: 16, bottom: 4),
             child: Text(
               group.label.tl,
-              style: ts.s14.copyWith(
+              style: context.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: context.colorScheme.onSurfaceVariant,
               ),
@@ -209,7 +207,8 @@ class _HistoryPageState extends State<HistoryPage> {
       );
 
       slivers.add(
-        _SliverGridComicsNoListener(
+        SliverGridComics(
+          listenToManagers: false,
           comics: items,
           selections: selectedComics,
           onLongPressed: null,
@@ -256,14 +255,9 @@ class _HistoryPageState extends State<HistoryPage> {
     if (filtered.isEmpty) {
       slivers.add(
         SliverToBoxAdapter(
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 64),
-            child: Center(
-              child: Text(
-                _searchQuery.isEmpty ? 'No history'.tl : 'No results'.tl,
-                style: ts.withColor(context.colorScheme.onSurfaceVariant),
-              ),
-            ),
+          child: EmptyState(
+            message: _searchQuery.isEmpty ? 'No history'.tl : 'No results'.tl,
+            icon: Icons.history_outlined,
           ),
         ),
       );
@@ -424,7 +418,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       height: 40,
                       child: TextField(
                         autofocus: true,
-                        style: ts.s16,
+                        style: context.textTheme.bodyLarge,
                         decoration: InputDecoration(
                           hintText: 'Search History'.tl,
                           border: InputBorder.none,
@@ -473,144 +467,5 @@ class _HistoryPageState extends State<HistoryPage> {
       res += "Page @page".tlParams({"page": h.page});
     }
     return res;
-  }
-}
-
-/// A version of SliverGridComics that does NOT listen to HistoryManager.
-///
-/// The parent _HistoryPageState already listens to HistoryManager and calls
-/// setState, which rebuilds this widget with updated comics. If this widget
-/// also listens, it triggers a setState inside didUpdateWidget's check, causing
-/// the widget to lose its state (like scroll position) and making search/filter
-/// behave incorrectly.
-class _SliverGridComicsNoListener extends StatefulWidget {
-  const _SliverGridComicsNoListener({
-    required this.comics,
-    this.selections,
-    this.onLongPressed,
-    this.onTap,
-    this.badgeBuilder,
-    this.menuBuilder,
-  });
-
-  final List<Comic> comics;
-  final Map<Comic, bool>? selections;
-  final void Function(Comic, int)? onLongPressed;
-  final void Function(Comic, int)? onTap;
-  final String? Function(Comic)? badgeBuilder;
-  final List<MenuEntry> Function(Comic)? menuBuilder;
-
-  @override
-  State<_SliverGridComicsNoListener> createState() =>
-      _SliverGridComicsNoListenerState();
-}
-
-class _SliverGridComicsNoListenerState
-    extends State<_SliverGridComicsNoListener> {
-  List<Comic> comics = [];
-  List<int> heroIDs = [];
-
-  static int _nextHeroID = 0;
-
-  void generateHeroID() {
-    heroIDs.clear();
-    for (var i = 0; i < comics.length; i++) {
-      heroIDs.add(_nextHeroID++);
-    }
-  }
-
-  @override
-  void initState() {
-    for (var comic in widget.comics) {
-      if (isBlocked(comic) == null) {
-        comics.add(comic);
-      }
-    }
-    generateHeroID();
-    appdata.settings.addListener(_onSettingsChanged);
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    appdata.settings.removeListener(_onSettingsChanged);
-    super.dispose();
-  }
-
-  void _onSettingsChanged() {
-    // 重新过滤漫画列表，屏蔽词变化时移除被屏蔽的漫画
-    var changed = false;
-    final newComics = <Comic>[];
-    for (var comic in widget.comics) {
-      if (isBlocked(comic) == null) {
-        newComics.add(comic);
-      } else {
-        changed = true;
-      }
-    }
-    if (changed || newComics.length != comics.length) {
-      setState(() {
-        comics
-          ..clear()
-          ..addAll(newComics);
-        generateHeroID();
-      });
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _SliverGridComicsNoListener oldWidget) {
-    if (!oldWidget.comics.isEqualTo(widget.comics)) {
-      comics.clear();
-      for (var comic in widget.comics) {
-        if (isBlocked(comic) == null) {
-          comics.add(comic);
-        }
-      }
-      generateHeroID();
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverGrid(
-      delegate: SliverChildBuilderDelegate((context, index) {
-        var badge = widget.badgeBuilder?.call(comics[index]);
-        var isSelected = widget.selections == null
-            ? false
-            : widget.selections![comics[index]] ?? false;
-        var comic = ComicTile(
-          comic: comics[index],
-          badge: badge,
-          menuOptions: widget.menuBuilder?.call(comics[index]),
-          onTap: widget.onTap != null
-              ? () => widget.onTap!(comics[index], heroIDs[index])
-              : null,
-          onLongPressed: widget.onLongPressed != null
-              ? () => widget.onLongPressed!(comics[index], heroIDs[index])
-              : null,
-          heroID: heroIDs[index],
-        );
-        if (widget.selections == null) {
-          return comic;
-        }
-        return AnimatedContainer(
-          key: ValueKey(comics[index].id),
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Theme.of(
-                    context,
-                  ).colorScheme.secondaryContainer.toOpacity(0.72)
-                : null,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(4),
-          child: comic,
-        );
-      }, childCount: comics.length),
-      gridDelegate: SliverGridDelegateWithComics(),
-    );
   }
 }

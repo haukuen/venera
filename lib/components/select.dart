@@ -22,7 +22,7 @@ class Select extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: context.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: const BorderRadius.all(Radius.circular(AppRadius.sm)),
       ),
       child: InkWell(
         onTap: () {
@@ -30,10 +30,6 @@ class Select extends StatelessWidget {
           var offset = renderBox.localToGlobal(Offset.zero);
           var size = renderBox.size;
           showMenu(
-            elevation: 3,
-            color: context.brightness == Brightness.light
-                ? const Color(0xFFF6F6F6)
-                : const Color(0xFF1E1E1E),
             context: context,
             useRootNavigator: true,
             constraints: BoxConstraints(
@@ -43,7 +39,7 @@ class Select extends StatelessWidget {
             position: RelativeRect.fromLTRB(
               offset.dx,
               offset.dy + size.height + 2,
-              offset.dx + size.height + 2,
+              offset.dx + size.width + 2,
               offset.dy,
             ),
             items: values
@@ -68,7 +64,7 @@ class Select extends StatelessWidget {
               constraints: BoxConstraints(
                 minWidth: minWidth != null ? (minWidth! - 32) : 0,
               ),
-              child: Text(current ?? ' ', style: ts.s14),
+              child: Text(current ?? ' ', style: context.textTheme.bodyMedium),
             ),
             const SizedBox(width: 8),
             Icon(Icons.arrow_drop_down, color: context.colorScheme.primary),

@@ -228,8 +228,11 @@ class _ChapterListTile extends StatelessWidget {
             Text(
               title,
               style: isActive
-                  ? ts.withColor(context.colorScheme.primary).bold.s16
-                  : ts.s16,
+                  ? context.textTheme.bodyLarge?.copyWith(
+                      color: context.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    )
+                  : context.textTheme.bodyLarge,
             ),
             const Spacer(),
             if (isDownloaded)

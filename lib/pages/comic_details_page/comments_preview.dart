@@ -106,7 +106,7 @@ class _CommentWidget extends StatelessWidget {
       width: 324,
       decoration: BoxDecoration(
         color: context.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Column(
         children: [
@@ -117,7 +117,7 @@ class _CommentWidget extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                     color: context.colorScheme.surfaceContainer,
                   ),
                   clipBehavior: Clip.antiAlias,
@@ -140,7 +140,10 @@ class _CommentWidget extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           if (comment.time != null)
-            Text(comment.time!, style: ts.s12).toAlign(Alignment.centerLeft),
+            Text(
+              comment.time!,
+              style: context.textTheme.bodySmall,
+            ).toAlign(Alignment.centerLeft),
         ],
       ),
     );
