@@ -259,8 +259,7 @@ class ComicTile extends StatelessWidget {
                           history.maxPage,
                           history.ep,
                         ),
-                        style: const TextStyle(
-                          fontSize: 12,
+                        style: context.textTheme.labelMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                           height: 1,
@@ -626,7 +625,7 @@ class _ComicDescription extends StatelessWidget {
       children: <Widget>[
         Text(
           title.trim(),
-          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14.0),
+          style: context.textTheme.titleSmall,
           maxLines: maxLines,
           overflow: TextOverflow.ellipsis,
           softWrap: true,
@@ -634,8 +633,7 @@ class _ComicDescription extends StatelessWidget {
         if (subtitle != "")
           Text(
             subtitle,
-            style: TextStyle(
-              fontSize: 10.0,
+            style: context.textTheme.labelSmall?.copyWith(
               color: context.colorScheme.onSurface.toOpacity(0.7),
             ),
             maxLines: 1,
@@ -647,13 +645,20 @@ class _ComicDescription extends StatelessWidget {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                if (constraints.maxHeight < 22) {
+                // Tag chip height and row packing follow the scaled type
+                // ramp so the chips never clip the label at large text sizes.
+                final tagLineHeight = MediaQuery.textScalerOf(
+                  context,
+                ).scale(16);
+                final tagHeight = tagLineHeight + 5;
+                final tagSpacing = tagHeight + 3;
+                if (constraints.maxHeight < tagHeight) {
                   return Container();
                 }
-                int cnt = (constraints.maxHeight - 22).toInt() ~/ 25;
+                int cnt = (constraints.maxHeight - tagHeight) ~/ tagSpacing;
                 return Container(
                   clipBehavior: Clip.antiAlias,
-                  height: 21 + cnt * 24,
+                  height: tagHeight + cnt * tagSpacing,
                   width: double.infinity,
                   decoration: const BoxDecoration(),
                   child: Wrap(
@@ -665,7 +670,7 @@ class _ComicDescription extends StatelessWidget {
                     children: [
                       for (var s in tags!)
                         Container(
-                          height: 21,
+                          height: tagHeight,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           constraints: BoxConstraints(
                             maxWidth: constraints.maxWidth * 0.45,
@@ -682,7 +687,11 @@ class _ComicDescription extends StatelessWidget {
                               enableTranslate
                                   ? TagsTranslation.translateTag(s)
                                   : s.split(':').last,
-                              style: const TextStyle(fontSize: 12),
+                              style: context.textTheme.labelMedium?.copyWith(
+                                color: s == "Unavailable"
+                                    ? context.colorScheme.onErrorContainer
+                                    : context.colorScheme.onSecondaryContainer,
+                              ),
                               softWrap: true,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
@@ -707,7 +716,7 @@ class _ComicDescription extends StatelessWidget {
                   if (rating != null) StarRating(value: rating!, size: 18),
                   Text(
                     description,
-                    style: const TextStyle(fontSize: 12.0),
+                    style: context.textTheme.bodySmall,
                     maxLines: (tags == null || tags!.isEmpty) ? 3 : 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -726,7 +735,9 @@ class _ComicDescription extends StatelessWidget {
                 child: Center(
                   child: Text(
                     "${badge![0].toUpperCase()}${badge!.substring(1).toLowerCase()}",
-                    style: const TextStyle(fontSize: 12),
+                    style: context.textTheme.labelMedium?.copyWith(
+                      color: context.colorScheme.onTertiaryContainer,
+                    ),
                   ),
                 ),
               ),
@@ -769,6 +780,7 @@ class SliverGridComics extends StatefulWidget {
     this.onTap,
     this.onLongPressed,
     this.selections,
+    this.listenToManagers = true,
   });
 
   final List<Comic> comics;
@@ -784,6 +796,13 @@ class SliverGridComics extends StatefulWidget {
   final void Function(Comic, int heroID)? onTap;
 
   final void Function(Comic, int heroID)? onLongPressed;
+
+  /// Whether to listen to HistoryManager and LocalFavoritesManager.
+  ///
+  /// Set to false when the parent already rebuilds this widget on those
+  /// changes; listening again would trigger a redundant rebuild that can drop
+  /// this widget's state (scroll position).
+  final bool listenToManagers;
 
   @override
   State<SliverGridComics> createState() => _SliverGridComicsState();
@@ -824,16 +843,44 @@ class _SliverGridComicsState extends State<SliverGridComics> {
       }
     }
     generateHeroID();
-    HistoryManager().addListener(update);
-    LocalFavoritesManager().addListener(update);
+    if (widget.listenToManagers) {
+      HistoryManager().addListener(update);
+      LocalFavoritesManager().addListener(update);
+    }
+    // Listened to regardless of [SliverGridComics.listenToManagers]: the
+    // manager listeners are owned by the parent, but blocked-word filtering
+    // lives here and must react to any settings write.
+    appdata.settings.addListener(_onSettingsChanged);
     super.initState();
   }
 
   @override
   void dispose() {
-    HistoryManager().removeListener(update);
-    LocalFavoritesManager().removeListener(update);
+    if (widget.listenToManagers) {
+      HistoryManager().removeListener(update);
+      LocalFavoritesManager().removeListener(update);
+    }
+    appdata.settings.removeListener(_onSettingsChanged);
     super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    final newComics = <Comic>[];
+    for (var comic in widget.comics) {
+      if (isBlocked(comic) == null) {
+        newComics.add(comic);
+      }
+    }
+    // Settings notify on every write; only rebuild when the filtered result
+    // actually changed, so unrelated settings keep the scroll position.
+    if (!newComics.isEqualTo(comics)) {
+      setState(() {
+        comics
+          ..clear()
+          ..addAll(newComics);
+        generateHeroID();
+      });
+    }
   }
 
   void update() {

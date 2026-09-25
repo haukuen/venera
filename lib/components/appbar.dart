@@ -98,7 +98,9 @@ class _AppbarState extends State<Appbar> {
           const SizedBox(width: 16),
           Expanded(
             child: DefaultTextStyle(
-              style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+              style: DefaultTextStyle.of(
+                context,
+              ).style.merge(Theme.of(context).textTheme.titleLarge),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               child: widget.title,
@@ -205,7 +207,9 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
         const SizedBox(width: 16),
         Expanded(
           child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+            style: DefaultTextStyle.of(
+              context,
+            ).style.merge(Theme.of(context).textTheme.titleLarge),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             child: title,
@@ -452,12 +456,13 @@ class _AppTabBarState extends State<AppTabBar> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(
-              color: i == _controller.animation?.value.round()
-                  ? context.colorScheme.primary
-                  : context.colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
-            ),
+            style: DefaultTextStyle.of(context).style
+                .merge(Theme.of(context).textTheme.titleSmall)
+                .copyWith(
+                  color: i == _controller.animation?.value.round()
+                      ? context.colorScheme.primary
+                      : context.colorScheme.onSurface,
+                ),
             child: widget.tabs[i],
           ),
         ),

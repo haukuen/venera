@@ -186,7 +186,9 @@ class _DoubleLineSelectSettingsState extends State<_DoubleLineSelectSettings> {
     return ListTile(
       title: Row(
         children: [
-          Text(widget.title),
+          // Flexible so a long title wraps instead of overflowing the row
+          // on narrow windows.
+          Flexible(child: Text(widget.title, overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 4),
           if (widget.help != null)
             Button.icon(
@@ -317,7 +319,9 @@ class _EndSelectorSelectSettingState extends State<_EndSelectorSelectSetting> {
     return ListTile(
       title: Row(
         children: [
-          Text(widget.title),
+          // Flexible so a long title wraps instead of overflowing the row
+          // on narrow windows.
+          Flexible(child: Text(widget.title, overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 4),
           if (widget.help != null)
             Button.icon(
@@ -496,11 +500,15 @@ class _SliderSettingState extends State<_SliderSetting> {
     value = _normalizeValue(value);
     return ListTile(
       title: Text(widget.title, softWrap: true, maxLines: 2),
-      trailing: Text(_displayValue(value), style: ts.s12),
+      trailing: Text(
+        _displayValue(value),
+        style: context.textTheme.labelMedium,
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.subtitle != null) Text(widget.subtitle!, style: ts.s12),
+          if (widget.subtitle != null)
+            Text(widget.subtitle!, style: context.textTheme.labelMedium),
           Slider(
             value: value,
             onChanged: (value) {
@@ -793,7 +801,7 @@ class _SettingPartTitle extends StatelessWidget {
           children: [
             Icon(icon, size: 24),
             const SizedBox(width: 8),
-            Text(title, style: ts.s18),
+            Text(title, style: context.textTheme.titleMedium),
           ],
         ),
       ),

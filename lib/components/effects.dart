@@ -29,3 +29,50 @@ class BlurEffect extends StatelessWidget {
     );
   }
 }
+
+/// Shared surface recipe for popover-style overlays (menus, flyouts, popups,
+/// side bars). Blurred, elevated, and outlined in dark mode, using the M3
+/// shape tokens so every overlay reads as the same family of surface.
+class PopoverSurface extends StatelessWidget {
+  const PopoverSurface({
+    required this.child,
+    this.radius = AppRadius.sm,
+    this.opacity = 0.92,
+    this.elevation = 8,
+    super.key,
+  });
+
+  final Widget child;
+  final double radius;
+  final double opacity;
+  final double elevation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colorScheme;
+    final borderRadius = BorderRadius.circular(radius);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        border: context.brightness == Brightness.dark
+            ? Border.all(color: colors.outlineVariant)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.toOpacity(0.2),
+            blurRadius: elevation,
+            blurStyle: BlurStyle.outer,
+          ),
+        ],
+      ),
+      child: BlurEffect(
+        borderRadius: borderRadius,
+        child: Material(
+          color: colors.surface.toOpacity(opacity),
+          borderRadius: borderRadius,
+          child: child,
+        ),
+      ),
+    );
+  }
+}

@@ -50,38 +50,13 @@ class _MenuRoute<T> extends PopupRoute<T> {
         Positioned(
           left: left,
           top: top,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
-              border: context.brightness == Brightness.dark
-                  ? Border.all(color: context.colorScheme.outlineVariant)
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: context.colorScheme.shadow.toOpacity(0.2),
-                  blurRadius: 8,
-                  blurStyle: BlurStyle.outer,
-                ),
-              ],
-            ),
-            child: BlurEffect(
-              borderRadius: BorderRadius.circular(4),
-              child: Material(
-                color: context.colorScheme.surface.toOpacity(0.92),
-                borderRadius: BorderRadius.circular(4),
-                child: Container(
-                  width: width,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 6,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: entries
-                        .map((e) => buildEntry(e, context))
-                        .toList(),
-                  ),
-                ),
+          child: PopoverSurface(
+            child: Container(
+              width: width,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: entries.map((e) => buildEntry(e, context)).toList(),
               ),
             ),
           ),
@@ -91,22 +66,33 @@ class _MenuRoute<T> extends PopupRoute<T> {
   }
 
   Widget buildEntry(MenuEntry entry, BuildContext context) {
+    // Grow the row with the text scale instead of a fixed height, and use the
+    // M3 body role for the entry text.
+    final scaler = MediaQuery.textScalerOf(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       onTap: () {
         Navigator.of(context).pop();
         entry.onClick();
       },
-      child: SizedBox(
-        height: entryHeight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: entryHeight),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               if (entry.icon != null)
-                Icon(entry.icon, size: 18, color: entry.color),
+                Icon(entry.icon, size: scaler.scale(18), color: entry.color),
               const SizedBox(width: 12),
-              Text(entry.text, style: TextStyle(color: entry.color)),
+              Flexible(
+                child: Text(
+                  entry.text,
+                  style: context.textTheme.bodyLarge?.copyWith(
+                    color: entry.color,
+                  ),
+                ),
+              ),
             ],
           ),
         ),

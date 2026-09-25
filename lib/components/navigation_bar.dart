@@ -270,7 +270,7 @@ class NaviPaneState extends State<NaviPane>
           children: [
             Text(
               widget.paneItems[currentPage].label,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const Spacer(),
             for (var action in widget.paneActions)
@@ -391,17 +391,26 @@ class _SideNaviWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = Icon(enabled ? entry.activeIcon : entry.icon);
+    final railTheme = Theme.of(context).navigationRailTheme;
+    final indicator =
+        railTheme.indicatorColor ?? colorScheme.secondaryContainer;
+    final onIndicator =
+        railTheme.selectedIconTheme?.color ?? colorScheme.onSecondaryContainer;
+    final icon = Icon(
+      enabled ? entry.activeIcon : entry.icon,
+      color: enabled ? onIndicator : null,
+    );
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        height: 38,
+        // Grow with the text scale so the label is never clipped.
+        constraints: const BoxConstraints(minHeight: 38),
         decoration: BoxDecoration(
-          color: enabled ? colorScheme.primaryContainer : null,
-          borderRadius: BorderRadius.circular(12),
+          color: enabled ? indicator : null,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: showTitle
             ? Row(
@@ -519,15 +528,23 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
   Widget buildContent() {
     final value = controller.value;
     final colorScheme = Theme.of(context).colorScheme;
+    final navTheme = Theme.of(context).navigationBarTheme;
+    final indicator = navTheme.indicatorColor ?? colorScheme.secondaryContainer;
+    // The icon sits on top of the indicator pill, so it must use the "on"
+    // color — the same pairing the side rail and navigationBarTheme use.
+    final onIndicator =
+        navTheme.iconTheme?.resolve({WidgetState.selected})?.color ??
+        colorScheme.onSecondaryContainer;
     final icon = Icon(
       widget.enabled ? widget.entry.activeIcon : widget.entry.icon,
+      color: value != 0 ? onIndicator : null,
     );
     return Center(
       child: Container(
         width: 64,
         height: 28,
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(32)),
+          borderRadius: const BorderRadius.all(Radius.circular(AppRadius.full)),
           color: isHovering ? colorScheme.surfaceContainer : Colors.transparent,
         ),
         child: Center(
@@ -535,10 +552,10 @@ class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
             width: 32 + value * 32,
             height: 28,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(32)),
-              color: value != 0
-                  ? colorScheme.secondaryContainer
-                  : Colors.transparent,
+              borderRadius: const BorderRadius.all(
+                Radius.circular(AppRadius.full),
+              ),
+              color: value != 0 ? indicator : Colors.transparent,
             ),
             child: Center(child: icon),
           ),

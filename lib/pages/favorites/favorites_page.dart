@@ -25,6 +25,7 @@ import 'package:venera/utils/io.dart';
 import 'package:venera/utils/opencc.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'package:venera/utils/translations.dart';
+import 'package:venera/foundation/app_theme.dart';
 
 part 'favorite_actions.dart';
 part 'side_bar.dart';
@@ -33,7 +34,7 @@ part 'network_favorites_page.dart';
 
 const _kLeftBarWidth = 256.0;
 
-const _kTwoPanelChangeWidth = 720.0;
+const _kTwoPanelChangeWidth = changePointTwoPane;
 
 class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});

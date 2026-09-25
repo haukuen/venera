@@ -61,8 +61,11 @@ class _ToastOverlay extends StatelessWidget {
                     Expanded(
                       child: Text(
                         message,
-                        style: const TextStyle(
-                          fontSize: 16,
+                        // Roles from the app theme carry their own onSurface
+                        // color, which would override the Material's
+                        // onInverseSurface default here.
+                        style: context.textTheme.bodyLarge?.copyWith(
+                          color: context.colorScheme.onInverseSurface,
                           fontWeight: FontWeight.w500,
                         ),
                         maxLines: 3,
@@ -141,6 +144,7 @@ Future<void> showConfirmDialog({
   required String content,
   required void Function() onConfirm,
   String confirmText = "Confirm",
+  String cancelText = "Cancel",
   Color? btnColor,
 }) {
   return showDialog(
@@ -149,6 +153,7 @@ Future<void> showConfirmDialog({
       title: title,
       content: Text(content).paddingHorizontal(16).paddingVertical(8),
       actions: [
+        TextButton(onPressed: context.pop, child: Text(cancelText.tl)),
         FilledButton(
           onPressed: () {
             context.pop();
@@ -302,27 +307,21 @@ class ContentDialog extends StatelessWidget {
               : const SizedBox.shrink(),
           this.content,
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            spacing: 8,
+            overflowAlignment: OverflowBarAlignment.end,
             children: actions,
           ).paddingRight(12),
           const SizedBox(height: 16),
         ],
       ),
     );
+    // Shape, elevation, shadow and surface color all come from dialogTheme.
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: context.brightness == Brightness.dark
-            ? BorderSide(color: context.colorScheme.outlineVariant)
-            : BorderSide.none,
-      ),
       insetPadding: context.width < 400
           ? const EdgeInsets.symmetric(horizontal: 4)
           : const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 2,
-      shadowColor: context.colorScheme.shadow,
-      backgroundColor: context.colorScheme.surface,
       child: AnimatedSize(
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.topCenter,
@@ -391,6 +390,10 @@ Future<void> showInputDialog({
               ],
             ),
             actions: [
+              TextButton(
+                onPressed: isLoading ? null : context.pop,
+                child: Text(cancelText.tl),
+              ),
               Button.filled(
                 isLoading: isLoading,
                 onPressed: () async {

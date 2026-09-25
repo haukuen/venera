@@ -14,6 +14,7 @@ import 'package:venera/pages/webview.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
+import 'package:venera/foundation/app_theme.dart';
 
 class ComicSourcePage extends StatelessWidget {
   const ComicSourcePage({super.key});
@@ -440,7 +441,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
                 color: Theme.of(context).colorScheme.outlineVariant,
                 width: 0.6,
               ),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -884,7 +885,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                   size: 20,
                 ),
                 const SizedBox(width: 4),
-                Text(source.name, style: ts.s18),
+                Text(source.name, style: context.textTheme.titleMedium),
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -893,11 +894,11 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                   ),
                   decoration: BoxDecoration(
                     color: context.colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                   child: Text(
                     source.version,
-                    style: const TextStyle(fontSize: 13),
+                    style: context.textTheme.labelMedium,
                   ),
                 ),
                 if (hasUpdate)
@@ -910,11 +911,11 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
                       ),
                       decoration: BoxDecoration(
                         color: context.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Text(
                         "New Version".tl,
-                        style: const TextStyle(fontSize: 13),
+                        style: context.textTheme.labelMedium,
                       ),
                     ),
                   ).paddingLeft(4),
@@ -1187,7 +1188,7 @@ class _LoginPageState extends State<_LoginPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Login".tl, style: const TextStyle(fontSize: 24)),
+                Text("Login".tl, style: context.textTheme.headlineSmall),
                 const SizedBox(height: 32),
                 if (widget.config.cookieFields == null)
                   TextField(

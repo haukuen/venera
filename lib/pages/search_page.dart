@@ -451,15 +451,14 @@ class _SearchPageState extends State<SearchPage> {
             if (!showMethod && showTranslation)
               Text(
                 subTitle,
-                style: TextStyle(
-                  fontSize: 14,
+                style: context.textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
                 ),
               ),
           ],
         ),
         subtitle: (showMethod && showTranslation) ? Text(subTitle) : null,
-        trailing: Text(value.right.name, style: const TextStyle(fontSize: 13)),
+        trailing: Text(value.right.name, style: context.textTheme.labelMedium),
         onTap: () => onSelected(value.left, value.right),
       );
     }
@@ -679,7 +678,10 @@ class _SearchHistoryState extends State<_SearchHistory> {
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(appdata.searchHistory[index], style: ts.s14),
+            child: Text(
+              appdata.searchHistory[index],
+              style: context.textTheme.labelLarge,
+            ),
           ),
         ).paddingBottom(8).paddingHorizontal(4);
       },

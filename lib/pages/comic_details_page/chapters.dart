@@ -114,10 +114,10 @@ class _NormalComicChaptersState extends State<_NormalComicChapters> {
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
                   child: Material(
                     color: context.colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                     child: InkWell(
                       onTap: () => state.read(i + 1),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Center(
@@ -324,10 +324,10 @@ class _GroupedComicChaptersState extends State<_GroupedComicChapters>
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
                   child: Material(
                     color: context.colorScheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
                     child: InkWell(
                       onTap: () => state.read(chapterIndex + 1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Center(

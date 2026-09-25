@@ -77,7 +77,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
                   const SizedBox(width: 8),
                   const CloseButton(),
                   const SizedBox(width: 8),
-                  Text("Folders".tl, style: ts.s18),
+                  Text("Folders".tl, style: context.textTheme.titleMedium),
                 ],
               ),
             ).paddingTop(context.padding.top),
@@ -231,7 +231,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
               padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: context.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
               child: Text(count.toString()),
             ),

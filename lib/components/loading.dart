@@ -39,7 +39,9 @@ class NetworkError extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   "Error".tl,
-                  style: ts.withColor(context.colorScheme.error).s16,
+                  style: context.textTheme.bodyLarge?.copyWith(
+                    color: context.colorScheme.error,
+                  ),
                 ),
               ],
             ),
@@ -92,6 +94,48 @@ class NetworkError extends StatelessWidget {
       );
     }
     return Material(child: body);
+  }
+}
+
+/// A neutral "nothing here yet" placeholder, visually distinct from
+/// [NetworkError] so a normal empty state is not presented as a failure.
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    super.key,
+    required this.message,
+    this.icon = Icons.inbox_outlined,
+    this.action,
+  });
+
+  final String message;
+  final IconData icon;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpace.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 40, color: context.colorScheme.onSurfaceVariant),
+            const SizedBox(height: AppSpace.md),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: AppSpace.lg),
+              action!,
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 

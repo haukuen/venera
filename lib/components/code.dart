@@ -53,20 +53,30 @@ class _CodeEditorState extends State<CodeEditor> {
     return text.split('\n').length;
   }
 
+  /// Code uses a monospace ramp kept in sync with the gutter: both derive from
+  /// the scaled base size so line numbers never drift from the code lines.
+  double _scaledCodeSize(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(14);
+
+  double _scaledGutterSize(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(13);
+
   Widget buildLineNumbers() {
+    final codeSize = _scaledCodeSize(context);
+    final lineHeight = codeSize * 1.5;
     return SizedBox(
       width: 36,
       child: Column(
         children: [
           for (var i = 1; i <= lineCount; i++)
             SizedBox(
-              height: 14 * 1.5,
+              height: lineHeight,
               child: Center(
                 child: Text(
                   i.toString(),
                   style: TextStyle(
                     color: context.colorScheme.outline,
-                    fontSize: 13,
+                    fontSize: _scaledGutterSize(context),
                     height: 1.0,
                     fontFamily: 'Consolas',
                     fontFamilyFallback: ['Courier New', 'monospace'],
@@ -124,8 +134,11 @@ class _CodeEditorState extends State<CodeEditor> {
                               controller: _controller,
                               focusNode: _focusNode,
                               maxLines: null,
-                              cursorHeight: 1.5 * 14,
-                              style: TextStyle(height: 1.5, fontSize: 14),
+                              cursorHeight: _scaledCodeSize(context) * 1.5,
+                              style: TextStyle(
+                                height: 1.5,
+                                fontSize: _scaledCodeSize(context),
+                              ),
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.all(8),
@@ -186,7 +199,7 @@ class _CodeTextEditingController extends TextEditingController {
     var result = highlighter.highlight(text);
     style = TextStyle(
       height: 1.5,
-      fontSize: 14,
+      fontSize: MediaQuery.textScalerOf(context).scale(14),
       fontFamily: 'Consolas',
       fontFamilyFallback: ['Courier New', 'Roboto Mono', 'monospace'],
     );

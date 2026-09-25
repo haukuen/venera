@@ -111,15 +111,7 @@ class PinPadState extends State<PinPad> {
         width: _keySize,
         height: _keySize,
         child: Center(
-          child:
-              icon ??
-              Text(
-                digit!,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
+          child: icon ?? Text(digit!, style: context.textTheme.headlineSmall),
         ),
       ),
     );

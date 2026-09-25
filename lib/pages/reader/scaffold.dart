@@ -243,7 +243,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                 child: epName == null
                     ? Text(
                         context.reader.widget.name,
-                        style: ts.s18,
+                        style: context.textTheme.titleMedium,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       )
@@ -253,13 +253,13 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                         children: [
                           Text(
                             context.reader.widget.name,
-                            style: ts.s16,
+                            style: context.textTheme.bodyLarge,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
                             epName,
-                            style: ts.s12,
+                            style: context.textTheme.bodySmall,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -570,7 +570,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                       padding: const EdgeInsets.fromLTRB(6, 2, 6, 0),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       child: Center(child: Text(text)),
                     ).paddingLeft(16),
@@ -647,20 +647,24 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     return Positioned(
       bottom: 13,
       left: 25,
-      child: Stack(
-        children: [
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              foreground: Paint()
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 1.4
-                ..color = context.colorScheme.onInverseSurface,
-            ),
+      child: Semantics(
+        label: "Page ${context.reader.page} of ${context.reader.maxPage}",
+        child: ExcludeSemantics(
+          child: Stack(
+            children: [
+              Text(
+                text,
+                style: context.textTheme.bodyMedium?.copyWith(
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 1.4
+                    ..color = context.colorScheme.onInverseSurface,
+                ),
+              ),
+              Text(text),
+            ],
           ),
-          Text(text),
-        ],
+        ),
       ),
     );
   }
@@ -834,7 +838,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
           child: Icon(
             lastValue == 1
@@ -851,7 +855,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
           height: 58,
           child: Material(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             elevation: 2,
             child: InkWell(
               onTap: () {
@@ -862,7 +866,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                 }
                 setFloatingButton(0);
               },
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadius.xl),
               child: Center(
                 child: Icon(
                   _getArrowIcon(isReversed, showFloatingButtonValue),
@@ -1100,8 +1104,7 @@ class _BatteryWidgetState extends State<_BatteryWidget> {
           children: [
             Text(
               '$batteryLevel%',
-              style: TextStyle(
-                fontSize: 14,
+              style: context.textTheme.bodyMedium?.copyWith(
                 foreground: Paint()
                   ..style = PaintingStyle.stroke
                   ..strokeWidth = 1.4
@@ -1156,8 +1159,7 @@ class _ClockWidgetState extends State<_ClockWidget> {
       children: [
         Text(
           _currentTime,
-          style: TextStyle(
-            fontSize: 14,
+          style: context.textTheme.bodyMedium?.copyWith(
             foreground: Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = 1.4
@@ -1209,7 +1211,7 @@ class _SelectImageOverlayContentState
             height: 42,
             decoration: BoxDecoration(
               color: context.colorScheme.surface,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.md),
               border: Border.all(color: context.colorScheme.outlineVariant),
             ),
             child: Row(
@@ -1219,8 +1221,7 @@ class _SelectImageOverlayContentState
                 const SizedBox(width: 16),
                 Text(
                   "Click to select an image".tl,
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: context.textTheme.bodyLarge?.copyWith(
                     color: context.colorScheme.onSurface,
                   ),
                 ),

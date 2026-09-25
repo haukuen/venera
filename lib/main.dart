@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,6 +18,7 @@ import 'components/components.dart';
 import 'components/window_frame.dart';
 import 'foundation/app.dart';
 import 'foundation/app_page_route.dart';
+import 'foundation/app_theme.dart';
 import 'foundation/appdata.dart';
 import 'headless.dart';
 import 'init.dart';
@@ -260,14 +260,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         'sans-serif',
       ];
     }
-    return ThemeData(
-      colorScheme: SeedColorScheme.fromSeeds(
-        primaryKey: primary,
-        secondaryKey: secondary,
-        tertiaryKey: tertiary,
-        brightness: brightness,
-        tones: FlexTones.vividBackground(brightness),
-      ),
+    return AppTheme.build(
+      primary: primary,
+      secondary: secondary,
+      tertiary: tertiary,
+      brightness: brightness,
       fontFamily: font,
       fontFamilyFallback: fallback,
     );
@@ -370,6 +367,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               );
             };
             if (widget != null) {
+              /// Compose the user UI font scale with the system text scale and
+              /// cap the product, so a large system font size combined with the
+              /// max app slider cannot push text past what the fixed-height
+              /// chrome (app bars, menus, rails) is laid out for.
+              final mediaQuery = MediaQuery.of(context);
+              final systemScale = mediaQuery.textScaler.scale(1.0);
+              final userScale =
+                  (appdata.settings['uiFontScale'] as num?)?.toDouble() ?? 1.0;
+              final effectiveScale = AppTheme.effectiveTextScale(
+                systemScale,
+                userScale,
+              );
+              if (systemScale != effectiveScale) {
+                widget = MediaQuery(
+                  data: mediaQuery.copyWith(
+                    textScaler: TextScaler.linear(effectiveScale),
+                  ),
+                  child: widget,
+                );
+              }
+
               /// 如果无法检测到状态栏高度设定指定高度
               /// https://github.com/flutter/flutter/issues/161086
               var isPaddingCheckError =

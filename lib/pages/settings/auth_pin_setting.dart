@@ -83,7 +83,7 @@ class _AuthPinSettingState extends State<AuthPinSetting> {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: context.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
                 child: Row(
                   children: [
