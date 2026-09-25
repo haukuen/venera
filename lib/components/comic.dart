@@ -847,6 +847,10 @@ class _SliverGridComicsState extends State<SliverGridComics> {
       HistoryManager().addListener(update);
       LocalFavoritesManager().addListener(update);
     }
+    // Listened to regardless of [SliverGridComics.listenToManagers]: the
+    // manager listeners are owned by the parent, but blocked-word filtering
+    // lives here and must react to any settings write.
+    appdata.settings.addListener(_onSettingsChanged);
     super.initState();
   }
 
@@ -856,7 +860,27 @@ class _SliverGridComicsState extends State<SliverGridComics> {
       HistoryManager().removeListener(update);
       LocalFavoritesManager().removeListener(update);
     }
+    appdata.settings.removeListener(_onSettingsChanged);
     super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    final newComics = <Comic>[];
+    for (var comic in widget.comics) {
+      if (isBlocked(comic) == null) {
+        newComics.add(comic);
+      }
+    }
+    // Settings notify on every write; only rebuild when the filtered result
+    // actually changed, so unrelated settings keep the scroll position.
+    if (!newComics.isEqualTo(comics)) {
+      setState(() {
+        comics
+          ..clear()
+          ..addAll(newComics);
+        generateHeroID();
+      });
+    }
   }
 
   void update() {

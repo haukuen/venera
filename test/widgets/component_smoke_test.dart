@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/custom_slider.dart';
 import 'package:venera/foundation/app_theme.dart';
+import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/utils/translations.dart';
 
 ThemeData buildTheme(Brightness brightness) {
@@ -431,6 +433,67 @@ void main() {
         expect(icon.color, isNot(scheme.secondaryContainer));
         expect(icon.color, scheme.onSecondaryContainer);
       }
+    });
+  });
+
+  group('SliverGridComics reacts to blocked words', () {
+    Comic comic(String title) => Comic(
+      // An empty cover still makes the tile's image provider arm its
+      // load-timeout timer; it is drained by the pump at the end.
+      title,
+      '',
+      title,
+      null,
+      null,
+      '',
+      'test',
+      null,
+      null,
+    );
+
+    testWidgets('re-filters without manager listeners when settings change', (
+      tester,
+    ) async {
+      appdata.settings['blockedWords'] = <String>[];
+      final comics = [
+        comic('Alpha Comic'),
+        comic('Beta Comic'),
+        comic('Gamma Comic'),
+      ];
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildTheme(Brightness.light),
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                SliverGridComics(comics: comics, listenToManagers: false),
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(find.text('Alpha Comic'), findsOneWidget);
+      expect(find.text('Beta Comic'), findsOneWidget);
+      expect(find.text('Gamma Comic'), findsOneWidget);
+
+      // A settings write (as done by the keyword-blocking page, backup
+      // restore, ...) must re-filter even when the history manager is not
+      // listened to.
+      appdata.settings['blockedWords'] = <String>['Beta'];
+      await tester.pump();
+      expect(find.text('Alpha Comic'), findsOneWidget);
+      expect(find.text('Beta Comic'), findsNothing);
+      expect(find.text('Gamma Comic'), findsOneWidget);
+
+      // Unblocking restores the comic without a parent rebuild.
+      appdata.settings['blockedWords'] = <String>[];
+      await tester.pump();
+      expect(find.text('Beta Comic'), findsOneWidget);
+
+      appdata.settings['blockedWords'] = <String>[];
+      // Drain the cover loader's retry backoff chain (2+4+8 seconds).
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 }
