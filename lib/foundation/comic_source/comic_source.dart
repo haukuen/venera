@@ -34,6 +34,7 @@ part 'types.dart';
 
 class ComicSourceManager with ChangeNotifier, Init {
   final List<ComicSource> _sources = [];
+  final List<ComicSourceInstallation> _installations = [];
 
   static ComicSourceManager? _instance;
 
@@ -42,6 +43,10 @@ class ComicSourceManager with ChangeNotifier, Init {
   factory ComicSourceManager() => _instance ??= ComicSourceManager._create();
 
   List<ComicSource> all() => List.from(_sources);
+
+  /// Every installed script, including scripts that failed to parse.
+  List<ComicSourceInstallation> installations() =>
+      List.unmodifiable(_installations);
 
   ComicSource? find(String key) =>
       _sources.firstWhereOrNull((element) => element.key == key);
@@ -66,7 +71,11 @@ class ComicSourceManager with ChangeNotifier, Init {
             entity.absolute.path,
           );
           _sources.add(source);
+          _installations.add(ComicSourceInstallation.ready(source));
         } catch (e, s) {
+          _installations.add(
+            ComicSourceInstallation.failed(entity.absolute.path, e.toString()),
+          );
           Log.error("ComicSource", "$e\n$s");
         }
       }
@@ -75,6 +84,7 @@ class ComicSourceManager with ChangeNotifier, Init {
 
   Future reload() async {
     _sources.clear();
+    _installations.clear();
     JsEngine().runCode("ComicSource.sources = {};");
     await doInit();
     notifyListeners();
@@ -82,11 +92,18 @@ class ComicSourceManager with ChangeNotifier, Init {
 
   void add(ComicSource source) {
     _sources.add(source);
+    _installations.removeWhere((item) => item.filePath == source.filePath);
+    _installations.add(ComicSourceInstallation.ready(source));
     notifyListeners();
   }
 
   void remove(String key) {
+    var paths = _sources
+        .where((element) => element.key == key)
+        .map((element) => element.filePath)
+        .toSet();
     _sources.removeWhere((element) => element.key == key);
+    _installations.removeWhere((element) => paths.contains(element.filePath));
     // 清理缓存的更新状态，避免同 key 源重装后仍显示旧版本徽章或误用旧 url。
     _availableUpdates.remove(key);
     _updateUrls.remove(key);
@@ -125,6 +142,38 @@ class ComicSourceManager with ChangeNotifier, Init {
 
   void notifyStateChange() {
     notifyListeners();
+  }
+}
+
+enum ComicSourceInstallationState { ready, disabled, parseError, incompatible }
+
+class ComicSourceInstallation {
+  final String filePath;
+  final ComicSourceInstallationState state;
+  final ComicSource? source;
+  final String? error;
+
+  const ComicSourceInstallation._({
+    required this.filePath,
+    required this.state,
+    this.source,
+    this.error,
+  });
+
+  factory ComicSourceInstallation.ready(ComicSource source) {
+    return ComicSourceInstallation._(
+      filePath: source.filePath,
+      state: ComicSourceInstallationState.ready,
+      source: source,
+    );
+  }
+
+  factory ComicSourceInstallation.failed(String filePath, String error) {
+    return ComicSourceInstallation._(
+      filePath: filePath,
+      state: ComicSourceInstallationState.parseError,
+      error: error,
+    );
   }
 }
 

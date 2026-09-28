@@ -11,6 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  args: ^2.6.0
   path_provider: any
   intl: any
   window_manager: ^0.5.1

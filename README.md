@@ -26,3 +26,6 @@ brew tap haukuen/tap
 brew install --cask venera
 ```
 
+## 命令行
+
+桌面版可通过 `venera --headless` 调用已安装的漫画源，执行搜索、元数据查询、分类、排行、探索及远程收藏管理。详细命令、JSON 协议和安全边界见 [Headless Mode](doc/headless_doc.md)。

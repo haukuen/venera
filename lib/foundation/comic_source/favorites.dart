@@ -42,6 +42,12 @@ class FavoriteData {
 
   final AddOrDelFavFunc? addOrDelFavorite;
 
+  /// Performs the remote mutation once without login recovery replay.
+  ///
+  /// Headless callers use this entry point because some source implementations
+  /// toggle state and therefore cannot be retried safely.
+  final AddOrDelFavFunc? addOrDelFavoriteOnce;
+
   final bool singleFolderForSingleComic;
 
   const FavoriteData({
@@ -55,6 +61,7 @@ class FavoriteData {
     this.addFolder,
     this.allFavoritesId,
     this.addOrDelFavorite,
+    this.addOrDelFavoriteOnce,
     this.isOldToNewSort,
     this.singleFolderForSingleComic = false,
   });

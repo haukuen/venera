@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/sqlite_connection.dart';
 import 'package:venera/utils/ext.dart';
@@ -228,7 +228,7 @@ class SingleInstanceCookieJar extends CookieJarSql {
     if (instance != null) {
       return instance!;
     }
-    var dataPath = (await getApplicationSupportDirectory()).path;
+    var dataPath = App.dataPath;
     instance = SingleInstanceCookieJar("$dataPath/cookie.db");
     return instance!;
   }

@@ -1,253 +1,354 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/widgets.dart';
-import 'package:venera/utils/data_sync.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/pages/comic_source_page.dart';
-import 'package:venera/init.dart';
-import 'package:venera/foundation/follow_updates.dart';
+import 'package:uuid/uuid.dart';
+import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/favorites.dart';
+import 'package:venera/foundation/log.dart';
+import 'package:venera/headless/command_runner.dart';
+import 'package:venera/headless/contract.dart';
+import 'package:venera/headless/execution_context.dart';
+import 'package:venera/headless/ipc.dart';
+import 'package:venera/headless/runtime_lock.dart';
+import 'package:venera/init.dart';
 
-void cliPrint(Map<String, dynamic> data) {
-  print('[CLI PRINT] ${jsonEncode(data)}');
-}
+const _legacyCommands = {'webdav', 'updatescript', 'updatesubscribe'};
 
-Future<void> runHeadlessMode(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  if (args.contains('--ignore-disheadless-log')) {
+/// Runs one `--headless` invocation and returns its process exit code.
+///
+/// This function deliberately does not call [exit], which keeps it testable.
+/// The executable entry point is responsible for terminating after streams are
+/// flushed.
+Future<int> runHeadlessMode(List<String> processArguments) async {
+  var marker = processArguments.indexOf('--headless');
+  var arguments = marker < 0
+      ? List<String>.from(processArguments)
+      : processArguments.sublist(marker + 1);
+  CliParsedInvocation invocation;
+  try {
+    invocation = CliCommandRunner.parseInvocation(arguments);
+  } on CliFailure catch (error) {
+    var envelope = _failureEnvelope(error, arguments);
+    var output = _HeadlessOutput.fromRaw(arguments);
+    output.finish(envelope);
+    return output.exitCode(envelope);
+  }
+
+  var output = _HeadlessOutput(invocation);
+  var runner = CliCommandRunner();
+  if (invocation.options.json || invocation.options.ignoreHeadlessLog) {
     Log.isMuted = true;
   }
+
+  // Help, version, and parser-level errors must remain usable even when the app
+  // profile or Flutter plugins cannot be initialized.
+  if (invocation.help ||
+      invocation.version ||
+      invocation.commandArguments.isEmpty) {
+    var envelope = await runner.run(
+      invocation: invocation,
+      transport: CliTransport.direct,
+      guiAvailable: false,
+    );
+    output.finish(envelope);
+    return output.exitCode(envelope);
+  }
+  try {
+    CliCommandRunner.commandParser.parse(invocation.commandArguments);
+  } on FormatException catch (error) {
+    var envelope = _failureEnvelope(
+      CliFailure.invalid(error.message),
+      invocation.commandArguments,
+    );
+    output.finish(envelope);
+    return output.exitCode(envelope);
+  }
+
+  WidgetsFlutterBinding.ensureInitialized();
   if (Platform.isLinux || Platform.isMacOS) {
-    Directory.current = Platform.environment['HOME']!;
+    var userHome = Platform.environment['HOME'];
+    if (userHome != null && userHome.isNotEmpty) Directory.current = userHome;
   }
-  // The first arg is '--headless', so we look at the next ones.
-  var commandIndex = args.indexOf('--headless') + 1;
-  if (commandIndex >= args.length) {
-    cliPrint({
-      'status': 'error',
-      'message': 'No command provided for headless mode.',
+
+  var cancellation = CliCancellationToken();
+  StreamSubscription<ProcessSignal>? signalSubscription;
+  var interruptCount = 0;
+  try {
+    signalSubscription = ProcessSignal.sigint.watch().listen((_) {
+      interruptCount++;
+      if (interruptCount == 1) {
+        cancellation.cancel();
+        if (!invocation.options.quiet) {
+          stderr.writeln(
+            'Cancellation requested; waiting for a safe boundary.',
+          );
+        }
+      } else {
+        exit(130);
+      }
     });
-    exit(1);
+  } on UnsupportedError {
+    // The runner timeout and normal cancellation path remain available.
   }
 
-  // Need to initialize the app for some features to work
-  await init();
-
-  var command = args[commandIndex];
-  var subCommand = (commandIndex + 1 < args.length)
-      ? args[commandIndex + 1]
-      : null;
-
-  switch (command) {
-    case 'webdav':
-      if (subCommand == 'up') {
-        cliPrint({'status': 'running', 'message': 'Uploading WebDAV data...'});
-        await DataSync().uploadData();
-        cliPrint({'status': 'success', 'message': 'Upload complete.'});
-      } else if (subCommand == 'down') {
-        cliPrint({
-          'status': 'running',
-          'message': 'Downloading WebDAV data...',
-        });
-        await DataSync().downloadData();
-        cliPrint({'status': 'success', 'message': 'Download complete.'});
-      } else {
-        cliPrint({
-          'status': 'error',
-          'message': 'Invalid webdav command. Use "up" or "down".',
-        });
-        exit(1);
-      }
-      break;
-    case 'updatescript':
-      if (subCommand == 'all') {
-        cliPrint({
-          'status': 'running',
-          'message': 'Checking for comic source script updates...',
-        });
-        await ComicSourcePage.checkComicSourceUpdate();
-        var updates = ComicSourceManager().availableUpdates;
-        if (updates.isEmpty) {
-          cliPrint({'status': 'success', 'message': 'No updates found.'});
-        } else {
-          var total = updates.length;
-          var current = 0;
-          var errors = 0;
-          var updated = 0;
-          cliPrint({
-            'status': 'running',
-            'message': 'Updating all comic source scripts...',
-            'data': {'total': total, 'current': 0, 'updated': 0, 'errors': 0},
-          });
-          for (var key in updates.keys) {
-            var source = ComicSource.find(key);
-            if (source != null) {
-              current++;
-              var data = {
-                'current': current,
-                'total': total,
-                'source': {
-                  'key': source.key,
-                  'name': source.name,
-                  'version': source.version,
-                  'url': source.url,
-                },
-              };
-              try {
-                await ComicSourcePage.update(source, false);
-                updated++;
-                cliPrint({
-                  'status': 'running',
-                  'message': 'Progress',
-                  'data': data,
-                });
-              } catch (e) {
-                errors++;
-                cliPrint({
-                  'status': 'running',
-                  'message': 'ProgressError',
-                  'data': {...data, 'error': e.toString()},
-                });
-              }
-            }
-          }
-          cliPrint({
-            'status': 'success',
-            'message': 'All scripts updated.',
-            'data': {'total': total, 'updated': updated, 'errors': errors},
-          });
-        }
-      } else {
-        cliPrint({
-          'status': 'error',
-          'message': 'Invalid updatescript command. Use "all".',
-        });
-        exit(1);
-      }
-      break;
-    case 'updatesubscribe':
-      cliPrint({
-        'status': 'running',
-        'message': 'Updating subscribed comics...',
-      });
-      var folder = appdata.settings["followUpdatesFolder"];
-      if (folder == null) {
-        cliPrint({
-          'status': 'error',
-          'message': 'Follow updates folder is not configured.',
-        });
-        exit(1);
-      }
-
-      var updateIndex = args.indexOf('--update-comic-by-id-type');
-      if (updateIndex != -1) {
-        if (updateIndex + 2 >= args.length) {
-          cliPrint({
-            'status': 'error',
-            'message':
-                'Missing arguments for --update-comic-by-id-type. Expected: --update-comic-by-id-type <id> <type>',
-          });
-          exit(1);
-        }
-        var id = args[updateIndex + 1];
-        var type = args[updateIndex + 2];
-        var comics = LocalFavoritesManager().getComicsWithUpdatesInfo(folder);
-        var comic = comics.firstWhere(
-          (c) => c.id == id && c.type.sourceKey == type,
+  CliRuntimeLease? lease;
+  CliEnvelope envelope;
+  try {
+    await App.init();
+    var routed = await _tryRunningGui(
+      arguments: arguments,
+      cancellation: cancellation,
+      output: output,
+    );
+    if (routed != null) {
+      envelope = routed;
+    } else {
+      lease = await CliRuntimeLock.tryAcquire();
+      if (lease == null) {
+        envelope = await _waitForGui(
+          arguments: arguments,
+          invocation: invocation,
+          cancellation: cancellation,
+          output: output,
         );
-
-        var result = await updateComic(comic, folder);
-
-        Map<String, dynamic> data = {
-          'current': 1,
-          'total': 1,
-          'comic': {
-            'id': comic.id,
-            'name': comic.name,
-            'coverUrl': comic.coverPath,
-            'author': comic.author,
-            'type': comic.type.sourceKey,
-            'updateTime': comic.updateTime,
-            'tags': comic.tags,
-          },
-        };
-
-        var message = 'Progress';
-        if (result.errorMessage != null) {
-          message = 'ProgressError';
-          data['error'] = result.errorMessage;
-        }
-
-        cliPrint({'status': 'running', 'message': message, 'data': data});
-
-        cliPrint({
-          'status': 'running',
-          'message': 'Update check complete.',
-          'data': {
-            'total': 1,
-            'updated': result.updated ? 1 : 0,
-            'errors': result.errorMessage != null ? 1 : 0,
-          },
-        });
-
-        await Future.delayed(const Duration(milliseconds: 500));
-        var json = await getUpdatedComicsAsJson(folder);
-        cliPrint({
-          'status': result.errorMessage != null ? 'error' : 'success',
-          'message': 'Updated comics list.',
-          'data': jsonDecode(json),
-        });
       } else {
-        int total = 0;
-        int updated = 0;
-        int errors = 0;
-        await for (var progress in updateFolder(folder, true)) {
-          total = progress.total;
-          updated = progress.updated;
-          errors = progress.errors;
-          Map<String, dynamic> data = {
-            'current': progress.current,
-            'total': progress.total,
-          };
-          if (progress.comic != null) {
-            data['comic'] = {
-              'id': progress.comic!.id,
-              'name': progress.comic!.name,
-              'coverUrl': progress.comic!.coverPath,
-              'author': progress.comic!.author,
-              'type': progress.comic!.type.sourceKey,
-              'updateTime': progress.comic!.updateTime,
-              'tags': progress.comic!.tags,
-            };
-          }
-          var message = 'Progress';
-          if (progress.errorMessage != null) {
-            message = 'ProgressError';
-            data['error'] = progress.errorMessage;
-          }
-          cliPrint({'status': 'running', 'message': message, 'data': data});
+        await lease.clearStaleDescriptor();
+        await init();
+        if (appdata.settings['authorizationRequired'] == true) {
+          envelope = CliEnvelope.failure(
+            command: CliCommandRunner.commandName(invocation.commandArguments),
+            error: CliFailure.appLocked(),
+            meta: _meta(CliTransport.direct),
+          );
+        } else {
+          envelope = await runner.run(
+            invocation: invocation,
+            transport: CliTransport.direct,
+            guiAvailable: false,
+            cancellation: cancellation,
+            eventSink: output.event,
+          );
         }
-        cliPrint({
-          'status': 'running',
-          'message': 'Update check complete.',
-          'data': {'total': total, 'updated': updated, 'errors': errors},
-        });
-        await Future.delayed(const Duration(milliseconds: 500));
-        var json = await getUpdatedComicsAsJson(folder);
-        cliPrint({
-          'status': errors > 0 ? 'error' : 'success',
-          'message': 'Updated comics list.',
-          'data': jsonDecode(json),
-        });
       }
-      break;
-    default:
-      cliPrint({'status': 'error', 'message': 'Unknown command: $command'});
-      exit(1);
+    }
+  } on CliFailure catch (error) {
+    envelope = CliEnvelope.failure(
+      command: CliCommandRunner.commandName(invocation.commandArguments),
+      error: error,
+      meta: _meta(CliTransport.direct),
+    );
+  } catch (error) {
+    envelope = CliEnvelope.failure(
+      command: CliCommandRunner.commandName(invocation.commandArguments),
+      error: CliFailure(
+        code: 'internal_error',
+        message: error.toString(),
+        exitCode: CliExitCode.internalError,
+      ),
+      meta: _meta(CliTransport.direct),
+    );
+  } finally {
+    await lease?.release();
+    await signalSubscription?.cancel();
   }
 
-  // Exit after command execution
-  exit(0);
+  output.finish(envelope);
+  return output.exitCode(envelope);
+}
+
+Future<CliEnvelope?> _tryRunningGui({
+  required List<String> arguments,
+  required CliCancellationToken cancellation,
+  required _HeadlessOutput output,
+}) async {
+  var descriptor = await CliRuntimeLock.readDescriptor();
+  if (descriptor == null) return null;
+  if (descriptor.protocolVersion != cliProtocolVersion) {
+    // A stale descriptor is harmless if the lock can be acquired. Defer the
+    // mismatch decision until the caller observes that another owner exists.
+    return null;
+  }
+  var client = CliIpcClient(descriptor);
+  try {
+    if (!await client.probe()) return null;
+    return await client.execute(
+      requestId: const Uuid().v4(),
+      arguments: arguments,
+      cancellation: cancellation,
+      onEvent: output.event,
+    );
+  } finally {
+    client.close();
+  }
+}
+
+Future<CliEnvelope> _waitForGui({
+  required List<String> arguments,
+  required CliParsedInvocation invocation,
+  required CliCancellationToken cancellation,
+  required _HeadlessOutput output,
+}) async {
+  var waitMs = invocation.options.timeout.inMilliseconds.clamp(1, 5000);
+  var deadline = DateTime.now().add(Duration(milliseconds: waitMs));
+  do {
+    cancellation.throwIfCancelled();
+    var descriptor = await CliRuntimeLock.readDescriptor();
+    if (descriptor != null) {
+      if (descriptor.protocolVersion != cliProtocolVersion) {
+        throw CliFailure(
+          code: 'protocol_mismatch',
+          message:
+              'CLI protocol $cliProtocolVersion is incompatible with the running Venera protocol ${descriptor.protocolVersion}.',
+          exitCode: CliExitCode.ipcError,
+        );
+      }
+      var client = CliIpcClient(descriptor);
+      try {
+        if (await client.probe()) {
+          return await client.execute(
+            requestId: const Uuid().v4(),
+            arguments: arguments,
+            cancellation: cancellation,
+            onEvent: output.event,
+          );
+        }
+      } finally {
+        client.close();
+      }
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+  } while (DateTime.now().isBefore(deadline));
+  throw CliFailure(
+    code: 'ipc_error',
+    message:
+        'Another Venera runtime owns the profile but its IPC endpoint is unavailable.',
+    exitCode: CliExitCode.ipcError,
+  );
+}
+
+class _HeadlessOutput {
+  final CliParsedInvocation invocation;
+  bool _legacyErrorPrinted = false;
+
+  _HeadlessOutput(this.invocation);
+
+  factory _HeadlessOutput.fromRaw(List<String> arguments) {
+    var options = CliGlobalOptions(
+      json: arguments.contains('--json'),
+      allowGui: arguments.contains('--allow-gui'),
+      recordHistory: arguments.contains('--record-history'),
+      quiet: arguments.contains('--quiet'),
+      noColor: arguments.contains('--no-color'),
+      ignoreHeadlessLog: arguments.contains('--ignore-disheadless-log'),
+      timeout: const Duration(minutes: 2),
+    );
+    return _HeadlessOutput(
+      CliParsedInvocation(
+        commandArguments: arguments,
+        options: options,
+        help: arguments.contains('--help') || arguments.contains('-h'),
+        version: arguments.contains('--version'),
+      ),
+    );
+  }
+
+  bool get isLegacy {
+    var first = invocation.commandArguments.firstOrNull;
+    return first != null && _legacyCommands.contains(first);
+  }
+
+  void event(String type, Object? rawData) {
+    var data = CliSanitizer.sanitizeValue(rawData);
+    if (type == 'legacy' && data is Map) {
+      if (data['status'] == 'error') _legacyErrorPrinted = true;
+      if (!invocation.options.json) {
+        stdout.writeln('[CLI PRINT] ${jsonEncode(data)}');
+      } else if (!invocation.options.quiet) {
+        stderr.writeln('[legacy] ${jsonEncode(data)}');
+      }
+      return;
+    }
+    if (type == 'progress' && !invocation.options.quiet) {
+      var message = data is Map ? data['message'] : data;
+      if (message != null) {
+        stderr.writeln(CliSanitizer.sanitizeText('$message'));
+      }
+      return;
+    }
+    if (type == 'warning' && data is Map) {
+      var code = data['code'] ?? 'warning';
+      var message = data['message'] ?? '';
+      stderr.writeln('warning [$code]: $message');
+    }
+  }
+
+  void finish(CliEnvelope envelope) {
+    if (invocation.options.json) {
+      stdout.writeln(envelope.encode());
+      return;
+    }
+    if (isLegacy) {
+      if (!envelope.ok && !_legacyErrorPrinted) {
+        stdout.writeln(
+          '[CLI PRINT] ${jsonEncode({'status': 'error', 'message': envelope.error?.message ?? 'Unknown error.'})}',
+        );
+      }
+      return;
+    }
+    if (!envelope.ok) {
+      var error = envelope.error!;
+      stderr.writeln(_styled('error [${error.code}]: ${error.message}', 31));
+      if (error.details != null) {
+        stderr.writeln(
+          const JsonEncoder.withIndent(
+            '  ',
+          ).convert(CliSanitizer.sanitizeValue(error.details)),
+        );
+      }
+      return;
+    }
+    if (envelope.command == 'help') {
+      stdout.write((envelope.data as Map)['usage']);
+    } else if (envelope.command == 'version') {
+      stdout.writeln('venera ${(envelope.data as Map)['version']}');
+    } else if (envelope.data != null) {
+      stdout.writeln(
+        const JsonEncoder.withIndent(
+          '  ',
+        ).convert(CliSanitizer.sanitizeValue(envelope.data)),
+      );
+    }
+  }
+
+  int exitCode(CliEnvelope envelope) {
+    if (isLegacy && !invocation.options.json) return envelope.ok ? 0 : 1;
+    return envelope.exitCode;
+  }
+
+  String _styled(String value, int color) {
+    if (invocation.options.noColor || !stderr.hasTerminal) return value;
+    return '\u001b[${color}m$value\u001b[0m';
+  }
+}
+
+CliEnvelope _failureEnvelope(CliFailure error, List<String> arguments) {
+  return CliEnvelope.failure(
+    command: CliCommandRunner.commandName(arguments),
+    error: error,
+    meta: _meta(CliTransport.direct),
+  );
+}
+
+Map<String, dynamic> _meta(CliTransport transport) => {
+  'appVersion': App.isInitialized ? App.version : cliAppVersion,
+  'protocolVersion': cliProtocolVersion,
+  'transport': transport.name,
+  'partial': false,
+  'requestId': const Uuid().v4(),
+};
+
+extension<T> on List<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

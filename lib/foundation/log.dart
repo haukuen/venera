@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:venera/foundation/app.dart';
+import 'package:venera/foundation/sensitive_data.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/io.dart';
 
@@ -42,6 +43,8 @@ class Log {
 
   static void addLog(LogLevel level, String title, String content) {
     if (isMuted) return;
+    title = SensitiveDataSanitizer.sanitizeText(title);
+    content = SensitiveDataSanitizer.sanitizeText(content);
     if (_file == null && App.isInitialized) {
       Directory dir;
       if (App.isAndroid) {
