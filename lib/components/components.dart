@@ -51,6 +51,7 @@ part 'scroll.dart';
 part 'select.dart';
 part 'side_bar.dart';
 part 'comic.dart';
+part 'rating.dart';
 part 'effects.dart';
 part 'gesture.dart';
 part 'code.dart';
