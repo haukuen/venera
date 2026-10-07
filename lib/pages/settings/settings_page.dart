@@ -34,6 +34,7 @@ part 'appearance.dart';
 part 'local_favorites.dart';
 part 'updates.dart';
 part 'app.dart';
+part 'webdav.dart';
 part 'auth_pin_setting.dart';
 part 'about.dart';
 part 'network.dart';

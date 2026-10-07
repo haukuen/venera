@@ -11,8 +11,6 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/res.dart';
-import 'package:venera/pages/category_comics_page.dart';
-import 'package:venera/pages/search_result_page.dart';
 import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/init.dart';
