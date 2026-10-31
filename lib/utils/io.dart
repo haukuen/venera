@@ -7,6 +7,7 @@ import 'package:flutter_file_dialog/flutter_file_dialog.dart';
 import 'package:flutter_saf/flutter_saf.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/utils/ext.dart';
+import 'package:venera/utils/translations.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart' as s;
 import 'package:file_selector/file_selector.dart' as file_selector;
@@ -537,7 +538,12 @@ class Share {
   }
 
   static void shareText(String text) {
-    s.SharePlus.instance.share(s.ShareParams(text: text));
+    if (App.isDesktop) {
+      Clipboard.setData(ClipboardData(text: text));
+      App.rootContext.showMessage(message: "Copied".tl);
+    } else {
+      s.SharePlus.instance.share(s.ShareParams(text: text));
+    }
   }
 }
 
