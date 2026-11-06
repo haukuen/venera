@@ -41,6 +41,9 @@ class _ReaderWithLoadingState
 
   @override
   Future<Res<ReaderProps>> loadData() async {
+    try {
+      await SyncV2Service.instance.pullNow();
+    } catch (_) {}
     var comicSource = ComicSource.find(widget.sourceKey);
     var history = HistoryManager().find(
       widget.id,

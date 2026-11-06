@@ -1,27 +1,20 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/components/window_frame.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/favorites.dart';
-import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/log.dart';
-import 'package:venera/foundation/read_later.dart';
 import 'package:venera/foundation/res.dart';
 import 'package:venera/network/app_dio.dart';
-import 'package:venera/network/cookie_jar.dart';
-import 'package:venera/utils/data.dart';
-import 'package:venera/utils/ext.dart';
-import 'package:webdav_client/webdav_client.dart' hide File;
+import 'package:venera/sync/app/sync_v2_service.dart';
+import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
+import 'package:webdav_client/webdav_client.dart' hide File;
 
-import 'io.dart';
-
-enum _DataSyncTransferOrigin { automatic, manual }
-
+/// Status snapshot consumed by the home sync card.
 class DataSyncStatusSnapshot {
   const DataSyncStatusSnapshot({
     required this.isEnabled,
@@ -55,6 +48,8 @@ class DataSyncStatusSnapshot {
 
 typedef WebDavProbe = Future<void> Function(List<String> config);
 
+/// Configuration validation + connectivity probe (kept for the settings page
+/// and tests; v2 transport reuses the same normalized config).
 class WebDavConnectionTester {
   const WebDavConnectionTester._();
 
@@ -98,16 +93,14 @@ class WebDavConnectionTester {
   }
 }
 
+/// Facade over [SyncV2Service] that keeps the UI/headless call sites stable.
 class DataSync with ChangeNotifier {
   DataSync._({bool initialize = true}) {
     if (!initialize) return;
+    SyncV2Service.instance.addListener(_onServiceChanged);
     if (isEnabled) {
-      downloadData();
+      unawaited(_autoInitialSync());
     }
-    LocalFavoritesManager().addListener(onDataChanged);
-    ComicSourceManager().addListener(onDataChanged);
-    HistoryManager().addListener(onDataChanged);
-    ReadLaterManager().addListener(onDataChanged);
     if (App.isDesktop) {
       Future.delayed(const Duration(seconds: 1), () {
         if (!App.rootContext.mounted) return;
@@ -120,17 +113,197 @@ class DataSync with ChangeNotifier {
   @visibleForTesting
   DataSync.forTesting() : this._(initialize: false);
 
+  static DataSync? instance;
+
+  factory DataSync() => instance ?? (instance = DataSync._());
+
+  bool _isUploading = false;
+  bool _isDownloading = false;
+  String? _lastError;
+
+  bool get isUploading => _isUploading || SyncV2Service.instance.isUploading;
+
+  bool get isDownloading =>
+      _isDownloading || SyncV2Service.instance.isDownloading;
+
+  String? get lastError => _lastError;
+
+  bool get isEnabled {
+    var config = appdata.settings['webdav'];
+    var autoSync = appdata.implicitData['webdavAutoSync'] ?? false;
+    return autoSync && config is List && config.isNotEmpty;
+  }
+
+  List<String>? _validateConfig({bool allowEmpty = true}) =>
+      WebDavConnectionTester.normalizeConfig(
+        appdata.settings['webdav'],
+        allowEmpty: allowEmpty,
+      );
+
+  DataSyncStatusSnapshot get statusSnapshot => DataSyncStatusSnapshot(
+    isEnabled: isEnabled,
+    isUploading: isUploading,
+    isDownloading: isDownloading,
+    lastSyncTime: (appdata.settings['lastSyncTime'] as int?) ?? 0,
+    lastError: _lastError ?? SyncV2Service.instance.lastError,
+  );
+
+  Future<void> _autoInitialSync() async {
+    try {
+      await SyncV2Service.instance.init();
+      final result = await SyncV2Service.instance.pullNow();
+      _applyResult(result);
+    } catch (error, stack) {
+      Log.error('Data Sync', error, stack);
+      _lastError = error.toString();
+      notifyListeners();
+    }
+  }
+
+  void _applyResult(Res<bool> result) {
+    _lastError = result.error ? result.errorMessage : null;
+    notifyListeners();
+  }
+
+  void _onServiceChanged() {
+    final serviceError = SyncV2Service.instance.lastError;
+    if (serviceError != null) _lastError = serviceError;
+    notifyListeners();
+  }
+
+  Future<Res<bool>> testConnection([Object? config]) {
+    return WebDavConnectionTester.test(config ?? appdata.settings['webdav']);
+  }
+
+  Future<Res<bool>> uploadData() {
+    if (!isEnabled) return Future.value(const Res(true));
+    return uploadDataManually();
+  }
+
+  Future<Res<bool>> uploadDataManually() async {
+    final config = _validateConfig();
+    if (config == null) {
+      return _fail('Invalid WebDAV configuration');
+    }
+    if (config.isEmpty) return const Res(true);
+    await SyncV2Service.instance.ensureConfig();
+    _isUploading = true;
+    _lastError = null;
+    notifyListeners();
+    try {
+      final result = await SyncV2Service.instance.pushNow();
+      _applyResult(result);
+      return result;
+    } catch (error, stack) {
+      Log.error('Data Sync', error, stack);
+      return _fail(error.toString());
+    } finally {
+      _isUploading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<Res<bool>> downloadData() {
+    if (!isEnabled) return Future.value(const Res(true));
+    return downloadDataManually();
+  }
+
+  Future<Res<bool>> downloadDataManually() async {
+    final config = _validateConfig();
+    if (config == null) {
+      return _fail('Invalid WebDAV configuration');
+    }
+    if (config.isEmpty) return const Res(true);
+    await SyncV2Service.instance.ensureConfig();
+    _isDownloading = true;
+    _lastError = null;
+    notifyListeners();
+    try {
+      final result = await SyncV2Service.instance.pullNow();
+      _applyResult(result);
+      return result;
+    } catch (error, stack) {
+      Log.error('Data Sync', error, stack);
+      return _fail(error.toString());
+    } finally {
+      _isDownloading = false;
+      notifyListeners();
+    }
+  }
+
+  Res<bool> _fail(String message) {
+    _lastError = message;
+    notifyListeners();
+    return Res.error(message);
+  }
+
+  /// Called after the "sync login state" toggle changes.
+  static Future<void> setAuthSyncEnabled(bool enabled) async {
+    appdata.implicitData['syncAuthEnabled'] = enabled;
+    await appdata.writeImplicitData();
+    if (SyncV2Service.instance.isInitialized) {
+      await SyncV2Service.instance.reconfigure();
+      if (enabled) {
+        await SyncV2Service.instance.rebuildAuthDomain();
+      }
+    }
+  }
+
+  /// Diagnostics for the settings page (plain maps keep the UI decoupled from
+  /// the service types).
+  static Future<Map<String, Object?>> syncDiagnostics() async {
+    try {
+      final diagnostics = await SyncV2Service.instance.diagnostics();
+      return {
+        'configured': diagnostics.configured,
+        'deviceId': diagnostics.deviceId,
+        'enabledDomains': diagnostics.enabledDomains,
+        'pendingOps': diagnostics.pendingOps,
+        'lastPush': diagnostics.lastPush,
+        'applied': diagnostics.applied,
+        'lastSnapshot': diagnostics.lastSnapshot == null
+            ? null
+            : {
+                'device': diagnostics.lastSnapshot!.deviceId,
+                'hlc': diagnostics.lastSnapshot!.hlc.encoded,
+                'range': [
+                  diagnostics.lastSnapshot!.rangeLo,
+                  diagnostics.lastSnapshot!.rangeHi,
+                ],
+                'applied': diagnostics.lastSnapshot!.applied,
+                'domains': diagnostics.lastSnapshot!.domains.toList()..sort(),
+              },
+        'lastError': diagnostics.lastError,
+        'lastSyncTime': diagnostics.lastSyncTime,
+        'recentConflicts': diagnostics.conflicts,
+      };
+    } catch (error) {
+      return {'error': error.toString()};
+    }
+  }
+
+  static Future<List<Map<String, Object?>>> syncDevices() async {
+    try {
+      return await SyncV2Service.instance.listRemoteDevices();
+    } catch (error) {
+      return [
+        {'error': error.toString()},
+      ];
+    }
+  }
+
+  static Future<Res<bool>> removeSyncDevice(String deviceId) {
+    return SyncV2Service.instance.removeRemoteDevice(deviceId);
+  }
+
+  /// Compatibility hook for callers that used to notify DataSync directly.
   void onDataChanged() {
-    _uploadDebounce?.cancel();
     if (!isEnabled) return;
-    _uploadDebounce = Timer(const Duration(seconds: 5), () {
-      if (!isEnabled) return;
-      uploadData();
-    });
+    SyncV2Service.instance.pushNow();
   }
 
   bool _handleWindowClose() {
-    if (_isUploading) {
+    if (isUploading) {
       _showWindowCloseDialog();
       return false;
     }
@@ -145,407 +318,15 @@ class DataSync with ChangeNotifier {
       barrierDismissible: false,
       message: "Uploading data...".tl,
     );
-    while (_isUploading) {
+    while (isUploading) {
       await Future.delayed(const Duration(milliseconds: 50));
     }
     exit(0);
   }
 
-  static DataSync? instance;
-
-  factory DataSync() => instance ?? (instance = DataSync._());
-
-  bool _isDownloading = false;
-
-  bool get isDownloading => _isDownloading;
-
-  bool _isUploading = false;
-
-  bool get isUploading => _isUploading;
-
-  Completer<void>? _syncLock;
-  Timer? _uploadDebounce;
-
-  Future<void> _acquireLock() async {
-    while (_syncLock != null) {
-      await _syncLock!.future;
-    }
-    _syncLock = Completer<void>();
-  }
-
-  void _releaseLock() {
-    var lock = _syncLock;
-    _syncLock = null;
-    lock?.complete();
-  }
-
   @override
   void dispose() {
-    _uploadDebounce?.cancel();
+    SyncV2Service.instance.removeListener(_onServiceChanged);
     super.dispose();
-  }
-
-  static const _backupFiles = [
-    'history.db',
-    'local_favorite.db',
-    'read_later.db',
-    'cookie.db',
-    'appdata.json',
-  ];
-
-  String get _backupDir => FilePath.join(App.cachePath, 'sync_backup');
-
-  Future<void> _backupLocalData() async {
-    var backupDir = Directory(_backupDir);
-    if (backupDir.existsSync()) {
-      backupDir.deleteSync(recursive: true);
-    }
-    backupDir.createSync();
-
-    for (var name in _backupFiles) {
-      var src = File(FilePath.join(App.dataPath, name));
-      if (src.existsSync()) {
-        src.copySync(FilePath.join(_backupDir, name));
-      }
-    }
-
-    var srcDir = Directory(FilePath.join(App.dataPath, 'comic_source'));
-    var dstDir = Directory(FilePath.join(_backupDir, 'comic_source'));
-    if (srcDir.existsSync()) {
-      dstDir.createSync();
-      for (var f in srcDir.listSync()) {
-        if (f is File) {
-          f.copySync(FilePath.join(_backupDir, 'comic_source', f.name));
-        }
-      }
-    }
-  }
-
-  Future<void> _restoreBackup() async {
-    var backupDir = Directory(_backupDir);
-    if (!backupDir.existsSync()) return;
-
-    // 先关闭所有数据库连接，避免 Windows 文件锁
-    HistoryManager().close();
-    LocalFavoritesManager().close();
-    ReadLaterManager().close();
-    SingleInstanceCookieJar.instance?.dispose();
-
-    for (var name in _backupFiles) {
-      var src = File(FilePath.join(_backupDir, name));
-      if (src.existsSync()) {
-        var dst = File(FilePath.join(App.dataPath, name));
-        if (dst.existsSync()) {
-          dst.renameSync(FilePath.join(App.dataPath, '$name.bak'));
-        }
-        // Clean WAL companion files from older versions
-        if (name.endsWith('.db')) {
-          for (final suffix in const ['-wal', '-shm']) {
-            final f = File(FilePath.join(App.dataPath, '$name$suffix'));
-            if (f.existsSync()) {
-              try {
-                f.deleteSync();
-              } catch (_) {}
-            }
-          }
-        }
-        src.copySync(dst.path);
-        File(FilePath.join(App.dataPath, '$name.bak')).deleteIgnoreError();
-      }
-    }
-
-    var srcDir = Directory(FilePath.join(_backupDir, 'comic_source'));
-    if (srcDir.existsSync()) {
-      var dstDir = Directory(FilePath.join(App.dataPath, 'comic_source'));
-      dstDir.deleteIfExistsSync(recursive: true);
-      dstDir.createSync();
-      for (var f in srcDir.listSync()) {
-        if (f is File) {
-          f.copySync(FilePath.join(App.dataPath, 'comic_source', f.name));
-        }
-      }
-    }
-
-    await HistoryManager().init();
-    await LocalFavoritesManager().init();
-    await ReadLaterManager().init();
-    SingleInstanceCookieJar.instance = SingleInstanceCookieJar(
-      FilePath.join(App.dataPath, "cookie.db"),
-    )..init();
-
-    // Reload in-memory appdata from the restored appdata.json
-    var restoredAppdata = File(FilePath.join(App.dataPath, 'appdata.json'));
-    if (restoredAppdata.existsSync()) {
-      try {
-        var json = jsonDecode(await restoredAppdata.readAsString());
-        appdata.syncData(json);
-      } catch (e) {
-        Log.error("Data Sync", "Failed to reload appdata after restore: $e");
-      }
-    }
-
-    // 确保所有监听者收到通知
-    HistoryManager().notifyChanges();
-    LocalFavoritesManager().notifyChanges();
-    ReadLaterManager().notifyChanges();
-    ImageFavoriteManager().notifyChanges();
-  }
-
-  void _cleanupBackup() {
-    var backupDir = Directory(_backupDir);
-    if (backupDir.existsSync()) {
-      backupDir.deleteSync(recursive: true);
-    }
-  }
-
-  String? _lastError;
-
-  String? get lastError => _lastError;
-
-  DataSyncStatusSnapshot get statusSnapshot => DataSyncStatusSnapshot(
-    isEnabled: isEnabled,
-    isUploading: _isUploading,
-    isDownloading: _isDownloading,
-    lastSyncTime: (appdata.settings['lastSyncTime'] as int?) ?? 0,
-    lastError: _lastError,
-  );
-
-  bool get isEnabled {
-    var config = appdata.settings['webdav'];
-    var autoSync = appdata.implicitData['webdavAutoSync'] ?? false;
-    return autoSync && config is List && config.isNotEmpty;
-  }
-
-  List<String>? _validateConfig() => WebDavConnectionTester.normalizeConfig(
-    appdata.settings['webdav'],
-    allowEmpty: true,
-  );
-
-  Future<Res<bool>> testConnection([Object? config]) {
-    return WebDavConnectionTester.test(config ?? appdata.settings['webdav']);
-  }
-
-  bool _isTransferAllowed(_DataSyncTransferOrigin origin) {
-    return origin == _DataSyncTransferOrigin.manual || isEnabled;
-  }
-
-  /// Uploads data only when automatic synchronization is enabled.
-  Future<Res<bool>> uploadData() {
-    return _uploadData(_DataSyncTransferOrigin.automatic);
-  }
-
-  /// Uploads data for an explicit user or headless request.
-  Future<Res<bool>> uploadDataManually() {
-    return _uploadData(_DataSyncTransferOrigin.manual);
-  }
-
-  Future<Res<bool>> _uploadData(_DataSyncTransferOrigin origin) async {
-    if (!_isTransferAllowed(origin)) return const Res(true);
-    if (_isDownloading) return const Res(true);
-    await _acquireLock();
-    if (!_isTransferAllowed(origin)) {
-      _releaseLock();
-      return const Res(true);
-    }
-    _isUploading = true;
-    _lastError = null;
-    notifyListeners();
-    try {
-      var config = _validateConfig();
-      if (config == null) {
-        _lastError = 'Invalid WebDAV configuration';
-        return const Res.error('Invalid WebDAV configuration');
-      }
-      if (config.isEmpty) {
-        return const Res(true);
-      }
-      String url = config[0];
-      String user = config[1];
-      String pass = config[2];
-
-      var client = newClient(
-        url,
-        user: user,
-        password: pass,
-        adapter: RHttpAdapter(
-          enableProxy: appdata.settings['webdavProxyEnabled'] != false,
-        ),
-      );
-
-      try {
-        var disableFields = appdata.settings['disableSyncFields'];
-        var data = await exportAppData(
-          disableFields != null && disableFields.toString().isNotEmpty,
-        );
-        var now = DateTime.now().millisecondsSinceEpoch;
-        var filename = '$now.venera';
-        var files = await client.readDir('/');
-        files = files.where((e) => e.name!.endsWith('.venera')).toList();
-
-        // Remove file with same timestamp prefix (extremely unlikely but safe)
-        var existing = files.firstWhereOrNull((e) => e.name == filename);
-        if (existing != null) {
-          await client.remove(existing.name!);
-        }
-
-        await client.write(filename, await data.readAsBytes());
-        data.deleteIgnoreError();
-
-        // Update lastSyncTime
-        appdata.settings['lastSyncTime'] = now;
-        await appdata.saveData(false);
-
-        // Sort numerically and remove oldest if over 10 files
-        files = await client.readDir('/');
-        files = files.where((e) => e.name!.endsWith('.venera')).toList();
-        files.sort((a, b) {
-          var ta = int.tryParse(a.name!.replaceAll('.venera', '')) ?? 0;
-          var tb = int.tryParse(b.name!.replaceAll('.venera', '')) ?? 0;
-          return ta.compareTo(tb);
-        });
-        while (files.length > 10) {
-          await client.remove(files.first.name!);
-          files.removeAt(0);
-        }
-
-        // Clean up old format files ({days}-{version}.venera)
-        for (var f in files) {
-          if (f.name!.contains('-') &&
-              !f.name!.startsWith('${now ~/ 86400000}-')) {
-            var part = f.name!.replaceAll('.venera', '');
-            var parts = part.split('-');
-            if (parts.length == 2 &&
-                int.tryParse(parts[0]) != null &&
-                int.tryParse(parts[1]) != null) {
-              await client.remove(f.name!);
-            }
-          }
-        }
-
-        Log.info("Upload Data", "Data uploaded successfully");
-        return const Res(true);
-      } catch (e, s) {
-        Log.error("Upload Data", e, s);
-        _lastError = e.toString();
-        return Res.error(e.toString());
-      }
-    } finally {
-      _isUploading = false;
-      _releaseLock();
-      notifyListeners();
-    }
-  }
-
-  /// Downloads data only when automatic synchronization is enabled.
-  Future<Res<bool>> downloadData() {
-    return _downloadData(_DataSyncTransferOrigin.automatic);
-  }
-
-  /// Downloads data for an explicit user or headless request.
-  Future<Res<bool>> downloadDataManually() {
-    return _downloadData(_DataSyncTransferOrigin.manual);
-  }
-
-  Future<Res<bool>> _downloadData(_DataSyncTransferOrigin origin) async {
-    if (!_isTransferAllowed(origin)) return const Res(true);
-    if (_isUploading) return const Res(true);
-    await _acquireLock();
-    if (!_isTransferAllowed(origin)) {
-      _releaseLock();
-      return const Res(true);
-    }
-    _isDownloading = true;
-    _lastError = null;
-    notifyListeners();
-    try {
-      var config = _validateConfig();
-      if (config == null) {
-        _lastError = 'Invalid WebDAV configuration';
-        return const Res.error('Invalid WebDAV configuration');
-      }
-      if (config.isEmpty) {
-        return const Res(true);
-      }
-      String url = config[0];
-      String user = config[1];
-      String pass = config[2];
-
-      var client = newClient(
-        url,
-        user: user,
-        password: pass,
-        adapter: RHttpAdapter(
-          enableProxy: appdata.settings['webdavProxyEnabled'] != false,
-        ),
-      );
-
-      try {
-        var files = await client.readDir('/');
-        files = files.where((e) => e.name!.endsWith('.venera')).toList();
-        files.sort((a, b) {
-          var ta = int.tryParse(a.name!.replaceAll('.venera', '')) ?? 0;
-          var tb = int.tryParse(b.name!.replaceAll('.venera', '')) ?? 0;
-          return tb.compareTo(ta); // newest first
-        });
-
-        if (files.isEmpty) {
-          Log.info("Data Sync", 'No data file found on server');
-          return const Res(true);
-        }
-
-        var remoteFile = files.first;
-        var remoteTimestamp = int.tryParse(
-          remoteFile.name!.replaceAll('.venera', ''),
-        );
-        var lastSyncTime = (appdata.settings['lastSyncTime'] as int?) ?? 0;
-
-        // If remote file is old format ({days}-{version}.venera), always download
-        // Old format files contain a dash, new format is pure timestamp
-        var isOldFormat = remoteFile.name!.contains('-');
-
-        if (!isOldFormat &&
-            remoteTimestamp != null &&
-            remoteTimestamp <= lastSyncTime) {
-          Log.info("Data Sync", 'No new data to download');
-          return const Res(true);
-        }
-
-        Log.info("Data Sync", "Downloading data from WebDAV server");
-        var localFile = File(FilePath.join(App.cachePath, remoteFile.name!));
-        await client.read2File(remoteFile.name!, localFile.path);
-
-        await _backupLocalData();
-        try {
-          await importAppData(localFile, skipDataVersionCheck: true);
-          await localFile.delete();
-
-          // Update lastSyncTime from the downloaded file's timestamp
-          if (remoteTimestamp != null) {
-            appdata.settings['lastSyncTime'] = remoteTimestamp;
-            await appdata.saveData(false);
-          }
-
-          _cleanupBackup();
-          App.forceRebuild();
-          Log.info("Data Sync", "Data downloaded successfully");
-          return const Res(true);
-        } catch (e, s) {
-          Log.error("Data Sync", "Import failed, restoring backup", s);
-          await _restoreBackup();
-          _cleanupBackup();
-          _lastError = 'Download failed: $e';
-          return Res.error(_lastError!);
-        }
-      } catch (e, s) {
-        Log.error("Data Sync", e, s);
-        _lastError = e.toString();
-        return Res.error(e.toString());
-      }
-    } finally {
-      _isDownloading = false;
-      _uploadDebounce?.cancel();
-      _releaseLock();
-      notifyListeners();
-    }
   }
 }

@@ -103,7 +103,13 @@ abstract mixin class _ComicPageActions {
   /// [page] the page number, start from 1
   ///
   /// [group] the chapter group number, start from 1
-  void read([int? ep, int? page, int? group]) {
+  Future<void> read([int? ep, int? page, int? group]) async {
+    try {
+      await SyncV2Service.instance.pullNow();
+    } catch (_) {}
+    final latestHistory =
+        HistoryManager().find(comic.id, comic.comicType) ?? history;
+    if (!App.rootContext.mounted) return;
     App.rootContext
         .to(
           () => Reader(
@@ -114,7 +120,9 @@ abstract mixin class _ComicPageActions {
             initialChapter: ep,
             initialPage: page,
             initialChapterGroup: group,
-            history: history ?? History.fromModel(model: comic, ep: 0, page: 0),
+            history:
+                latestHistory ??
+                History.fromModel(model: comic, ep: 0, page: 0),
             author: comic.findAuthor() ?? '',
             tags: comic.plainTags,
           ),

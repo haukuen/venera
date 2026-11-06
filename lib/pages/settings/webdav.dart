@@ -16,6 +16,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
 
   bool isTesting = false;
   bool upload = true;
+  bool syncAuthEnabled = true;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
     user = configs[1];
     pass = configs[2];
     autoSync = appdata.implicitData['webdavAutoSync'] ?? true;
+    syncAuthEnabled = appdata.implicitData['syncAuthEnabled'] ?? true;
   }
 
   void onAutoSyncChanged(bool value) {
@@ -82,6 +84,20 @@ class _WebdavSettingState extends State<_WebdavSetting> {
               title: Text("Auto Sync Data".tl),
               contentPadding: EdgeInsets.zero,
               trailing: Switch(value: autoSync, onChanged: onAutoSyncChanged),
+            ),
+            ListTile(
+              leading: Icon(Icons.account_circle_outlined),
+              title: Text("同步登录状态"),
+              contentPadding: EdgeInsets.zero,
+              trailing: Switch(
+                value: syncAuthEnabled,
+                onChanged: (value) async {
+                  setState(() {
+                    syncAuthEnabled = value;
+                  });
+                  await DataSync.setAuthSyncEnabled(value);
+                },
+              ),
             ),
             const SizedBox(height: 12),
             RadioGroup<bool>(
@@ -202,9 +218,56 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Button.outlined(
+                    onPressed: _openDiagnostics,
+                    child: const Text("同步诊断"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Button.outlined(
+                    onPressed: _openDevices,
+                    child: const Text("设备管理"),
+                  ),
+                ),
+              ],
+            ),
           ],
         ).paddingHorizontal(16),
       ),
+    );
+  }
+
+  Future<void> _openDiagnostics() async {
+    final data = await DataSync.syncDiagnostics();
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => ContentDialog(
+        title: "同步诊断",
+        content: SingleChildScrollView(
+          child: SelectableText(
+            const JsonEncoder.withIndent('  ').convert(data),
+          ),
+        ).paddingHorizontal(16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text("OK".tl),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDevices() async {
+    await showDialog(
+      context: context,
+      builder: (_) => const _SyncDevicesDialog(),
     );
   }
 
@@ -423,5 +486,101 @@ class _BackupWebdavSettingState extends State<_BackupWebdavSetting> {
       context.showMessage(message: "Saved".tl);
       App.rootPop();
     }
+  }
+}
+
+class _SyncDevicesDialog extends StatefulWidget {
+  const _SyncDevicesDialog();
+
+  @override
+  State<_SyncDevicesDialog> createState() => _SyncDevicesDialogState();
+}
+
+class _SyncDevicesDialogState extends State<_SyncDevicesDialog> {
+  late Future<List<Map<String, Object?>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = DataSync.syncDevices();
+  }
+
+  void _reload() {
+    setState(() {
+      _future = DataSync.syncDevices();
+    });
+  }
+
+  Future<void> _remove(String deviceId) async {
+    final result = await DataSync.removeSyncDevice(deviceId);
+    if (!mounted) return;
+    if (result.error) {
+      context.showMessage(message: result.errorMessage ?? 'Error');
+    } else {
+      _reload();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ContentDialog(
+      title: "设备管理",
+      content: SizedBox(
+        width: 480,
+        child: FutureBuilder<List<Map<String, Object?>>>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final devices = snapshot.data!;
+            if (devices.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text("No devices".tl),
+              );
+            }
+            return ListView(
+              shrinkWrap: true,
+              children: [
+                for (final device in devices)
+                  if (device['error'] != null)
+                    ListTile(title: Text(device['error'].toString()))
+                  else
+                    ListTile(
+                      leading: Icon(
+                        device['isSelf'] == true
+                            ? Icons.smartphone
+                            : Icons.devices,
+                      ),
+                      title: Text(device['deviceId'] as String),
+                      subtitle: Text(
+                        'lastChange: ${device['lastChange']} · '
+                        '${device['lastSeen'] ?? ''}',
+                      ),
+                      trailing: device['isSelf'] == true
+                          ? const Text("This device")
+                          : IconButton(
+                              tooltip: "Remove".tl,
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () =>
+                                  _remove(device['deviceId'] as String),
+                            ),
+                    ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text("OK".tl),
+        ),
+      ],
+    );
   }
 }
