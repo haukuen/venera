@@ -114,4 +114,33 @@ class BlobSync {
     }
     return null;
   }
+
+  /// Deletes blobs on this device's branch that no record references anymore.
+  ///
+  /// Immutability makes an unreferenced blob pure garbage: content-addressed
+  /// names mean a later record with the same content re-uploads the same name.
+  /// Callers must only run this after the references snapshot was uploaded
+  /// (a change file may still reference a blob the snapshot does not carry).
+  /// Returns the number of deleted blobs; failures are reported per blob and
+  /// never abort the sweep.
+  Future<int> deleteUnreferenced(Iterable<String> referencedSha256) async {
+    final referenced = referencedSha256.toSet();
+    var deleted = 0;
+    final List<String> blobs;
+    try {
+      blobs = await transport.listBlobs(localDeviceId);
+    } on SyncTransportException {
+      return 0;
+    }
+    for (final sha in blobs) {
+      if (referenced.contains(sha)) continue;
+      try {
+        await transport.deleteBlob(localDeviceId, sha);
+        deleted++;
+      } on SyncTransportException {
+        // Keep sweeping; the blob stays for the next run.
+      }
+    }
+    return deleted;
+  }
 }

@@ -98,9 +98,12 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
     return records;
   }
 
-  /// Uploads every valid `.data` file to this device's blob branch.
+  /// Uploads every valid `.data` file to this device's blob branch. Returns
+  /// the number of files that could not be uploaded (read failures only —
+  /// invalid JSON is not a blob this adapter ever referenced).
   @override
-  Future<void> ensureBlobsUploaded() async {
+  Future<int> ensureBlobsUploaded() async {
+    var failed = 0;
     for (final file in _dataFiles()) {
       if (_stemOf(file) == null) continue;
       try {
@@ -108,9 +111,11 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
         if (!_isJsonObject(bytes)) continue;
         await _blobSync.upload(bytes);
       } catch (error) {
+        failed++;
         _warn('source data: failed to upload ${file.path}: $error');
       }
     }
+    return failed;
   }
 
   /// Writes visible source-data records back as `<sourceKey>.data` files and
@@ -209,6 +214,19 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
   @override
   Future<void> reload() async {
     await _reload?.call();
+  }
+
+  /// Login sidecars are retained while they are merely unreadable.
+  ///
+  /// `readLocalRecords` skips invalid JSON with a warning; without this hook
+  /// the reconciler would tombstone the record and delete the login state on
+  /// every other device. A real logout rewrites the file (still valid JSON) or
+  /// removes the record through [applyRemote]'s tombstone handling, so genuine
+  /// deletions still propagate.
+  @override
+  bool retainsMissingRecord(StoredRecord record) {
+    if (record.domain != SyncDomains.auth) return false;
+    return SyncKeys.isSourceDataKey(record.key.parts);
   }
 
   /// Local `*.data` files, sorted for deterministic projections.

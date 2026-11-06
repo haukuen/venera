@@ -26,13 +26,17 @@ class SyncAppReconciler {
 
   /// Emits local business differences into [store].
   Future<void> reconcileLocal(SyncStore store) async {
+    final adaptersByDomain = <String, SyncAppAdapter>{};
     final desired = <String, AdapterRecord>{};
     for (final adapter in adapters) {
       if (adapter.domains.intersection(enabledDomains).isEmpty) continue;
+      for (final domain in adapter.domains) {
+        adaptersByDomain.putIfAbsent(domain, () => adapter);
+      }
       final records = await adapter.readLocalRecords();
-      for (final record in records) {
-        if (!enabledDomains.contains(record.domain)) continue;
-        desired[record.identity] = record;
+      for (final adapterRecord in records) {
+        if (!enabledDomains.contains(adapterRecord.domain)) continue;
+        desired[adapterRecord.identity] = adapterRecord;
       }
     }
 
@@ -47,6 +51,7 @@ class SyncAppReconciler {
     }
 
     for (final domain in enabledDomains) {
+      final adapter = adaptersByDomain[domain];
       final desiredForDomain = desired.values
           .where((record) => record.domain == domain)
           .toList();
@@ -61,6 +66,12 @@ class SyncAppReconciler {
       for (final entry in stored.entries) {
         if (desired.containsKey(entry.key)) continue;
         final record = entry.value;
+        // An adapter may report its local projection as unreadable rather
+        // than deleted (e.g. a source login sidecar that failed validation):
+        // keep the stored record instead of tombstoning it.
+        if (adapter != null && adapter.retainsMissingRecord(record)) {
+          continue;
+        }
         await store.emit(
           domain: record.domain,
           key: record.key,

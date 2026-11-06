@@ -97,4 +97,33 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('deleteUnreferenced removes only unreferenced blobs', () async {
+    final keepSha = await blobsA.upload(
+      Uint8List.fromList(utf8.encode('keep me')),
+    );
+    await blobsA.upload(Uint8List.fromList(utf8.encode('garbage')));
+
+    final deleted = await blobsA.deleteUnreferenced({keepSha});
+
+    expect(deleted, 1);
+    final remaining = remote.debugBlobs(_deviceA);
+    expect(remaining.keys, <String>[keepSha]);
+
+    // A later re-upload of removed content is a plain re-create.
+    final again = await blobsA.upload(
+      Uint8List.fromList(utf8.encode('garbage')),
+    );
+    expect(again, isNotNull);
+  });
+
+  test('deleteUnreferenced survives list failures', () async {
+    await blobsA.upload(Uint8List.fromList(utf8.encode('orphan')));
+    remote.setUnavailable(true);
+
+    final deleted = await blobsA.deleteUnreferenced(const <String>{});
+
+    expect(deleted, 0);
+    expect(remote.debugBlobs(_deviceA), isNotEmpty);
+  });
 }

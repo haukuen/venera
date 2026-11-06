@@ -61,6 +61,19 @@ abstract class SyncAppAdapter {
   /// Reloads manager caches / notifies UI after [applyRemote] changed the
   /// business database. Should be a no-op when nothing changed.
   Future<void> reload();
+
+  /// Whether the reconciler must keep a stored record whose local projection
+  /// is currently absent.
+  ///
+  /// For most adapters an absent projection is a deliberate local deletion
+  /// and the default (`false`) lets reconciliation tombstone it. Adapters whose
+  /// local storage can be *unreadable* (not deleted) — e.g. a source login
+  /// sidecar that failed validation — return `true` so a transient read
+  /// failure is never propagated as a deletion to every other device.
+  /// [AdapterRecord]s previously emitted by this adapter are passed for
+  /// reference; explicit deletions are represented by the adapter itself
+  /// emitting a delete, which this hook does not intercept.
+  bool retainsMissingRecord(StoredRecord record) => false;
 }
 
 /// Optional capability for adapters that reference content-addressed blobs
@@ -70,5 +83,11 @@ abstract class SyncAppAdapter {
 /// before push/seed, so `readLocalRecords` stays side-effect free while the
 /// referenced blobs are guaranteed to exist remotely before the op is uploaded.
 abstract interface class SyncBlobAdapter {
-  Future<void> ensureBlobsUploaded();
+  /// Uploads every local blob that a record references.
+  ///
+  /// Returns the number of blobs that could **not** be uploaded. The caller
+  /// must treat a non-zero result as a failed push: a record whose blob is
+  /// missing remotely can never be repaired later, because the record itself
+  /// does not change again.
+  Future<int> ensureBlobsUploaded();
 }

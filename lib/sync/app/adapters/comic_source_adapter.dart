@@ -94,17 +94,21 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
   /// Called by the service before pushing/seeding so the record payload never
   /// references a blob that does not exist remotely. Blobs are immutable and
   /// content-addressed, so repeated calls are cheap (existing blobs are
-  /// verified and skipped by [BlobSync.upload]).
+  /// verified and skipped by [BlobSync.upload]). Returns the number of files
+  /// that could not be uploaded; the caller treats that as a failed push.
   @override
-  Future<void> ensureBlobsUploaded() async {
+  Future<int> ensureBlobsUploaded() async {
+    var failed = 0;
     for (final file in _sourceFiles()) {
       try {
         final bytes = await file.readAsBytes();
         await _blobSync.upload(bytes);
       } catch (error) {
+        failed++;
         _warn('comicSource: failed to upload ${file.path}: $error');
       }
     }
+    return failed;
   }
 
   /// Projects the merged store state back into the `comic_source` directory.
@@ -230,6 +234,9 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
   Future<void> reload() async {
     await _reload?.call();
   }
+
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
 
   /// Local source files, sorted for deterministic projections. Missing
   /// directories yield no files; unreadable listings yield a warning.

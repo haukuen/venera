@@ -192,6 +192,22 @@ void main() {
           .length;
       expect(writeCountAfter, writeCountBefore);
     });
+
+    test(
+      'a failed upload is counted so the caller can abort the push',
+      () async {
+        writeSource(sourceDirA, 'good.js', 'var good = 1;');
+        writeSource(sourceDirA, 'bad.js', 'var bad = 1;');
+        remote.failNextWrite(count: 1);
+
+        final failed = await adapterA.ensureBlobsUploaded();
+
+        // The failure must be visible to the service, which aborts the push;
+        // the outbox keeps its ops so the next push retries.
+        expect(failed, 1);
+        expect(warnings, isNotEmpty);
+      },
+    );
   });
 
   group('applyRemote', () {

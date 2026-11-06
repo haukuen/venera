@@ -589,6 +589,24 @@ class FakeTransport implements SyncTransport {
     });
   }
 
+  @override
+  Future<List<String>> listBlobs(String deviceId) async {
+    _checkDeviceId(deviceId);
+    return _read('listBlobs:$deviceId', () {
+      final names = remote._blobs[deviceId]?.keys.toList() ?? const <String>[];
+      return List<String>.of(names..sort());
+    });
+  }
+
+  @override
+  Future<void> deleteBlob(String deviceId, String sha256) async {
+    _checkDeviceId(deviceId);
+    _checkSha256(sha256);
+    await _write('deleteBlob:$deviceId:$sha256', () {
+      remote._blobs[deviceId]?.remove(sha256);
+    });
+  }
+
   // ------------------------------------------------------------- management --
 
   @override

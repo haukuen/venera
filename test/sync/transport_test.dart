@@ -61,7 +61,7 @@ SnapshotInfo _info(
   );
 }
 
-Uint8List _snapshotBytes(SnapshotInfo info) {
+Uint8List _snapshotBytes(SnapshotInfo info, {int fillerRecords = 0}) {
   return SnapshotCodec.encode(info, const {}, [
     SnapshotRecord(
       domain: 'history',
@@ -70,6 +70,14 @@ Uint8List _snapshotBytes(SnapshotInfo info) {
       version: Version(Hlc(ms: 10, counter: 0, deviceId: info.deviceId), 1),
       data: {'ep': 1, 'page': 2},
     ),
+    for (var i = 0; i < fillerRecords; i++)
+      SnapshotRecord(
+        domain: 'history',
+        key: SyncKey(['filler-$i', '1']),
+        field: 'progress',
+        version: Version(Hlc(ms: 10, counter: 0, deviceId: info.deviceId), 1),
+        data: {'ep': i, 'page': 0},
+      ),
   ]);
 }
 
@@ -146,6 +154,18 @@ class _FakeWebDavIo implements WebDavIo {
     if (error != null) throw error;
     final bytes = files[path];
     return bytes == null ? null : Uint8List.fromList(bytes);
+  }
+
+  @override
+  Future<Uint8List?> readHead(String path, int maxLength) async {
+    _record('GET-HEAD', path);
+    final error = readError;
+    if (error != null) throw error;
+    final bytes = files[path];
+    if (bytes == null) return null;
+    return Uint8List.fromList(
+      bytes.length <= maxLength ? bytes : bytes.sublist(0, maxLength),
+    );
   }
 
   @override
@@ -972,6 +992,26 @@ void main() {
       final fallback = await transport.readSnapshot(_deviceA);
       expect(fallback, first);
       expect((await transport.readSnapshotInfo(_deviceA))?.rangeHi, 7);
+    });
+
+    test('readSnapshotInfo fetches only a prefix of the snapshot', () async {
+      // A snapshot whose meta line is well inside the first deflate block:
+      // a 4 KiB range request must be able to decode it without reading the
+      // rest of the file.
+      final big = _snapshotBytes(_info(_deviceA), fillerRecords: 2000);
+      expect(big.length, greaterThan(4096));
+      await transport.writeSnapshot(_deviceA, big);
+
+      io.requests.clear();
+      final info = await transport.readSnapshotInfo(_deviceA);
+
+      expect(info?.rangeHi, 7);
+      expect(
+        io.requestsOf('GET-HEAD'),
+        isNotEmpty,
+        reason: 'the probe must use the head read, not a full GET',
+      );
+      expect(io.requestsOf('GET'), isEmpty);
     });
 
     test('snapshot without MOVE support still writes', () async {

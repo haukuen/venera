@@ -129,6 +129,9 @@ class SettingsAdapter implements SyncAppAdapter {
     await _reload?.call();
   }
 
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
   void _warn(String message) => _onWarning?.call(message);
 
   static bool _isJsonEncodable(Object? value) {

@@ -304,6 +304,9 @@ class _SettingsAdapterForTest implements SyncAppAdapter {
 
   @override
   Future<void> reload() async {}
+
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
 }
 
 class _HistoryRow {

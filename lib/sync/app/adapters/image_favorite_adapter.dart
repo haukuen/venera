@@ -242,6 +242,9 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
     }
   }
 
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
   // ---------------------------------------------------------------------------
   // Business row mapping
   // ---------------------------------------------------------------------------

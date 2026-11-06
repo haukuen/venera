@@ -637,6 +637,17 @@ class _FakeTransport implements SyncTransport {
       blobs[deviceId]?[sha256];
 
   @override
+  Future<List<String>> listBlobs(String deviceId) async {
+    final names = blobs[deviceId]?.keys.toList() ?? const <String>[];
+    return List<String>.of(names..sort());
+  }
+
+  @override
+  Future<void> deleteBlob(String deviceId, String sha256) async {
+    blobs[deviceId]?.remove(sha256);
+  }
+
+  @override
   Future<void> deleteChanges(String deviceId, int upToSeq) async {
     final files = changes[deviceId];
     if (files == null) return;

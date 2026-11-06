@@ -10,6 +10,7 @@ import 'package:venera/sync/domains.dart';
 import 'package:venera/sync/fake_transport.dart';
 import 'package:venera/sync/op.dart';
 import 'package:venera/sync/sqlite_store.dart';
+import 'package:venera/sync/store.dart';
 
 const _deviceA = 'aaaaaaaa-1111-2222-3333-444444444444';
 const _deviceB = 'bbbbbbbb-1111-2222-3333-444444444444';
@@ -125,6 +126,45 @@ void main() {
     await adapter.ensureBlobsUploaded();
     expect(warnings, isEmpty);
   });
+
+  test(
+    'an unreadable sidecar is retained, not reconciled into a deletion',
+    () async {
+      writeData(dirA, 'picacg.data', '{"token":"abc"}');
+      await adapterA.ensureBlobsUploaded();
+      await emitRecords(await adapterA.readLocalRecords());
+
+      // The sidecar becomes unreadable (truncated write / corrupt file). The
+      // adapter must ask the reconciler to keep the stored record instead of
+      // letting reconciliation tombstone it.
+      dataFile(dirA, 'picacg.data').writeAsStringSync('{oops');
+
+      final stored = await store.recordOf(
+        SyncDomains.auth,
+        SyncKeys.sourceDataKey('picacg'),
+        '',
+      );
+      expect(stored, isNotNull);
+      expect(stored!.visible, isTrue);
+      expect(adapterA.retainsMissingRecord(stored), isTrue);
+      // Cookie records of the same domain are not retained.
+      expect(
+        adapterA.retainsMissingRecord(
+          StoredRecord(
+            domain: SyncDomains.auth,
+            key: SyncKeys.authCookieKey('example.com', '/', 'sid'),
+            field: '',
+            version: stored.version,
+          ),
+        ),
+        isFalse,
+      );
+
+      // Once the file is readable again the normal diff path takes over.
+      writeData(dirA, 'picacg.data', '{"token":"new"}');
+      expect(await adapterA.readLocalRecords(), hasLength(1));
+    },
+  );
 
   test('uploads every valid .data blob', () async {
     writeData(dirA, 'a.data', '{"token":"t1"}');

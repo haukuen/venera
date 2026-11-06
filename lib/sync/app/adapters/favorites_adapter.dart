@@ -245,6 +245,9 @@ class FavoritesAdapter implements SyncAppAdapter {
     }
   }
 
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
   // ---------------------------------------------------------------------------
   // Parsing merged store records
   // ---------------------------------------------------------------------------

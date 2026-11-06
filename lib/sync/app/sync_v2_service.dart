@@ -102,6 +102,7 @@ class SyncV2Service extends ChangeNotifier {
   WebDavSyncTransport? _transport;
   SyncEngine? _engine;
   SyncAppReconciler? _reconciler;
+  BlobSync? _blobSync;
   final List<SyncAppAdapter> _adapters = [];
 
   Future<void>? _initFuture;
@@ -229,6 +230,7 @@ class SyncV2Service extends ChangeNotifier {
       transport: transport,
       localDeviceId: store.deviceId,
     );
+    _blobSync = blobSync;
     final adapters = <SyncAppAdapter>[
       HistoryAdapter(
         dbPath: FilePath.join(App.dataPath, 'history.db'),
@@ -352,14 +354,22 @@ class SyncV2Service extends ChangeNotifier {
     // Project local data first so local state wins LWW against older remote
     // records (documented one-time migration trade-off).
     await _reconciler!.reconcileLocal(store);
-    await _ensureBlobs();
+    final blobFailures = await _ensureBlobs();
+    if (blobFailures > 0) {
+      Log.error(
+        'Sync v2',
+        'Seed aborted: $blobFailures blob upload(s) failed; '
+            'retrying on the next sync',
+      );
+      // Deliberately not marking the seed as done: the next start retries.
+      return;
+    }
     try {
       final pull = await engine.pull();
       if (pull.changed) await _projectRemote(store);
     } catch (error, stack) {
       Log.error('Sync v2', 'Seed pull failed', stack);
     }
-    await _ensureBlobs();
     final push = await engine.push();
     if (push.error != null) {
       Log.error('Sync v2', 'Seed push failed: ${push.error}');
@@ -504,13 +514,20 @@ class SyncV2Service extends ChangeNotifier {
     try {
       await _projectPendingIfNeeded(syncStore);
       await _reconciler!.reconcileLocal(syncStore);
-      await _ensureBlobs();
+      final blobFailures = await _ensureBlobs();
+      if (blobFailures > 0) {
+        // The outbox keeps its ops; the next push retries both the blob and
+        // the change files, so nothing is lost by aborting here.
+        _lastError = '$blobFailures blob upload(s) failed; push aborted';
+        return Res.error(_lastError!);
+      }
       final result = await syncEngine.push();
       if (result.error != null) {
         _lastError = result.error.toString();
         return Res.error(_lastError!);
       }
       await syncEngine.maybeSnapshot();
+      await _gcBlobs();
       await _touchLastSyncTime();
       return const Res(true);
     } catch (error, stack) {
@@ -547,16 +564,51 @@ class SyncV2Service extends ChangeNotifier {
     return map;
   }
 
-  Future<void> _ensureBlobs() async {
+  /// Uploads every referenced blob. Returns the number of failed uploads;
+  /// callers must abort the push when it is non-zero, otherwise the record
+  /// would reference a blob that no later sync re-uploads.
+  Future<int> _ensureBlobs() async {
+    var failed = 0;
     for (final adapter in _adapters) {
-      if (adapter is SyncBlobAdapter) {
-        try {
-          await (adapter as SyncBlobAdapter).ensureBlobsUploaded();
-        } catch (error, stack) {
-          Log.error('Sync v2', 'Blob upload failed', stack);
-          _lastError = error.toString();
-        }
+      if (adapter is! SyncBlobAdapter) continue;
+      try {
+        failed += await (adapter as SyncBlobAdapter).ensureBlobsUploaded();
+      } catch (error, stack) {
+        Log.error('Sync v2', 'Blob upload failed', stack);
+        _lastError = error.toString();
+        failed++;
       }
+    }
+    return failed;
+  }
+
+  /// Deletes blobs on this device's branch that no *visible* record of the
+  /// local store references anymore.
+  ///
+  /// Safe only after a successful push + snapshot: the snapshot carries the
+  /// surviving references, and content-addressed names make a re-upload of
+  /// still-needed content a no-op even if a concurrent device still holds an
+  /// older reference. Tombstones count as no reference (the blob is dead
+  /// content), but a record whose tombstone is *older* than its value may
+  /// still be referenced — `visible` decides, matching what peers can request.
+  Future<void> _gcBlobs() async {
+    final blobSync = _blobSync;
+    final store = _store;
+    if (blobSync == null || store == null) return;
+    try {
+      final referenced = <String>{};
+      for (final record in await store.dumpRecords()) {
+        if (!record.visible) continue;
+        final sha256 = record.data?['sha256'];
+        if (sha256 is String) referenced.add(sha256);
+      }
+      final deleted = await blobSync.deleteUnreferenced(referenced);
+      if (deleted > 0) {
+        Log.info('Sync v2', 'Blob GC removed $deleted unreferenced blob(s)');
+      }
+    } catch (error, stack) {
+      // Garbage collection must never fail the push.
+      Log.error('Sync v2', 'Blob GC failed', stack);
     }
   }
 

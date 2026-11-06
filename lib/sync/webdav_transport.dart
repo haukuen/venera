@@ -116,6 +116,12 @@ abstract class WebDavIo {
   /// Reads a file, `null` when absent.
   Future<Uint8List?> read(String path);
 
+  /// Reads at most [maxLength] leading bytes of a file, `null` when absent.
+  ///
+  /// Implemented with a Range request when the server supports it, falling
+  /// back to a full GET. Used for cheap metadata probes of large files.
+  Future<Uint8List?> readHead(String path, int maxLength);
+
   /// Writes a file (creating missing parent collections), overwriting any
   /// previous content. Retrying the same content is idempotent.
   Future<void> write(String path, Uint8List bytes);
@@ -177,6 +183,48 @@ class PackageWebDavIo implements WebDavIo {
         options.responseType = ResponseType.bytes;
       },
     );
+    return _bytesOrNull(path, response);
+  }
+
+  @override
+  Future<Uint8List?> readHead(String path, int maxLength) async {
+    Future<Response<dynamic>> get([Map<String, String>? headers]) {
+      return _request(
+        'GET',
+        path,
+        optionsHandler: (options) {
+          options.responseType = ResponseType.bytes;
+          if (headers != null) options.headers!.addAll(headers);
+        },
+      );
+    }
+
+    // Try a range request first; a server without range support answers 200
+    // with the whole body, which is still correct (just less efficient).
+    final ranged = await get({'range': 'bytes=0-${maxLength - 1}'});
+    final status = ranged.statusCode;
+    if (status == 206) {
+      final data = ranged.data;
+      if (data is Uint8List) return data;
+      if (data is List<int>) return Uint8List.fromList(data);
+      if (data is String) return Uint8List.fromList(utf8.encode(data));
+      throw SyncTransportException(
+        'Unexpected 206 response body type: ${data.runtimeType}',
+        statusCode: status,
+      );
+    }
+    if (status == 404) return null;
+    if (status != 200) {
+      throw SyncTransportException('GET $path failed', statusCode: status);
+    }
+    final full = _bytesOrNull(path, ranged);
+    if (full == null) return null;
+    return full.length <= maxLength
+        ? full
+        : Uint8List.sublistView(full, 0, maxLength);
+  }
+
+  Uint8List? _bytesOrNull(String path, Response<dynamic> response) {
     final status = response.statusCode;
     if (status == 200) {
       final data = response.data;
@@ -543,13 +591,14 @@ class WebDavSyncTransport implements SyncTransport {
 
   /// Decodes the meta line (first JSONL line) of a `snapshot.jsonl.gz`.
   ///
-  /// Only the beginning of the gzip stream is inflated, so this stays cheap
-  /// (and within the snapshot size limits) even for large snapshots.
+  /// [readSnapshotInfo] passes only a prefix of the gzip stream; inflate the
+  /// leading bytes until the first newline of the *decompressed* data.
   static SnapshotInfo decodeSnapshotInfo(
     Uint8List bytes, {
     String? expectedDeviceId,
+    bool prefixOnly = false,
   }) {
-    final line = _decodeFirstLine(bytes);
+    final line = _decodeFirstLine(bytes, prefixOnly: prefixOnly);
     final decoded = jsonDecode(line);
     if (decoded is! Map) {
       throw const FormatException('Invalid snapshot meta line');
@@ -567,7 +616,12 @@ class WebDavSyncTransport implements SyncTransport {
 
   static const int _maxSnapshotMetaBytes = 256 << 10;
 
-  static String _decodeFirstLine(Uint8List bytes) {
+  /// Leading bytes fetched for a snapshot metadata probe. The gzip header
+  /// (~18 bytes) plus one flate block of a JSON meta line stays well below
+  /// this for realistic snapshot sizes.
+  static const int _snapshotMetaProbeBytes = 4096;
+
+  static String _decodeFirstLine(Uint8List bytes, {bool prefixOnly = false}) {
     if (bytes.isEmpty) throw const FormatException('Empty snapshot');
     final sink = _FirstLineSink(_maxSnapshotMetaBytes);
     final decoder = GZipCodec().decoder.startChunkedConversion(sink);
@@ -576,11 +630,21 @@ class WebDavSyncTransport implements SyncTransport {
       decoder.add(bytes);
     } on _FirstLineComplete {
       completed = true;
+    } on FormatException {
+      if (!prefixOnly) rethrow;
+      // A truncated gzip prefix that still flushed a complete first line is
+      // usable; otherwise fall through to the empty-line error below.
     }
     if (!completed) {
-      // A snapshot without a trailing newline: closing flushes the remaining
-      // decompressed bytes so the single meta line can be read.
-      decoder.close();
+      if (prefixOnly && bytes.length < _snapshotMetaProbeBytes) {
+        // The probe covered the whole file: closing is safe and flushes any
+        // remaining decompressed bytes.
+        decoder.close();
+      } else {
+        // A snapshot without a trailing newline: closing flushes the remaining
+        // decompressed bytes so the single meta line can be read.
+        decoder.close();
+      }
     }
     final line = utf8.decode(sink.takeBytes()).trim();
     if (line.isEmpty) throw const FormatException('Empty snapshot meta line');
@@ -677,13 +741,41 @@ class WebDavSyncTransport implements SyncTransport {
     final snapshot = paths.snapshotPath(deviceId);
     final previous = paths.snapshotPrevPath(deviceId);
     return _guard('readSnapshotInfo', () async {
-      final bytes = await _io.read(snapshot);
-      final fallback = (bytes == null || bytes.isEmpty)
-          ? await _io.read(previous)
-          : null;
-      final source = (bytes != null && bytes.isNotEmpty) ? bytes : fallback;
-      if (source == null || source.isEmpty) return null;
-      return decodeSnapshotInfo(source, expectedDeviceId: deviceId);
+      // Only the leading bytes are fetched: the meta line is the first
+      // decompressed line, so a range request avoids downloading the whole
+      // (potentially multi-MB) snapshot for a metadata probe.
+      Uint8List? source;
+      var prefixOnly = false;
+      final bytes = await _io.readHead(snapshot, _snapshotMetaProbeBytes);
+      if (bytes != null && bytes.isNotEmpty) {
+        source = bytes;
+        prefixOnly = true;
+      } else {
+        final previousBytes = await _io.readHead(
+          previous,
+          _snapshotMetaProbeBytes,
+        );
+        if (previousBytes == null || previousBytes.isEmpty) return null;
+        source = previousBytes;
+        prefixOnly = true;
+      }
+      try {
+        return decodeSnapshotInfo(
+          source,
+          expectedDeviceId: deviceId,
+          prefixOnly: prefixOnly,
+        );
+      } on FormatException catch (error) {
+        if (!prefixOnly) rethrow;
+        // A truncated prefix may fail to inflate; fall back to a full read.
+        final full = await _io.read(snapshot) ?? await _io.read(previous);
+        if (full == null || full.isEmpty) return null;
+        try {
+          return decodeSnapshotInfo(full, expectedDeviceId: deviceId);
+        } on FormatException {
+          throw error;
+        }
+      }
     });
   }
 
@@ -715,6 +807,31 @@ class WebDavSyncTransport implements SyncTransport {
   Future<Uint8List?> readBlob(String deviceId, String sha256) async {
     final path = paths.blobPath(deviceId, sha256);
     return _guard('readBlob', () => _io.read(path));
+  }
+
+  @override
+  Future<List<String>> listBlobs(String deviceId) {
+    final blobsDir = '${paths.deviceDir(deviceId)}/blobs';
+    return _guard('listBlobs', () async {
+      final entries = await _io.list(blobsDir);
+      if (entries == null) return const <String>[];
+      final names = <String>[];
+      for (final entry in entries) {
+        if (entry.isDirectory) continue;
+        // Stored as `<sha256>.gz`; strip both suffixes defensively.
+        var name = entry.name;
+        if (name.endsWith('.gz')) name = name.substring(0, name.length - 3);
+        if (WebDavPaths.sha256RegExp.hasMatch(name)) names.add(name);
+      }
+      names.sort();
+      return names;
+    });
+  }
+
+  @override
+  Future<void> deleteBlob(String deviceId, String sha256) async {
+    final path = paths.blobPath(deviceId, sha256);
+    await _guard('deleteBlob', () => _io.remove(path));
   }
 
   @override

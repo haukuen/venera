@@ -141,6 +141,9 @@ class ComicSettingAdapter implements SyncAppAdapter {
     await _reload?.call();
   }
 
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
   /// Extracts the comic key from a store key.
   ///
   /// The canonical form is `[comicKey, '']`; a bare `[comicKey]` is also

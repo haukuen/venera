@@ -249,6 +249,9 @@ class AuthAdapter implements SyncAppAdapter {
     await _reload?.call();
   }
 
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
   void _warn(String message) => _onWarning?.call(message);
 
   void _deleteExisting(Database db, _ExistingCookie cookie) {

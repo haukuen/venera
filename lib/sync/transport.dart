@@ -189,6 +189,12 @@ abstract class SyncTransport {
   /// Reads a content-addressed blob, or `null` when absent.
   Future<Uint8List?> readBlob(String deviceId, String sha256);
 
+  /// Lists the sha256 names of a device's uploaded blobs.
+  Future<List<String>> listBlobs(String deviceId);
+
+  /// Deletes a content-addressed blob; missing blobs are ignored.
+  Future<void> deleteBlob(String deviceId, String sha256);
+
   /// Deletes change files up to and including [upToSeq].
   Future<void> deleteChanges(String deviceId, int upToSeq);
 
