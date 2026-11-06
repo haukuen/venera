@@ -233,10 +233,7 @@ void main() {
         },
       );
       expect(created, 1);
-      expect(
-        transport.paths.statePath(_deviceA),
-        'venera-sync/v2/devices/$_deviceA.json',
-      );
+      expect(transport.paths.statePath(_deviceA), 'v2/devices/$_deviceA.json');
       await transport.close();
       await transport.close();
     },
@@ -261,36 +258,30 @@ void main() {
     final paths = WebDavPaths();
 
     test('builds the documented v2 layout', () {
-      expect(paths.devicesDir, 'venera-sync/v2/devices');
-      expect(
-        paths.statePath(_deviceA),
-        'venera-sync/v2/devices/$_deviceA.json',
-      );
-      expect(paths.deviceDir(_deviceA), 'venera-sync/v2/devices/$_deviceA');
+      expect(paths.devicesDir, 'v2/devices');
+      expect(paths.statePath(_deviceA), 'v2/devices/$_deviceA.json');
+      expect(paths.deviceDir(_deviceA), 'v2/devices/$_deviceA');
       expect(
         paths.deviceMetaPath(_deviceA),
-        'venera-sync/v2/devices/$_deviceA/device.json',
+        'v2/devices/$_deviceA/device.json',
       );
-      expect(
-        paths.changesDir(_deviceA),
-        'venera-sync/v2/devices/$_deviceA/changes',
-      );
+      expect(paths.changesDir(_deviceA), 'v2/devices/$_deviceA/changes');
       expect(
         paths.changeFilePath(_deviceA, 1, 42),
-        'venera-sync/v2/devices/$_deviceA/changes/'
+        'v2/devices/$_deviceA/changes/'
         '000000000001-000000000042.jsonl.gz',
       );
       expect(
         paths.snapshotPath(_deviceA),
-        'venera-sync/v2/devices/$_deviceA/snapshot.jsonl.gz',
+        'v2/devices/$_deviceA/snapshot.jsonl.gz',
       );
       expect(
         paths.snapshotPrevPath(_deviceA),
-        'venera-sync/v2/devices/$_deviceA/snapshot.prev.jsonl.gz',
+        'v2/devices/$_deviceA/snapshot.prev.jsonl.gz',
       );
       expect(
         paths.blobPath(_deviceA, _sha),
-        'venera-sync/v2/devices/$_deviceA/blobs/$_sha.gz',
+        'v2/devices/$_deviceA/blobs/$_sha.gz',
       );
     });
 
@@ -845,9 +836,9 @@ void main() {
       await transport.writeState(_deviceA, _state(_deviceA));
       await transport.writeState(_deviceB, _state(_deviceB));
       // Ignored junk: non-hex name, non-json file, directory named like junk.
-      io.files['venera-sync/v2/devices/not-a-device.json'] = Uint8List(1);
-      io.files['venera-sync/v2/devices/notes.txt'] = Uint8List(1);
-      io.files['venera-sync/v2/devices/zzz/device.json'] = Uint8List(1);
+      io.files['v2/devices/not-a-device.json'] = Uint8List(1);
+      io.files['v2/devices/notes.txt'] = Uint8List(1);
+      io.files['v2/devices/zzz/device.json'] = Uint8List(1);
 
       io.requests.clear();
       final devices = await transport.listDevices();
@@ -924,7 +915,7 @@ void main() {
       final bytes = Uint8List.fromList([42]);
       await transport.writeChanges(_deviceA, 1, 42, bytes);
       final name =
-          'venera-sync/v2/devices/$_deviceA/changes/'
+          'v2/devices/$_deviceA/changes/'
           '000000000001-000000000042.jsonl.gz';
       expect(io.files[name], bytes);
       expect(
@@ -1047,11 +1038,9 @@ void main() {
 
     test('maps low level network errors to SyncTransportException', () async {
       io.readError = DioException(
-        requestOptions: RequestOptions(path: '/venera-sync/v2/devices/x.json'),
+        requestOptions: RequestOptions(path: '/v2/devices/x.json'),
         response: Response<dynamic>(
-          requestOptions: RequestOptions(
-            path: '/venera-sync/v2/devices/x.json',
-          ),
+          requestOptions: RequestOptions(path: '/v2/devices/x.json'),
           statusCode: 500,
         ),
         type: DioExceptionType.badResponse,

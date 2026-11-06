@@ -4,12 +4,12 @@
 /// directory:
 ///
 /// ```text
-/// venera-sync/v2/devices/<deviceId>.json
-/// venera-sync/v2/devices/<deviceId>/device.json
-/// venera-sync/v2/devices/<deviceId>/snapshot.jsonl.gz
-/// venera-sync/v2/devices/<deviceId>/snapshot.prev.jsonl.gz
-/// venera-sync/v2/devices/<deviceId>/changes/000000000001-000000000042.jsonl.gz
-/// venera-sync/v2/devices/<deviceId>/blobs/<sha256>.gz
+/// v2/devices/<deviceId>.json
+/// v2/devices/<deviceId>/device.json
+/// v2/devices/<deviceId>/snapshot.jsonl.gz
+/// v2/devices/<deviceId>/snapshot.prev.jsonl.gz
+/// v2/devices/<deviceId>/changes/000000000001-000000000042.jsonl.gz
+/// v2/devices/<deviceId>/blobs/<sha256>.gz
 /// ```
 ///
 /// Security notes (protocol doc §12.3): every value that ends up in a remote
@@ -374,7 +374,7 @@ class PackageWebDavIo implements WebDavIo {
 class WebDavPaths {
   WebDavPaths([String root = defaultRoot]) : root = _normalizeRoot(root);
 
-  static const String defaultRoot = 'venera-sync/v2';
+  static const String defaultRoot = 'v2';
 
   static final RegExp changeFileNameRegExp = RegExp(
     r'^(\d{12})-(\d{12})\.jsonl\.gz$',
