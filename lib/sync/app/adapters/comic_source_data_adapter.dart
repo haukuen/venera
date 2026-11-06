@@ -185,7 +185,7 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
           final existing = await target.readAsBytes();
           if (BlobSync.sha256Hex(existing) == entry.value) continue;
         }
-        await target.writeAsBytes(bytes, flush: true);
+        await _writeAtomically(target, bytes);
         changed++;
       } catch (error) {
         _warn('source data: failed to write ${target.path}: $error');
@@ -240,6 +240,22 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
 
   File _fileFor(String stem) =>
       File('${_directory.path}${Platform.pathSeparator}$stem$dataExtension');
+
+  /// Writes a sidecar through a temporary file so a crash cannot leave a
+  /// truncated `.data` behind (a truncated file would project as a tombstone on
+  /// the next reconciliation and delete the login state everywhere).
+  static Future<void> _writeAtomically(File target, Uint8List bytes) async {
+    final tmp = File('${target.path}.tmp');
+    await tmp.writeAsBytes(bytes, flush: true);
+    try {
+      // POSIX rename replaces the destination atomically.
+      await tmp.rename(target.path);
+    } on FileSystemException {
+      // Windows cannot rename over an existing file.
+      if (await target.exists()) await target.delete();
+      await tmp.rename(target.path);
+    }
+  }
 
   static String _fileName(File file) {
     final path = file.path;

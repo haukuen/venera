@@ -117,6 +117,22 @@ class SyncV2Service extends ChangeNotifier {
   AppLifecycleListener? _lifecycle;
   Future<void>? _operation;
 
+  /// Store meta key set before merged records are projected into the business
+  /// databases and cleared afterwards.
+  ///
+  /// A pull advances the applied watermarks before `applyRemote` runs. If the
+  /// app dies in between, the next pull would see "nothing new" and skip the
+  /// projection forever. The marker makes that projection retryable; it also
+  /// guarantees the projection happens *before* the next `reconcileLocal`, so
+  /// business rows that were merged but never written back are not mistaken
+  /// for local deletions and tombstoned.
+  static const String _metaProjectionPending = 'projectionPending';
+
+  /// Implicit-data key that forces one projection on the first start after
+  /// upgrading from a build where snapshot-only pulls did not project their
+  /// merged records.
+  static const String _implicitProjectionSeeded = 'syncV2ProjectionSeeded';
+
   bool get isInitialized => _initialized;
 
   bool get isUploading => _isUploading;
@@ -292,6 +308,21 @@ class SyncV2Service extends ChangeNotifier {
       _lastError = error.toString();
     }
 
+    // Recover merged-but-unprojected records before any reconciliation can
+    // mistake them for local deletions. The one-time flag also repairs data
+    // merged by older builds that skipped projection after a snapshot repair.
+    try {
+      if (appdata.implicitData[_implicitProjectionSeeded] != true) {
+        appdata.implicitData[_implicitProjectionSeeded] = true;
+        await appdata.writeImplicitData();
+        await store.setMeta(_metaProjectionPending, '1');
+      }
+      await _projectPendingIfNeeded(store);
+    } catch (error, stack) {
+      Log.error('Sync v2', 'Pending projection failed', stack);
+      _lastError = error.toString();
+    }
+
     HistoryManager().addListener(_onManagerChanged);
     LocalFavoritesManager().addListener(_onManagerChanged);
     ReadLaterManager().addListener(_onManagerChanged);
@@ -324,7 +355,7 @@ class SyncV2Service extends ChangeNotifier {
     await _ensureBlobs();
     try {
       final pull = await engine.pull();
-      if (pull.changed) await _reconciler!.applyRemote(_store!);
+      if (pull.changed) await _projectRemote(store);
     } catch (error, stack) {
       Log.error('Sync v2', 'Seed pull failed', stack);
     }
@@ -337,6 +368,21 @@ class SyncV2Service extends ChangeNotifier {
     }
     appdata.implicitData['syncV2Seeded'] = true;
     await appdata.writeImplicitData();
+  }
+
+  /// Projects the merged store into the business databases with a crash-safe
+  /// marker: the marker survives a failure between watermark advance and
+  /// projection, so [_projectPendingIfNeeded] retries instead of treating the
+  /// pull as "nothing new".
+  Future<void> _projectRemote(SqliteSyncStore store) async {
+    await store.setMeta(_metaProjectionPending, '1');
+    await _reconciler!.applyRemote(store);
+    await store.setMeta(_metaProjectionPending, null);
+  }
+
+  Future<void> _projectPendingIfNeeded(SqliteSyncStore store) async {
+    if (await store.getMeta(_metaProjectionPending) == null) return;
+    await _projectRemote(store);
   }
 
   // ------------------------------------------------------------- transfers --
@@ -398,21 +444,28 @@ class SyncV2Service extends ChangeNotifier {
   }
 
   Future<Res<bool>> _pullInternal() async {
-    final store = _store;
-    final engine = _engine;
+    var store = _store;
+    var engine = _engine;
     if (store == null || engine == null) {
       await init();
+      store = _store;
+      engine = _engine;
     }
+    final syncStore = store!;
+    final syncEngine = engine!;
     _isDownloading = true;
     _lastError = null;
     notifyListeners();
     var changedAnything = false;
     try {
-      await _reconciler!.reconcileLocal(store!);
-      final result = await engine!.pull();
+      // Project anything a previous pull merged but never wrote back before
+      // reconciliation can classify those records as local deletions.
+      await _projectPendingIfNeeded(syncStore);
+      await _reconciler!.reconcileLocal(syncStore);
+      final result = await syncEngine.pull();
       changedAnything = result.changed;
       if (result.changed) {
-        await _reconciler!.applyRemote(_store!);
+        await _projectRemote(syncStore);
         if (enabledDomains.contains(SyncDomains.history)) {
           _historyRevision++;
         }
@@ -436,23 +489,28 @@ class SyncV2Service extends ChangeNotifier {
   }
 
   Future<Res<bool>> _pushInternal() async {
-    final store = _store;
-    final engine = _engine;
+    var store = _store;
+    var engine = _engine;
     if (store == null || engine == null) {
       await init();
+      store = _store;
+      engine = _engine;
     }
+    final syncStore = store!;
+    final syncEngine = engine!;
     _isUploading = true;
     _lastError = null;
     notifyListeners();
     try {
-      await _reconciler!.reconcileLocal(store!);
+      await _projectPendingIfNeeded(syncStore);
+      await _reconciler!.reconcileLocal(syncStore);
       await _ensureBlobs();
-      final result = await engine!.push();
+      final result = await syncEngine.push();
       if (result.error != null) {
         _lastError = result.error.toString();
         return Res.error(_lastError!);
       }
-      await engine.maybeSnapshot();
+      await syncEngine.maybeSnapshot();
       await _touchLastSyncTime();
       return const Res(true);
     } catch (error, stack) {
@@ -575,12 +633,15 @@ class SyncV2Service extends ChangeNotifier {
   /// re-enabled.
   Future<void> rebuildAuthDomain() async {
     if (!_initialized || !authSyncEnabled) return;
+    final store = _store;
+    if (store == null) return;
     try {
+      // Capture login changes made while the domain was disabled first: they
+      // become fresh versions, so the replay cannot overwrite them. Projecting
+      // before reconciling would instead delete those local-only changes.
+      await _reconciler!.reconcileLocal(store);
       await _engine?.replayDomain(SyncDomains.auth);
-      // Project first: records replayed into the store must reach cookie.db /
-      // source `.data` files before local reconciliation can overwrite them.
-      await _reconciler!.applyRemote(_store!);
-      await _reconciler!.reconcileLocal(_store!);
+      await _projectRemote(store);
       await _engine?.push();
     } catch (error, stack) {
       Log.error('Sync v2', 'Auth domain rebuild failed', stack);
