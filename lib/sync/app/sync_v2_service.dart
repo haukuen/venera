@@ -25,6 +25,7 @@ import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/sync/app/adapters/auth_adapter.dart';
 import 'package:venera/sync/app/adapters/comic_setting_adapter.dart';
 import 'package:venera/sync/app/adapters/comic_source_adapter.dart';
+import 'package:venera/sync/app/adapters/comic_source_data_adapter.dart';
 import 'package:venera/sync/app/adapters/favorites_adapter.dart';
 import 'package:venera/sync/app/adapters/history_adapter.dart';
 import 'package:venera/sync/app/adapters/image_favorite_adapter.dart';
@@ -159,6 +160,8 @@ class SyncV2Service extends ChangeNotifier {
     return values;
   }
 
+  String get _comicSourceDir => FilePath.join(App.dataPath, 'comic_source');
+
   String _resolveDeviceId() {
     final raw = appdata.settings['deviceId'];
     if (raw is String && hlcDeviceIdRegExp.hasMatch(raw.trim())) {
@@ -206,6 +209,10 @@ class SyncV2Service extends ChangeNotifier {
     );
     _transport = transport;
 
+    final blobSync = BlobSync(
+      transport: transport,
+      localDeviceId: store.deviceId,
+    );
     final adapters = <SyncAppAdapter>[
       HistoryAdapter(
         dbPath: FilePath.join(App.dataPath, 'history.db'),
@@ -241,10 +248,19 @@ class SyncV2Service extends ChangeNotifier {
         reload: () async => App.forceRebuild(),
       ),
       ComicSourceAdapter(
-        sourceDir: FilePath.join(App.dataPath, 'comic_source'),
-        blobSync: BlobSync(transport: transport, localDeviceId: store.deviceId),
+        sourceDir: _comicSourceDir,
+        blobSync: blobSync,
         reload: _reloadComicSources,
       ),
+      // Source login tokens live in `<key>.data` sidecars, not in the JS
+      // definition, so they need their own projection. They share the `auth`
+      // domain (and therefore the "sync login state" toggle).
+      if (authSyncEnabled)
+        ComicSourceDataAdapter(
+          sourceDir: _comicSourceDir,
+          blobSync: blobSync,
+          reload: _reloadComicSources,
+        ),
       if (authSyncEnabled)
         AuthAdapter(
           dbPath: FilePath.join(App.dataPath, 'cookie.db'),
@@ -553,15 +569,18 @@ class SyncV2Service extends ChangeNotifier {
     }
   }
 
-  /// Replays the auth domain from retained changes/snapshots (M2, §3.4), then
-  /// merges local cookies and pushes. Called when "sync login state" is
+  /// Replays the auth domain (cookies + comic source login state) from
+  /// retained changes/snapshots (M2, §3.4), projects the merged state, then
+  /// merges local state and pushes. Called when "sync login state" is
   /// re-enabled.
   Future<void> rebuildAuthDomain() async {
     if (!_initialized || !authSyncEnabled) return;
     try {
       await _engine?.replayDomain(SyncDomains.auth);
-      await _reconciler!.reconcileLocal(_store!);
+      // Project first: records replayed into the store must reach cookie.db /
+      // source `.data` files before local reconciliation can overwrite them.
       await _reconciler!.applyRemote(_store!);
+      await _reconciler!.reconcileLocal(_store!);
       await _engine?.push();
     } catch (error, stack) {
       Log.error('Sync v2', 'Auth domain rebuild failed', stack);

@@ -328,6 +328,23 @@ abstract final class SyncKeys {
   /// they may contain `@` and `/`, so they are passed as separate segments.
   static SyncKey authCookieKey(String domain, String path, String name) =>
       SyncKey(<String>[domain, path, name]);
+
+  /// Reserved first segment of source login-state records in [SyncDomains.auth].
+  ///
+  /// Cookie keys always have three segments and a cookie domain cannot contain
+  /// `@`, so source-data keys and cookie keys can never collide.
+  static const String sourceDataPrefix = '@sourceData';
+
+  /// `auth` (comic source login state) key: `[@sourceData, sourceKey]`.
+  ///
+  /// The payload is a blob reference to the source's `<key>.data` sidecar,
+  /// which stores login tokens for sources such as picacg / komga / jm.
+  static SyncKey sourceDataKey(String sourceKey) =>
+      SyncKey(<String>[sourceDataPrefix, sourceKey]);
+
+  /// Whether [parts] is a [sourceDataKey] (rather than a cookie key).
+  static bool isSourceDataKey(List<String> parts) =>
+      parts.length == 2 && parts[0] == sourceDataPrefix;
 }
 
 /// Top-level aliases for [SyncKeys].

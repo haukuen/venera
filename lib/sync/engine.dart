@@ -630,6 +630,10 @@ class SyncEngine {
   /// Repair attempts per remote device for the current public operation.
   final Map<String, int> _repairAttempts = <String, int>{};
 
+  /// Cached answer of "is the locally recorded snapshot present on this
+  /// remote?" for the current engine session (see [_snapshotPresentRemotely]).
+  bool? _remoteSnapshotConfirmed;
+
   /// The local device id (the remote branch this engine writes).
   String get deviceId => _store.deviceId;
 
@@ -806,7 +810,15 @@ class SyncEngine {
       if (lastChange > (applied[self] ?? 0)) {
         applied[self] = lastChange;
       }
-      final snapshot = snapshotOverride ?? await _store.getLastSnapshot();
+      // A locally recorded snapshot pointer only describes *this* remote when
+      // the file is actually there. The directory may have been recreated or
+      // replaced since the pointer was stored (e.g. a fresh remote after a
+      // version upgrade), in which case advertising it would send peers into an
+      // unrepairable gap.
+      var snapshot = snapshotOverride ?? await _store.getLastSnapshot();
+      if (snapshot != null && snapshotOverride == null) {
+        if (!await _snapshotPresentRemotely(snapshot)) snapshot = null;
+      }
       final state = RemoteState(
         protocol: syncProtocolVersion,
         deviceId: self,
@@ -823,6 +835,41 @@ class SyncEngine {
       _stateDirty = true;
       return (written: false, error: error);
     }
+  }
+
+  /// Whether this device's snapshot on the remote still matches [local].
+  ///
+  /// Returns `null` when the remote cannot be inspected right now (transient
+  /// I/O error), so callers can keep a possibly valid pointer instead of
+  /// discarding it. `false` means the remote explicitly has no snapshot, or a
+  /// different one than the locally recorded pointer.
+  Future<bool?> _remoteSnapshotMatches(SnapshotInfo local) async {
+    final SnapshotInfo? remote;
+    try {
+      remote = await _transport.readSnapshotInfo(_store.deviceId);
+    } catch (_) {
+      return null;
+    }
+    return remote != null &&
+        remote.deviceId == local.deviceId &&
+        remote.rangeLo == local.rangeLo &&
+        remote.rangeHi == local.rangeHi &&
+        remote.hlc == local.hlc;
+  }
+
+  /// Session-cached [bool] view of [_remoteSnapshotMatches].
+  ///
+  /// Checking the remote downloads the snapshot metadata (the whole file on
+  /// WebDAV), so it must not happen on every push. The answer is cached until a
+  /// snapshot upload updates it; a transient probe failure is reported as
+  /// "present" and not cached.
+  Future<bool> _snapshotPresentRemotely(SnapshotInfo local) async {
+    final cached = _remoteSnapshotConfirmed;
+    if (cached != null) return cached;
+    final matches = await _remoteSnapshotMatches(local);
+    if (matches == null) return true;
+    _remoteSnapshotConfirmed = matches;
+    return matches;
   }
 
   // ---------------------------------------------------------------------------
@@ -1029,17 +1076,21 @@ class SyncEngine {
 
       // Gap repair (§7.4): apply the device's snapshot, then retry once.
       final before = await _store.getAppliedSeq(remote);
-      final repaired = await _repairFromSnapshot(remote, builder);
+      final repair = await _repairFromSnapshot(remote, builder);
+      if (repair.changed) builder.changed = true;
       final after = await _store.getAppliedSeq(remote);
-      if (pass == 0 && repaired && after > before) {
+      if (pass == 0 && repair.repaired && after > before) {
         continue;
       }
+      final detail = repair.repaired
+          ? 'snapshot applied but the watermark did not advance'
+          : repair.reason;
       builder.errors.add(
         SyncPullError(
           deviceId: remote,
           message:
               'Change range gap could not be repaired '
-              '(applied=$before target=$target)',
+              '(applied=$before target=$target; $detail)',
         ),
       );
       return;
@@ -1517,9 +1568,18 @@ class SyncEngine {
         );
       });
 
-  Future<bool> _repairFromSnapshot(String remote, _PullBuilder builder) async {
+  Future<({bool repaired, bool changed, String reason})> _repairFromSnapshot(
+    String remote,
+    _PullBuilder builder,
+  ) async {
     final attempts = _repairAttempts[remote] ?? 0;
-    if (attempts >= maxRepairAttempts) return false;
+    if (attempts >= maxRepairAttempts) {
+      return (
+        repaired: false,
+        changed: false,
+        reason: 'snapshot repair attempts exhausted',
+      );
+    }
     _repairAttempts[remote] = attempts + 1;
     final result = await _bootstrapInternal(deviceId: remote);
     builder.snapshotsApplied += result.snapshotsApplied;
@@ -1533,7 +1593,23 @@ class SyncEngine {
         ),
       );
     }
-    return result.snapshotsApplied > 0;
+    if (result.snapshotsApplied > 0) {
+      return (
+        repaired: true,
+        // Snapshot records are real local data changes: the caller must
+        // project them into the app databases even when no change file was
+        // applied afterwards.
+        changed: result.recordsApplied > 0,
+        reason: 'snapshot applied',
+      );
+    }
+    return (
+      repaired: false,
+      changed: false,
+      reason: result.error != null
+          ? 'snapshot unusable: ${result.error}'
+          : 'the source device has no usable snapshot',
+    );
   }
 
   Future<SyncBootstrapResult> _bootstrapInternal({String? deviceId}) async {
@@ -1716,6 +1792,12 @@ class SyncEngine {
     if (lastSnapshot == null) {
       // Seed the first snapshot so other devices can bootstrap from us
       // (§7.4 step 4).
+      return _writePeriodicSnapshot();
+    }
+    // The local pointer does not prove the file survived on this remote. When
+    // it is gone (recreated/replaced directory), rebuild it instead of letting
+    // peers hit a gap that can never be repaired.
+    if (!await _snapshotPresentRemotely(lastSnapshot)) {
       return _writePeriodicSnapshot();
     }
     final lastPush = await _store.getLastPush();
@@ -1929,6 +2011,22 @@ class SyncEngine {
         );
       }
 
+      // An upload that cannot be read back must not become a local pointer:
+      // advertising it would make peers treat a missing snapshot as usable.
+      final uploaded = await _remoteSnapshotMatches(info);
+      if (uploaded == false) {
+        _remoteSnapshotConfirmed = false;
+        return SyncSnapshotResult(
+          info: info,
+          records: records.length,
+          clears: clears.length,
+          error: StateError(
+            'Snapshot upload was not found on the remote after writing it',
+          ),
+        );
+      }
+      _remoteSnapshotConfirmed = true;
+
       // Protocol order (§7.2 step 6): snapshot data first, then the state
       // pointer, and only then track it as our last snapshot. The local
       // pointer is recorded even when the state write fails: the snapshot
@@ -1976,6 +2074,18 @@ class SyncEngine {
     }
     if (snapshot == null) {
       return const SyncGcResult(skipped: true);
+    }
+    // Pruning changes is only safe while the snapshot that covers them is
+    // really on the remote. A stale local pointer must never delete data.
+    if (await _remoteSnapshotMatches(snapshot) == false) {
+      return SyncGcResult(
+        skipped: true,
+        snapshotWatermark: snapshot.applied[_store.deviceId] ?? 0,
+        error: StateError(
+          'Refusing to delete change files: the snapshot is missing on the '
+          'remote',
+        ),
+      );
     }
     final watermark = snapshot.applied[_store.deviceId] ?? 0;
     final upTo = watermark - gcRetainChanges;

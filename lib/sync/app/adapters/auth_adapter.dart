@@ -139,6 +139,9 @@ class AuthAdapter implements SyncAppAdapter {
         continue;
       }
       final parts = record.key.parts;
+      // Source login state shares the `auth` domain with a two-part key and is
+      // owned by ComicSourceDataAdapter; skip it without a warning.
+      if (SyncKeys.isSourceDataKey(parts)) continue;
       if (parts.length != 3) {
         _warn('auth: ignoring malformed key ${record.key.encode()}');
         continue;

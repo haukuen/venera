@@ -398,6 +398,24 @@ void main() {
       });
     });
 
+    test('source login-state records are skipped without warnings', () async {
+      await store.emit(
+        domain: SyncDomains.auth,
+        key: SyncKeys.sourceDataKey('picacg'),
+        kind: SyncOpKind.upsert,
+        data: <String, Object?>{
+          'sha256': List<String>.filled(64, 'a').join(),
+          'size': 12,
+        },
+      );
+
+      await adapter.applyRemote(store);
+
+      expect(warnings, isEmpty);
+      expect(reloadCalls, 0);
+      expect(readAllCookies(), isEmpty);
+    });
+
     test('bad optional fields keep the cookie with warnings', () async {
       await emitCookie('example.com', '/', 'sid', value: 'keep-me', secure: 1);
       // Overwrite the record with wrong optional types via a fresh upsert.
