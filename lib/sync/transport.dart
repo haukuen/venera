@@ -201,8 +201,5 @@ abstract class SyncTransport {
   /// Deletes all remote data of a device (device management).
   Future<void> deleteDevice(String deviceId);
 
-  /// Creates or validates the shared schema document.
-  Future<void> ensureSchema(Uint8List schemaJson);
-
   Future<void> close();
 }

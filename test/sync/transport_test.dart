@@ -114,7 +114,6 @@ class _FakeWebDavIo implements WebDavIo {
   final List<String> requests = [];
 
   bool moveSupported = true;
-  bool ifNoneMatchSupported = true;
   Exception? readError;
   bool closed = false;
 
@@ -172,18 +171,6 @@ class _FakeWebDavIo implements WebDavIo {
   Future<void> write(String path, Uint8List bytes) async {
     _record('PUT', path);
     files[path] = Uint8List.fromList(bytes);
-  }
-
-  @override
-  Future<WebDavWriteIfAbsentResult> writeIfAbsent(
-    String path,
-    Uint8List bytes,
-  ) async {
-    _record('PUT-IF-ABSENT', path);
-    if (!ifNoneMatchSupported) return WebDavWriteIfAbsentResult.unsupported;
-    if (files.containsKey(path)) return WebDavWriteIfAbsentResult.alreadyExists;
-    files[path] = Uint8List.fromList(bytes);
-    return WebDavWriteIfAbsentResult.created;
   }
 
   @override
@@ -274,7 +261,6 @@ void main() {
     final paths = WebDavPaths();
 
     test('builds the documented v2 layout', () {
-      expect(paths.schemaPath, 'venera-sync/v2/schema.json');
       expect(paths.devicesDir, 'venera-sync/v2/devices');
       expect(
         paths.statePath(_deviceA),
@@ -311,7 +297,6 @@ void main() {
     test('encodes every segment and normalizes the root', () {
       final custom = WebDavPaths('/folder name//v2/');
       expect(custom.root, 'folder%20name/v2');
-      expect(custom.schemaPath, 'folder%20name/v2/schema.json');
       expect(WebDavPaths.encodeSegment('a b/c'), 'a%20b%2Fc');
       expect(() => WebDavPaths('///'), throwsArgumentError);
     });
@@ -720,19 +705,6 @@ void main() {
       );
     });
 
-    test('ensureSchema creates once and never overwrites', () async {
-      final first = Uint8List.fromList(utf8.encode('{"protocol":2}'));
-      final second = Uint8List.fromList(utf8.encode('{"protocol":3}'));
-      await transport.ensureSchema(first);
-      expect(remote.debugSchema, first);
-      await transport.ensureSchema(second);
-      expect(remote.debugSchema, first);
-      await expectLater(
-        transport.ensureSchema(Uint8List(0)),
-        throwsArgumentError,
-      );
-    });
-
     test('deleteDevice drops every branch file', () async {
       await transport.writeState(_deviceA, _state(_deviceA));
       await transport.writeChanges(_deviceA, 1, 1, Uint8List.fromList([1]));
@@ -1044,32 +1016,6 @@ void main() {
         throwsArgumentError,
       );
     });
-
-    test(
-      'ensureSchema uses If-None-Match and keeps the existing file',
-      () async {
-        final first = Uint8List.fromList(utf8.encode('{"protocol":2}'));
-        final second = Uint8List.fromList(utf8.encode('{"protocol":9}'));
-        await transport.ensureSchema(first);
-        expect(io.files[paths.schemaPath], first);
-        await transport.ensureSchema(second);
-        expect(io.files[paths.schemaPath], first);
-        expect(io.requestsOf('PUT-IF-ABSENT').length, 2);
-      },
-    );
-
-    test(
-      'ensureSchema falls back to existence check when header unsupported',
-      () async {
-        io.ifNoneMatchSupported = false;
-        final first = Uint8List.fromList(utf8.encode('{"protocol":2}'));
-        final second = Uint8List.fromList(utf8.encode('{"protocol":9}'));
-        await transport.ensureSchema(first);
-        expect(io.files[paths.schemaPath], first);
-        await transport.ensureSchema(second);
-        expect(io.files[paths.schemaPath], first);
-      },
-    );
 
     test('deleteDevice removes its directory and state file', () async {
       await transport.writeState(_deviceA, _state(_deviceA));

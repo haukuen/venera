@@ -94,8 +94,6 @@ class FakeRemote {
   /// Device directories that exist even when they currently hold no files.
   final Set<String> _deviceDirs = {};
 
-  Uint8List? _schema;
-
   // ----------------------------------------------------------------- faults --
 
   /// Range keys (`deviceId|lo-hi`) whose change file disappears from listings
@@ -151,8 +149,6 @@ class FakeRemote {
 
   Map<String, Uint8List> debugBlobs(String deviceId) =>
       Map.unmodifiable(_blobs[deviceId] ?? const {});
-
-  Uint8List? get debugSchema => _schema;
 
   // ---------------------------------------------------------- fault control --
 
@@ -626,16 +622,6 @@ class FakeTransport implements SyncTransport {
       final prefix = '$deviceId|';
       remote._missingChanges.removeWhere((key) => key.startsWith(prefix));
       remote._corruptChanges.removeWhere((key) => key.startsWith(prefix));
-    });
-  }
-
-  @override
-  Future<void> ensureSchema(Uint8List schemaJson) async {
-    if (schemaJson.isEmpty) {
-      throw ArgumentError.value(schemaJson, 'schemaJson', 'Must not be empty');
-    }
-    await _write('ensureSchema', () {
-      remote._schema ??= Uint8List.fromList(schemaJson);
     });
   }
 

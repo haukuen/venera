@@ -485,7 +485,6 @@ class _FakeTransport implements SyncTransport {
   final Map<String, Uint8List> snapshots = <String, Uint8List>{};
   final Map<String, Map<String, Uint8List>> blobs =
       <String, Map<String, Uint8List>>{};
-  final Map<String, Uint8List> schema = <String, Uint8List>{};
   final Set<String> devices = <String>{};
 
   // Fault injection knobs.
@@ -661,11 +660,6 @@ class _FakeTransport implements SyncTransport {
     changes.remove(deviceId);
     snapshots.remove(deviceId);
     blobs.remove(deviceId);
-  }
-
-  @override
-  Future<void> ensureSchema(Uint8List schemaJson) async {
-    schema.putIfAbsent('schema', () => schemaJson);
   }
 
   @override

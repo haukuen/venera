@@ -4,7 +4,6 @@
 /// directory:
 ///
 /// ```text
-/// venera-sync/v2/schema.json
 /// venera-sync/v2/devices/<deviceId>.json
 /// venera-sync/v2/devices/<deviceId>/device.json
 /// venera-sync/v2/devices/<deviceId>/snapshot.jsonl.gz
@@ -79,19 +78,6 @@ class WebDavEntry {
   String toString() => 'WebDavEntry($name, dir=$isDirectory, etag=$etag)';
 }
 
-/// Result of a conditional "create only when absent" write.
-enum WebDavWriteIfAbsentResult {
-  /// The file did not exist and was created.
-  created,
-
-  /// The server answered 412 / the file already existed.
-  alreadyExists,
-
-  /// The server rejected `If-None-Match`; the caller must check existence
-  /// itself.
-  unsupported,
-}
-
 /// Result of a WebDAV `MOVE`.
 enum WebDavMoveResult {
   /// The move succeeded (including overwriting the destination).
@@ -125,9 +111,6 @@ abstract class WebDavIo {
   /// Writes a file (creating missing parent collections), overwriting any
   /// previous content. Retrying the same content is idempotent.
   Future<void> write(String path, Uint8List bytes);
-
-  /// Writes a file only when it does not exist yet.
-  Future<WebDavWriteIfAbsentResult> writeIfAbsent(String path, Uint8List bytes);
 
   /// Moves [from] to [to], overwriting [to].
   Future<WebDavMoveResult> move(String from, String to);
@@ -251,33 +234,6 @@ class PackageWebDavIo implements WebDavIo {
       response = await _put(path, bytes);
     }
     _checkWriteStatus('PUT', path, response.statusCode);
-  }
-
-  @override
-  Future<WebDavWriteIfAbsentResult> writeIfAbsent(
-    String path,
-    Uint8List bytes,
-  ) async {
-    await _ensureParent(path);
-    var response = await _put(
-      path,
-      bytes,
-      headers: const {'if-none-match': '*'},
-    );
-    if (response.statusCode == 409) {
-      _ensuredParents.clear();
-      await _ensureParent(path);
-      response = await _put(path, bytes, headers: const {'if-none-match': '*'});
-    }
-    final status = response.statusCode;
-    if (status == 200 || status == 201 || status == 204) {
-      return WebDavWriteIfAbsentResult.created;
-    }
-    if (status == 412) return WebDavWriteIfAbsentResult.alreadyExists;
-    if (status == 405 || status == 501) {
-      return WebDavWriteIfAbsentResult.unsupported;
-    }
-    throw SyncTransportException('PUT $path failed', statusCode: status);
   }
 
   @override
@@ -442,8 +398,6 @@ class WebDavPaths {
   }
 
   static String encodeSegment(String value) => Uri.encodeComponent(value);
-
-  String get schemaPath => '$root/schema.json';
 
   String get devicesDir => '$root/devices';
 
@@ -867,24 +821,6 @@ class WebDavSyncTransport implements SyncTransport {
     await _guard('deleteDevice', () async {
       await _io.removeDirectory(deviceDir);
       await _io.remove(state);
-    });
-  }
-
-  @override
-  Future<void> ensureSchema(Uint8List schemaJson) async {
-    if (schemaJson.isEmpty) {
-      throw ArgumentError.value(schemaJson, 'schemaJson', 'Must not be empty');
-    }
-    final path = paths.schemaPath;
-    await _guard('ensureSchema', () async {
-      final result = await _io.writeIfAbsent(path, schemaJson);
-      if (result != WebDavWriteIfAbsentResult.unsupported) return;
-      // Server does not support If-None-Match: check existence first. The
-      // schema is tiny, so a GET is cheaper than a PROPFIND round trip here.
-      final existing = await _io.read(path);
-      if (existing == null || existing.isEmpty) {
-        await _io.write(path, schemaJson);
-      }
     });
   }
 

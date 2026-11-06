@@ -19,9 +19,7 @@
 /// itself are left behind (the transport contract has no "delete root").
 library;
 
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:dio/io.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,18 +105,6 @@ void main() {
 
       try {
         final (storeA, transportA, engineA) = await openDevice(_deviceA);
-
-        // Shared schema document; writes create device directories lazily.
-        final schema = Uint8List.fromList(
-          utf8.encode(
-            jsonEncode({
-              'protocol': 2,
-              'schema': 2,
-              'domains': SyncDomains.all.toList()..sort(),
-            }),
-          ),
-        );
-        await transportA.ensureSchema(schema);
 
         final key = SyncKeys.historyKey('live-comic', '1');
         Future<void> writeProgress(

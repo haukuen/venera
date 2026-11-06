@@ -96,7 +96,7 @@ abstract final class SyncDomains {
   /// Enabled by default, see [authEnabledByDefault].
   static const String auth = 'auth';
 
-  /// Every domain of protocol v2, in `schema.json` order (§2).
+  /// Every domain of protocol v2, in §2 declaration order.
   static const Set<String> all = <String>{
     history,
     favoriteFolder,
