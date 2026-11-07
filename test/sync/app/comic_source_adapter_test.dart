@@ -164,6 +164,35 @@ void main() {
 
       expect(await adapter.readLocalRecords(), isEmpty);
     });
+
+    test(
+      'missing directory is unreadable (retained), empty directory is consent',
+      () async {
+        final missing = ComicSourceAdapter(
+          sourceDir: '${root.path}/does-not-exist',
+          blobSync: blobSyncA,
+        );
+        await missing.readLocalRecords();
+        expect(
+          await missing.retainsDomainRecords(store, SyncDomains.comicSource),
+          isTrue,
+          reason: 'a missing volume must not read as "deleted every source"',
+        );
+
+        // An existing but empty directory is a deliberate state: deletions
+        // derived from it must propagate.
+        final empty = Directory('${root.path}/empty')..createSync();
+        final present = ComicSourceAdapter(
+          sourceDir: empty.path,
+          blobSync: blobSyncA,
+        );
+        await present.readLocalRecords();
+        expect(
+          await present.retainsDomainRecords(store, SyncDomains.comicSource),
+          isFalse,
+        );
+      },
+    );
   });
 
   group('ensureBlobsUploaded', () {

@@ -41,6 +41,13 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
 
   static const Set<String> _domains = <String>{SyncDomains.comicSource};
 
+  /// Whether the last [readLocalRecords] could not trust what it saw: a
+  /// missing directory (fresh install or unmounted storage) or a listing that
+  /// threw. While unreadable, records must be retained instead of tombstoned
+  /// — an unreadable projection must never be read as "the user deleted
+  /// every source".
+  bool _lastReadUnreadable = false;
+
   @override
   Set<String> get domains => _domains;
 
@@ -54,6 +61,14 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
   @override
   Future<List<AdapterRecord>> readLocalRecords() async {
     final records = <AdapterRecord>[];
+    _lastReadUnreadable = false;
+    // A missing directory is *not* "zero sources": a fresh install or an
+    // unmounted data volume must not tombstone every synced source.
+    if (!Directory(_sourceDir).existsSync()) {
+      _lastReadUnreadable = true;
+      return const <AdapterRecord>[];
+    }
+    var anyReadFailed = false;
     for (final file in _sourceFiles()) {
       try {
         final fileName = _fileName(file);
@@ -83,8 +98,14 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
           ),
         );
       } catch (error) {
+        anyReadFailed = true;
         _warn('comicSource: failed to read ${file.path}: $error');
       }
+    }
+    if (anyReadFailed) {
+      // A locked file (antivirus, another process) reads as absent; the
+      // projection is partial, so deletions derived from it would be wrong.
+      _lastReadUnreadable = true;
     }
     return records;
   }
@@ -196,7 +217,12 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
             final existing = await target.readAsBytes();
             if (BlobSync.sha256Hex(existing) == sha256) continue;
           }
-          await target.writeAsBytes(bytes, flush: true);
+          // Atomic replace: a crash mid-write must never leave a truncated
+          // file behind — readLocalRecords would hash the truncation and
+          // propagate the corrupted source to every device.
+          final temp = File('${target.path}.tmp');
+          await temp.writeAsBytes(bytes, flush: true);
+          await temp.rename(target.path);
           changed++;
         } catch (error) {
           _warn('comicSource: failed to write ${target.path}: $error');
@@ -236,11 +262,11 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
   }
 
   @override
-  bool retainsMissingRecord(StoredRecord record) => false;
+  bool retainsMissingRecord(StoredRecord record) => _lastReadUnreadable;
 
   @override
   Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
-      false;
+      _lastReadUnreadable;
 
   /// Local source files, sorted for deterministic projections. Missing
   /// directories yield no files; unreadable listings yield a warning.

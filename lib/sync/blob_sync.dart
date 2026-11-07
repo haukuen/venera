@@ -263,6 +263,11 @@ class BlobSync {
   /// (a change file may still reference a blob the snapshot does not carry).
   /// Returns the number of deleted blobs; failures are reported per blob and
   /// never abort the sweep.
+  ///
+  /// Every deleted sha is dropped from the ledger: a ledger hit means "known
+  /// present on the remote", and after this sweep that claim is false. A
+  /// stale entry would make a later [upload] of the same content skip the
+  /// network entirely and emit a record referencing a deleted blob.
   Future<int> deleteUnreferenced(Iterable<String> referencedSha256) async {
     final referenced = referencedSha256.toSet();
     var deleted = 0;
@@ -272,14 +277,22 @@ class BlobSync {
     } on SyncTransportException {
       return 0;
     }
+    var ledgerTouched = false;
+    Map<String, int>? ledger;
     for (final sha in blobs) {
       if (referenced.contains(sha)) continue;
       try {
         await transport.deleteBlob(localDeviceId, sha);
         deleted++;
+        // Lazy-load: the common no-delete sweep must not touch persistence.
+        ledger ??= await _loadLedger();
+        if (ledger.remove(sha) != null) ledgerTouched = true;
       } on SyncTransportException {
         // Keep sweeping; the blob stays for the next run.
       }
+    }
+    if (ledgerTouched && ledger != null) {
+      await _saveLedger(ledger);
     }
     return deleted;
   }

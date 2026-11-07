@@ -269,5 +269,29 @@ void main() {
       blobs.resetUploadCounter();
       expect(blobs.uploadsSinceLastGc, 0);
     });
+
+    test('deleteUnreferenced invalidates ledger entries', () async {
+      final transport = _CountingTransport(remote, label: _deviceA);
+      final blobs = BlobSync(transport: transport, localDeviceId: _deviceA);
+      final bytes = Uint8List.fromList(utf8.encode('gc then re-add'));
+      final sha = await blobs.upload(bytes);
+      expect(transport.writeBlobCalls, 1);
+
+      // The record died; the sweep deletes the blob and must drop the
+      // ledger claim that it is present.
+      await blobs.deleteUnreferenced(const <String>{});
+      expect(remote.debugBlobs(_deviceA)[sha], isNull);
+
+      // Re-adding the same content must actually re-upload it.
+      transport.resetCounters();
+      final again = await blobs.upload(bytes);
+      expect(again, sha);
+      expect(
+        transport.writeBlobCalls,
+        1,
+        reason: 'stale ledger entry must not skip the re-upload',
+      );
+      expect(remote.debugBlobs(_deviceA)[sha], isNotNull);
+    });
   });
 }

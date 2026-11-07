@@ -116,6 +116,7 @@ class _FakeWebDavIo implements WebDavIo {
   final List<String> requests = [];
 
   bool moveSupported = true;
+  bool failMoves = false;
   Exception? readError;
   bool closed = false;
 
@@ -170,6 +171,12 @@ class _FakeWebDavIo implements WebDavIo {
   }
 
   @override
+  Future<bool> exists(String path) async {
+    _record('PROPFIND-ONE', path);
+    return files.containsKey(path);
+  }
+
+  @override
   Future<void> write(String path, Uint8List bytes) async {
     _record('PUT', path);
     files[path] = Uint8List.fromList(bytes);
@@ -178,6 +185,9 @@ class _FakeWebDavIo implements WebDavIo {
   @override
   Future<WebDavMoveResult> move(String from, String to) async {
     _record('MOVE', from, extra: to);
+    if (failMoves) {
+      throw SyncTransportException('MOVE failed', statusCode: 500);
+    }
     if (!moveSupported) return WebDavMoveResult.unsupported;
     final bytes = files.remove(from);
     if (bytes == null) return WebDavMoveResult.notFound;
@@ -931,6 +941,37 @@ void main() {
       expect(io.requestsOf('PUT').length, 1);
       _expectState(await transport.readState(_deviceA), state);
     });
+
+    test(
+      'failing MOVE degrades to plain PUT instead of failing the write',
+      () async {
+        // Some servers (Alist/OpenList) answer every MOVE with 5xx; writes must
+        // still succeed and later writes must skip the doomed tmp+MOVE dance.
+        io.failMoves = true;
+        final state = _state(_deviceA, lastChange: 5);
+        await transport.writeState(_deviceA, state);
+        expect(io.files.containsKey(paths.statePath(_deviceA)), isTrue);
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceA)}.tmp'),
+          isFalse,
+          reason: 'fallback must clean up the tmp file',
+        );
+        _expectState(await transport.readState(_deviceA), state);
+
+        io.requests.clear();
+        await transport.writeState(_deviceA, _state(_deviceA, lastChange: 6));
+        expect(
+          io.requestsOf('MOVE'),
+          isEmpty,
+          reason: 'a failed MOVE must disable tmp+MOVE for the session',
+        );
+        expect(io.requestsOf('PUT').length, greaterThanOrEqualTo(1));
+        _expectState(
+          await transport.readState(_deviceA),
+          _state(_deviceA, lastChange: 6),
+        );
+      },
+    );
 
     test('MOVE fallback writes via PUT and stops trying MOVE', () async {
       io.moveSupported = false;

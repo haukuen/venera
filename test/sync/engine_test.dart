@@ -492,6 +492,8 @@ class _FakeTransport implements SyncTransport {
   bool failWriteState = false;
   bool failWriteSnapshot = false;
   bool failReadChanges = false;
+  bool failReadSnapshotInfo = false;
+  bool failDeleteChanges = false;
   final Set<int> failWriteChangesCalls = <int>{};
   final Set<String> corruptStateDevices = <String>{};
   final Set<String> corruptChangeFiles = <String>{};
@@ -569,6 +571,9 @@ class _FakeTransport implements SyncTransport {
 
   @override
   Future<SnapshotInfo?> readSnapshotInfo(String deviceId) async {
+    if (failReadSnapshotInfo) {
+      throw StateError('simulated network failure');
+    }
     final bytes = snapshots[deviceId];
     if (bytes == null) return null;
     try {
@@ -652,6 +657,9 @@ class _FakeTransport implements SyncTransport {
 
   @override
   Future<void> deleteChanges(String deviceId, int upToSeq) async {
+    if (failDeleteChanges) {
+      throw StateError('simulated delete failure');
+    }
     final files = changes[deviceId];
     if (files == null) return;
     files.removeWhere((key, _) => _parseRange(key).hi <= upToSeq);
@@ -1118,6 +1126,34 @@ void main() {
         fixture.storeB.fingerprint(),
         equals(fixture.storeA.fingerprint()),
       );
+    });
+
+    test('gc refuses to delete when the snapshot probe fails', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+      // Simulate the chained sweep failing transiently: the snapshot uploads
+      // fine but its covered change file survives below the watermark.
+      fixture.transport.failDeleteChanges = true;
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      fixture.transport.failDeleteChanges = false;
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      // A network failure during the presence probe is *unknown*, not
+      // consent: pruning must be refused, never skipped silently.
+      fixture.transport.failReadSnapshotInfo = true;
+      final refused = await fixture.engineA.gc();
+      expect(refused.skipped, isTrue);
+      expect(refused.deleted, isFalse);
+      expect(refused.error, isNotNull);
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      fixture.transport.failReadSnapshotInfo = false;
+      final ok = await fixture.engineA.gc();
+      expect(ok.error, isNull);
+      expect(ok.deleted, isTrue);
+      expect(await fixture.transport.listChanges(_deviceA), isEmpty);
     });
 
     test('snapshot prunes its covered change files automatically', () async {

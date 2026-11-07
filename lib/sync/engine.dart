@@ -2038,15 +2038,18 @@ class SyncEngine {
 
       // An upload that cannot be read back must not become a local pointer:
       // advertising it would make peers treat a missing snapshot as usable.
+      // An *unknown* read-back (probe error) is not consent either — only a
+      // verified match confirms the upload.
       final uploaded = await _remoteSnapshotMatches(info);
-      if (uploaded == false) {
+      if (uploaded != true) {
         _remoteSnapshotConfirmed = false;
         return SyncSnapshotResult(
           info: info,
           records: records.length,
           clears: clears.length,
           error: StateError(
-            'Snapshot upload was not found on the remote after writing it',
+            'Snapshot upload could not be confirmed on the remote after '
+            'writing it',
           ),
         );
       }
@@ -2107,14 +2110,16 @@ class SyncEngine {
       return const SyncGcResult(skipped: true);
     }
     // Pruning changes is only safe while the snapshot that covers them is
-    // really on the remote. A stale local pointer must never delete data.
-    if (await _remoteSnapshotMatches(snapshot) == false) {
+    // really on the remote. A stale local pointer must never delete data, and
+    // neither may an *unknown* probe result: a network hiccup during the
+    // check must be treated as "cannot prove it is there", never as consent.
+    if (await _remoteSnapshotMatches(snapshot) != true) {
       return SyncGcResult(
         skipped: true,
         snapshotWatermark: snapshot.applied[_store.deviceId] ?? 0,
         error: StateError(
-          'Refusing to delete change files: the snapshot is missing on the '
-          'remote',
+          'Refusing to delete change files: the snapshot could not be '
+          'confirmed on the remote',
         ),
       );
     }

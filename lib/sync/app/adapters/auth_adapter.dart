@@ -46,6 +46,13 @@ class AuthAdapter implements SyncAppAdapter, SyncDisposableAdapter {
 
   Database? _db;
 
+  /// Whether the last [readLocalRecords] found the projection unreadable
+  /// (missing table / database). While unreadable, the reconciler must keep
+  /// the stored records: an absent table must never be read as "the user
+  /// logged out everywhere" — and a thrown query would abort every push
+  /// forever.
+  bool _lastReadUnreadable = false;
+
   /// Closes the lazily opened database connection. The adapter can be reused
   /// afterwards (the next call reopens the file).
   @override
@@ -74,10 +81,21 @@ class AuthAdapter implements SyncAppAdapter, SyncDisposableAdapter {
   /// jar treats it. Does not mutate the database.
   @override
   Future<List<AdapterRecord>> readLocalRecords() async {
-    final rows = _database.select('''
-      SELECT name, value, domain, path, expires, secure, httpOnly
-      FROM cookies;
-    ''');
+    _lastReadUnreadable = false;
+    final ResultSet rows;
+    try {
+      rows = _database.select('''
+        SELECT name, value, domain, path, expires, secure, httpOnly
+        FROM cookies;
+      ''');
+    } catch (error) {
+      // A missing `cookies` table (fresh or recreated database) must neither
+      // throw — which would abort every push until it is fixed — nor be read
+      // as a global logout.
+      _lastReadUnreadable = true;
+      _warn('auth: cookies table is unreadable; keeping synced records');
+      return const <AdapterRecord>[];
+    }
     final records = <AdapterRecord>[];
     for (final row in rows) {
       final name = row['name'];
@@ -251,11 +269,11 @@ class AuthAdapter implements SyncAppAdapter, SyncDisposableAdapter {
   }
 
   @override
-  bool retainsMissingRecord(StoredRecord record) => false;
+  bool retainsMissingRecord(StoredRecord record) => _lastReadUnreadable;
 
   @override
   Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
-      false;
+      _lastReadUnreadable;
 
   void _warn(String message) => _onWarning?.call(message);
 

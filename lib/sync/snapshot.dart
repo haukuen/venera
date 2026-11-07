@@ -317,11 +317,30 @@ class SnapshotCodec {
             cutoffSeq is! int) {
           throw const FormatException('Invalid snapshot clear');
         }
+        // Same coverage contract as records below: an undeclared domain
+        // claims authority over data the snapshot does not carry, which would
+        // silently hide newer records behind its cutoff.
+        if (!info.domains.contains(domain)) {
+          throw const FormatException(
+            'Snapshot contains a clear for a domain it does not declare',
+          );
+        }
         final version = Version(Hlc.parse(cutoffHlc), cutoffSeq);
+        if (version.seq <= 0) {
+          throw const FormatException('Invalid snapshot clear seq');
+        }
         final existing = clears[domain];
         if (existing == null || version > existing) clears[domain] = version;
       } else if (type == 'reg') {
-        records.add(SnapshotRecord.fromJson(json));
+        final record = SnapshotRecord.fromJson(json);
+        if (record.version.seq <= 0) {
+          throw const FormatException('Invalid snapshot record seq');
+        }
+        final deleted = record.deletedVersion;
+        if (deleted != null && deleted.seq <= 0) {
+          throw const FormatException('Invalid snapshot record delete seq');
+        }
+        records.add(record);
         if (records.length > maxRecords) {
           throw const FormatException('Too many snapshot records');
         }

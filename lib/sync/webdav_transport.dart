@@ -18,6 +18,7 @@
 /// strict regular expressions.
 library;
 
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -25,6 +26,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart'
     show DioException, Options, Response, ResponseType;
 import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/log.dart';
 import 'package:venera/network/app_dio.dart' show RHttpAdapter;
 import 'package:webdav_client/webdav_client.dart' as webdav;
 
@@ -44,7 +46,7 @@ webdav.Client _defaultWebDavClientFactory(
   String user,
   String password,
 ) {
-  return webdav.newClient(
+  final client = webdav.newClient(
     baseUrl,
     user: user,
     password: password,
@@ -52,6 +54,15 @@ webdav.Client _defaultWebDavClientFactory(
       enableProxy: appdata.settings['webdavProxyEnabled'] != false,
     ),
   );
+  // The webdav client leaves all three dio timeouts unset; the rust adapter
+  // only enforces a connect timeout. Without receive timeouts a server that
+  // accepts the connection but never sends its body would stall the sync
+  // queue forever. [_guard]'s wall-clock cap is the second line of defense.
+  client.c.options
+    ..connectTimeout = const Duration(seconds: 15)
+    ..receiveTimeout = const Duration(seconds: 60)
+    ..sendTimeout = const Duration(seconds: 60);
+  return client;
 }
 
 /// One entry of a WebDAV directory listing.
@@ -107,6 +118,13 @@ abstract class WebDavIo {
   /// Implemented with a Range request when the server supports it, falling
   /// back to a full GET. Used for cheap metadata probes of large files.
   Future<Uint8List?> readHead(String path, int maxLength);
+
+  /// Whether a resource exists, without transferring its body.
+  ///
+  /// Implemented as a `PROPFIND Depth: 0`, so it costs one tiny response even
+  /// on servers without Range support (where a [readHead]-based probe would
+  /// download the whole file).
+  Future<bool> exists(String path);
 
   /// Writes a file (creating missing parent collections), overwriting any
   /// previous content. Retrying the same content is idempotent.
@@ -278,6 +296,20 @@ class PackageWebDavIo implements WebDavIo {
       status = response.statusCode;
     }
     _checkDeleteStatus(path, status);
+  }
+
+  @override
+  Future<bool> exists(String path) async {
+    // PROPFIND Depth 0 on the resource itself: 207 = present, 404 = absent.
+    // readProps parses the response body, so this never transfers content.
+    try {
+      await client.readProps(path);
+      return true;
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (status == 404) return false;
+      rethrow;
+    }
   }
 
   @override
@@ -770,10 +802,10 @@ class WebDavSyncTransport implements SyncTransport {
   @override
   Future<bool> blobExists(String deviceId, String sha256) async {
     final path = paths.blobPath(deviceId, sha256);
-    // Range probe of the first byte: 404 answers null, a present blob answers
-    // 206 (or 200 with the full body on servers without range support).
-    final head = await _guard('blobExists', () => _io.readHead(path, 1));
-    return head != null;
+    // PROPFIND instead of a Range GET: a byte-range probe degrades to a full
+    // download on servers without Range support, and this check runs on every
+    // push (ledger re-verification).
+    return _guard('blobExists', () => _io.exists(path));
   }
 
   @override
@@ -875,6 +907,11 @@ class WebDavSyncTransport implements SyncTransport {
 
   /// Writes [bytes] to [path] using `tmp` + `MOVE` when the server supports
   /// it, falling back to a plain `PUT` (protocol doc §7.2 step 4).
+  ///
+  /// Some servers answer every `MOVE` with 5xx (an Alist/OpenList quirk).
+  /// A thrown MOVE must degrade to a plain PUT instead of failing the write:
+  /// the PUT is idempotent and overwrites the destination whether or not the
+  /// MOVE actually happened server-side.
   Future<void> _writeAtomic(String path, Uint8List bytes) async {
     if (_moveSupported == false) {
       await _io.write(path, bytes);
@@ -882,7 +919,17 @@ class WebDavSyncTransport implements SyncTransport {
     }
     final tmp = '$path.tmp';
     await _io.write(tmp, bytes);
-    final result = await _io.move(tmp, path);
+    WebDavMoveResult result;
+    try {
+      result = await _io.move(tmp, path);
+    } on SyncTransportException catch (error) {
+      // Fall through to the plain PUT below. Also stop offering tmp+MOVE for
+      // the rest of this session: a server that errors on MOVE would make
+      // every future write pay for the wasted attempt.
+      _moveSupported = false;
+      result = WebDavMoveResult.unsupported;
+      _logMoveDegraded(path, error);
+    }
     if (result == WebDavMoveResult.moved) return;
     if (result == WebDavMoveResult.unsupported) _moveSupported = false;
     await _io.write(path, bytes);
@@ -893,14 +940,30 @@ class WebDavSyncTransport implements SyncTransport {
     }
   }
 
+  void _logMoveDegraded(String path, Object error) {
+    // Surfaced for diagnostics only; the write itself continues via PUT.
+    Log.info(
+      'Sync v2',
+      'WebDAV MOVE failed ($error); falling back to plain PUT for $path',
+    );
+  }
+
   Future<T> _guard<T>(String operation, Future<T> Function() action) async {
     if (_closed) {
       throw SyncTransportException('WebDAV sync transport is closed');
     }
     try {
-      return await action();
+      // Wall-clock cap for every operation: custom client factories and
+      // adapters may ignore the dio timeouts, and a stalled request must
+      // never wedge the serialized sync queue until the app restarts.
+      return await action().timeout(const Duration(seconds: 120));
     } on SyncTransportException {
       rethrow;
+    } on TimeoutException {
+      throw SyncTransportException(
+        'WebDAV $operation timed out after 120s',
+        statusCode: 0,
+      );
     } on DioException catch (error) {
       throw SyncTransportException(
         'WebDAV $operation failed: ${error.message ?? error.type.name}',

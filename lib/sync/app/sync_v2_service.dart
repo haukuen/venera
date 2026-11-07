@@ -13,6 +13,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
@@ -136,10 +137,21 @@ class SyncV2Service extends ChangeNotifier {
   /// merged records.
   static const String _implicitProjectionSeeded = 'syncV2ProjectionSeeded';
 
-  /// Store meta key persisting the blob ledger: sha256 -> last-verified
+  /// Store meta key prefix persisting the blob ledger: sha256 -> last-verified
   /// epoch ms. Backs [BlobSync] so already-uploaded blobs are never probed
-  /// or re-downloaded on subsequent pushes.
-  static const String _metaBlobLedger = 'blobLedger';
+  /// or re-downloaded on subsequent pushes. Suffixed per server account.
+  static const String _metaBlobLedgerPrefix = 'blobLedger.';
+
+  /// Per-account ledger meta key. Purely derived from the WebDAV config so
+  /// switching servers can never inherit the previous account's "uploaded"
+  /// claims. Not release-compatible sensitive: the ledger shipped nowhere yet.
+  static String blobLedgerMetaKey(String url, String user, String password) {
+    final digest = sha256.convert(utf8.encode('$url\n$user\n$password'));
+    return '$_metaBlobLedgerPrefix${digest.toString().substring(0, 16)}';
+  }
+
+  static String _blobLedgerMetaKey(List<String> config) =>
+      blobLedgerMetaKey(config[0], config[1], config[2]);
 
   /// Store meta key holding the epoch ms of the last blob GC run.
   static const String _metaBlobGcAt = 'blobGcAt';
@@ -235,11 +247,17 @@ class SyncV2Service extends ChangeNotifier {
     );
     _transport = transport;
 
+    // The ledger is scoped to the server account: a ledger hit claims "this
+    // blob is present on the remote", which is meaningless after switching
+    // URL/credentials. Keying the meta by a hash of the config makes every
+    // account start from an empty ledger automatically — no reconfigure hook
+    // and no stale claims about a server we no longer talk to.
+    final blobLedgerKey = _blobLedgerMetaKey(config);
     final blobSync = BlobSync(
       transport: transport,
       localDeviceId: store.deviceId,
       ledgerLoader: () async {
-        final raw = await store.getMeta(_metaBlobLedger);
+        final raw = await store.getMeta(blobLedgerKey);
         if (raw == null || raw.isEmpty) return null;
         try {
           final decoded = jsonDecode(raw);
@@ -251,8 +269,7 @@ class SyncV2Service extends ChangeNotifier {
           return null;
         }
       },
-      ledgerSaver: (ledger) =>
-          store.setMeta(_metaBlobLedger, jsonEncode(ledger)),
+      ledgerSaver: (ledger) => store.setMeta(blobLedgerKey, jsonEncode(ledger)),
     );
     _blobSync = blobSync;
     final adapters = <SyncAppAdapter>[
@@ -515,11 +532,23 @@ class SyncV2Service extends ChangeNotifier {
       // Project anything a previous pull merged but never wrote back before
       // reconciliation can classify those records as local deletions.
       await _projectPendingIfNeeded(syncStore);
-      // No reconcileLocal here on purpose: its output (local tombstones and
-      // the retained-domain self-heal) only matters before a *push* — it
-      // cannot leave this device through a pull. Running the full business
-      // scan on every poll or reader-open pull was pure overhead; the push
-      // path reconciles right before uploading.
+      // Reconcile BEFORE pulling, unconditionally. Both directions of the
+      // race need it:
+      //  * deletions: a pull must not project the still-alive store record
+      //    back over a row the user just deleted (resurrection + suppressed
+      //    tombstone);
+      //  * insertions: the incoming projection must not delete local rows
+      //    that have not been emitted into the store yet (a fresh cookie or
+      //    favorite folder would be wiped by any remote change).
+      // This is local SQLite work only; the expensive parts of a pull are on
+      // the network and untouched by this scan.
+      final retained = await _reconciler!.reconcileLocal(syncStore);
+      if (retained.isNotEmpty) {
+        // The local business data was recreated or unreadable: restore it
+        // from the merged store now instead of waiting for the next remote
+        // change. This also re-aligns the business database identity tokens.
+        await _projectRemote(syncStore);
+      }
       final result = await syncEngine.pull();
       changedAnything = result.changed;
       if (result.changed) {
@@ -879,8 +908,11 @@ class SyncV2Service extends ChangeNotifier {
       pushNow();
     });
     // The cap timer is NOT restarted by later changes: it measures since the
-    // first unsent change of the current burst.
+    // first unsent change of the current burst. Clearing itself when it fires
+    // is what allows `??=` to arm a fresh cap for the next burst — without
+    // it, the cap would protect exactly one burst per app session.
     _flushDebounce ??= Timer(_pushMaxLatency, () {
+      _flushDebounce = null;
       _debounce?.cancel();
       _debounce = null;
       pushNow();
