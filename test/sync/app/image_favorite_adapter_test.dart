@@ -285,6 +285,12 @@ void main() {
       );
       expect(await adapter.readLocalRecords(), isEmpty);
       expect(warnings, isNotEmpty);
+      // A missing table is an unreadable projection, not an emptied library:
+      // the reconciler must keep the stored records of the domain.
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.imageFavorite),
+        isTrue,
+      );
     });
 
     test('skips malformed rows instead of throwing', () async {

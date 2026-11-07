@@ -181,17 +181,8 @@ class SyncV2Service extends ChangeNotifier {
 
   String _resolveDeviceId() {
     final raw = appdata.settings['deviceId'];
-    if (raw is String && hlcDeviceIdRegExp.hasMatch(raw.trim())) {
-      return raw.trim();
-    }
-    // Deterministic fallback for broken/legacy settings; still fits the HLC
-    // device-id grammar.
     final seed = (raw is String && raw.isNotEmpty) ? raw : App.dataPath;
-    final hex = seed.codeUnits
-        .fold<int>(0x5eed, (value, unit) => (value * 31 + unit) & 0x7fffffff)
-        .toRadixString(16)
-        .padLeft(8, '0');
-    return 'device-$hex';
+    return resolveSyncDeviceId(raw, seed);
   }
 
   Future<void> init() {
@@ -235,14 +226,17 @@ class SyncV2Service extends ChangeNotifier {
       HistoryAdapter(
         dbPath: FilePath.join(App.dataPath, 'history.db'),
         reload: _reloadHistory,
+        onWarning: _logAdapterWarning,
       ),
       ReadLaterAdapter(
         dbPath: FilePath.join(App.dataPath, 'read_later.db'),
         reload: _reloadReadLater,
+        onWarning: _logAdapterWarning,
       ),
       FavoritesAdapter(
         dbPath: FilePath.join(App.dataPath, 'local_favorite.db'),
         reload: _reloadFavorites,
+        onWarning: _logAdapterWarning,
       ),
       SettingsAdapter(
         keys: () => (appdata.toJson()['settings'] as Map).keys
@@ -256,6 +250,7 @@ class SyncV2Service extends ChangeNotifier {
       ImageFavoriteAdapter(
         dbPath: FilePath.join(App.dataPath, 'history.db'),
         reload: _reloadHistory,
+        onWarning: _logAdapterWarning,
       ),
       ComicSettingAdapter(
         readComicSettings: () => _comicSettings,
@@ -352,7 +347,10 @@ class SyncV2Service extends ChangeNotifier {
     if (appdata.implicitData['syncV2Seeded'] == true) return;
     Log.info('Sync v2', 'Seeding v2 sync state from local data');
     // Project local data first so local state wins LWW against older remote
-    // records (documented one-time migration trade-off).
+    // records (documented one-time migration trade-off). The returned
+    // retention domains are ignored deliberately: with an empty store no
+    // deletion can be emitted (there is nothing to diff against), and
+    // re-projecting an empty store is a no-op.
     await _reconciler!.reconcileLocal(store);
     final blobFailures = await _ensureBlobs();
     if (blobFailures > 0) {
@@ -471,7 +469,13 @@ class SyncV2Service extends ChangeNotifier {
       // Project anything a previous pull merged but never wrote back before
       // reconciliation can classify those records as local deletions.
       await _projectPendingIfNeeded(syncStore);
-      await _reconciler!.reconcileLocal(syncStore);
+      final retained = await _reconciler!.reconcileLocal(syncStore);
+      if (retained.isNotEmpty) {
+        // The local business data was recreated or unreadable: restore it
+        // from the merged store now instead of waiting for the next remote
+        // change. This also re-aligns the business database identity tokens.
+        await _projectRemote(syncStore);
+      }
       final result = await syncEngine.pull();
       changedAnything = result.changed;
       if (result.changed) {
@@ -513,7 +517,12 @@ class SyncV2Service extends ChangeNotifier {
     notifyListeners();
     try {
       await _projectPendingIfNeeded(syncStore);
-      await _reconciler!.reconcileLocal(syncStore);
+      final retained = await _reconciler!.reconcileLocal(syncStore);
+      if (retained.isNotEmpty) {
+        // See _pullInternal: re-project recreated/unreadable business data
+        // before pushing, so the next reconciliation sees restored rows.
+        await _projectRemote(syncStore);
+      }
       final blobFailures = await _ensureBlobs();
       if (blobFailures > 0) {
         // The outbox keeps its ops; the next push retries both the blob and
@@ -731,6 +740,10 @@ class SyncV2Service extends ChangeNotifier {
 
   // ------------------------------------------------------------- reloading --
 
+  /// Adapter warnings (unreadable business data, skipped rows) are important
+  /// operational signals; surface them in the log page.
+  void _logAdapterWarning(String message) => Log.warning('Sync v2', message);
+
   Future<void> _reloadHistory() async {
     HistoryManager().close();
     await HistoryManager().init();
@@ -792,6 +805,13 @@ class SyncV2Service extends ChangeNotifier {
     }
     _initialized = false;
     _reconciler = null;
+    for (final adapter in _adapters) {
+      if (adapter is! SyncDisposableAdapter) continue;
+      try {
+        (adapter as SyncDisposableAdapter).dispose();
+      } catch (_) {}
+    }
+    _adapters.clear();
     final engine = _engine;
     _engine = null;
     final transport = _transport;

@@ -25,13 +25,24 @@ class SyncAppReconciler {
   final Set<String> clearableDomains;
 
   /// Emits local business differences into [store].
-  Future<void> reconcileLocal(SyncStore store) async {
-    final adaptersByDomain = <String, SyncAppAdapter>{};
+  ///
+  /// Returns the domains whose local projection could not be trusted as a
+  /// deletion signal (see [SyncAppAdapter.retainsDomainRecords]): their
+  /// stored records were kept, and the caller should re-project the merged
+  /// store state into the business databases so lost local data is restored
+  /// and the business database identity re-aligns.
+  ///
+  /// A domain can be claimed by several adapters (e.g. `auth`). Both
+  /// retention hooks use *any* semantics: if any adapter claiming the domain
+  /// asks for retention, the domain is retained — a first-registered adapter
+  /// must not shadow the others.
+  Future<Set<String>> reconcileLocal(SyncStore store) async {
+    final adaptersByDomain = <String, List<SyncAppAdapter>>{};
     final desired = <String, AdapterRecord>{};
     for (final adapter in adapters) {
       if (adapter.domains.intersection(enabledDomains).isEmpty) continue;
       for (final domain in adapter.domains) {
-        adaptersByDomain.putIfAbsent(domain, () => adapter);
+        adaptersByDomain.putIfAbsent(domain, () => []).add(adapter);
       }
       final records = await adapter.readLocalRecords();
       for (final adapterRecord in records) {
@@ -50,13 +61,24 @@ class SyncAppReconciler {
       storedByDomain[domain] = map;
     }
 
+    final retainedDomains = <String>{};
     for (final domain in enabledDomains) {
-      final adapter = adaptersByDomain[domain];
+      final domainAdapters =
+          adaptersByDomain[domain] ?? const <SyncAppAdapter>[];
       final desiredForDomain = desired.values
           .where((record) => record.domain == domain)
           .toList();
       final stored = storedByDomain[domain]!;
+      var retained = false;
+      for (final adapter in domainAdapters) {
+        if (await adapter.retainsDomainRecords(store, domain)) {
+          retained = true;
+          break;
+        }
+      }
+      if (retained) retainedDomains.add(domain);
       if (desiredForDomain.isEmpty &&
+          !retained &&
           clearableDomains.contains(domain) &&
           stored.isNotEmpty) {
         await store.emitClear(domain);
@@ -65,11 +87,14 @@ class SyncAppReconciler {
 
       for (final entry in stored.entries) {
         if (desired.containsKey(entry.key)) continue;
-        final record = entry.value;
         // An adapter may report its local projection as unreadable rather
         // than deleted (e.g. a source login sidecar that failed validation):
         // keep the stored record instead of tombstoning it.
-        if (adapter != null && adapter.retainsMissingRecord(record)) {
+        if (retained) continue;
+        final record = entry.value;
+        if (domainAdapters.any(
+          (adapter) => adapter.retainsMissingRecord(record),
+        )) {
           continue;
         }
         await store.emit(
@@ -94,6 +119,7 @@ class SyncAppReconciler {
         );
       }
     }
+    return retainedDomains;
   }
 
   /// Projects merged store state back into the business databases.

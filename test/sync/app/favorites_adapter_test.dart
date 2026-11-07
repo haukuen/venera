@@ -311,17 +311,24 @@ void main() {
     );
 
     test(
-      'projects an empty order register when the database is missing',
+      'reports an unreadable projection when the database is missing',
       () async {
         final adapter = newAdapter();
         final records = await adapter.readLocalRecords();
 
-        expect(records, hasLength(1));
-        expect(records.single.domain, SyncDomains.favoriteOrder);
-        expect(records.single.kind, SyncOpKind.upsert);
-        expect(records.single.data!['folders'], isEmpty);
+        expect(records, isEmpty);
         // Reading must not create the business database as a side effect.
         expect(File(favoritesPath).existsSync(), isFalse);
+        // A missing database is not an emptied library: the reconciler must
+        // keep the stored records of every favorites domain.
+        final store = await openStore();
+        for (final domain in adapter.domains) {
+          expect(
+            await adapter.retainsDomainRecords(store, domain),
+            isTrue,
+            reason: domain,
+          );
+        }
       },
     );
 

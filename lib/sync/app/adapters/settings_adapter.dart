@@ -132,6 +132,10 @@ class SettingsAdapter implements SyncAppAdapter {
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
 
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
+
   void _warn(String message) => _onWarning?.call(message);
 
   static bool _isJsonEncodable(Object? value) {

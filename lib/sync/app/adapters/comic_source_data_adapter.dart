@@ -229,6 +229,10 @@ class ComicSourceDataAdapter implements SyncAppAdapter, SyncBlobAdapter {
     return SyncKeys.isSourceDataKey(record.key.parts);
   }
 
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
+
   /// Local `*.data` files, sorted for deterministic projections.
   List<File> _dataFiles() {
     final directory = _directory;

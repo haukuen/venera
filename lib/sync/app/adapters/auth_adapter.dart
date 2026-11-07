@@ -29,7 +29,7 @@ import '../../op.dart';
 import '../../store.dart';
 import '../sync_app_adapter.dart';
 
-class AuthAdapter implements SyncAppAdapter {
+class AuthAdapter implements SyncAppAdapter, SyncDisposableAdapter {
   AuthAdapter({
     required String dbPath,
     Future<void> Function()? reload,
@@ -48,6 +48,7 @@ class AuthAdapter implements SyncAppAdapter {
 
   /// Closes the lazily opened database connection. The adapter can be reused
   /// afterwards (the next call reopens the file).
+  @override
   void dispose() {
     final db = _db;
     _db = null;
@@ -251,6 +252,10 @@ class AuthAdapter implements SyncAppAdapter {
 
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
 
   void _warn(String message) => _onWarning?.call(message);
 

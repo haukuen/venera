@@ -422,4 +422,19 @@ void main() {
       );
     });
   });
+
+  group('resolveSyncDeviceId', () {
+    test('passes through a grammar-conformant id (trimmed)', () {
+      expect(resolveSyncDeviceId(_deviceA, 'seed'), _deviceA);
+      expect(resolveSyncDeviceId('  $_deviceA  ', 'seed'), _deviceA);
+    });
+
+    test('derives a deterministic, grammar-conformant fallback', () {
+      for (final raw in <Object?>['not a device id', 'UPPER', null, '']) {
+        final id = resolveSyncDeviceId(raw, 'D:/data/path');
+        expect(hlcDeviceIdRegExp.hasMatch(id), isTrue, reason: '$raw -> $id');
+        expect(resolveSyncDeviceId(raw, 'D:/data/path'), id);
+      }
+    });
+  });
 }

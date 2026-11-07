@@ -200,3 +200,22 @@ class HlcClock {
 
 /// Compact JSON encoding of an HLC clock, used in logs/tests.
 String encodeHlcClock(HlcClock clock) => jsonEncode(clock.toJson());
+
+/// Resolves the sync device id from the stored setting.
+///
+/// Returns [raw] when it already satisfies the device-id grammar (a UUID,
+/// for example). Otherwise derives a deterministic, grammar-conformant id
+/// from [fallbackSeed]. The grammar allows hex digits and dashes only, so
+/// the fallback is pure hex: an arbitrary prefix such as `device-` would be
+/// rejected by [HlcClock] and break sync startup entirely.
+String resolveSyncDeviceId(Object? raw, String fallbackSeed) {
+  if (raw is String) {
+    final trimmed = raw.trim();
+    if (hlcDeviceIdRegExp.hasMatch(trimmed)) return trimmed;
+  }
+  final hash = fallbackSeed.codeUnits
+      .fold<int>(0x5eed, (value, unit) => (value * 31 + unit) & 0x7fffffff)
+      .toRadixString(16)
+      .padLeft(8, '0');
+  return '$hash$hash';
+}

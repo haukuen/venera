@@ -238,6 +238,10 @@ class ComicSourceAdapter implements SyncAppAdapter, SyncBlobAdapter {
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
 
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
+
   /// Local source files, sorted for deterministic projections. Missing
   /// directories yield no files; unreadable listings yield a warning.
   List<File> _sourceFiles() {

@@ -14,6 +14,7 @@ library;
 import '../key_codec.dart';
 import '../op.dart';
 import '../store.dart';
+import 'business_db_token.dart';
 
 /// One desired local record, as projected from a business database.
 class AdapterRecord {
@@ -50,7 +51,9 @@ abstract class SyncAppAdapter {
   ///
   /// Must not mutate anything. Missing previously-known records are detected
   /// by the service (store has a visible record but the adapter no longer
-  /// returns it) and emitted as deletes by the service.
+  /// returns it) and emitted as deletes by the service — unless
+  /// [retainsDomainRecords] says the local projection cannot be trusted, see
+  /// [BusinessDbToken].
   Future<List<AdapterRecord>> readLocalRecords();
 
   /// Projects the merged store state for [domains] back into the business
@@ -74,6 +77,34 @@ abstract class SyncAppAdapter {
   /// reference; explicit deletions are represented by the adapter itself
   /// emitting a delete, which this hook does not intercept.
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  /// Whether the stored records of [domain] must currently be kept instead of
+  /// being diffed against the local projection.
+  ///
+  /// Diff-based deletion detection is only safe when the local business
+  /// database is the same instance the last projection was written to.
+  /// Implementations return `true` while the local data cannot prove that
+  /// (unreadable file, missing table, or a recreated database file — see
+  /// [BusinessDbToken]). The reconciler then keeps the stored records of the
+  /// domain (no deletes, no clear cutoffs) and reports the domain to the
+  /// service, which re-projects the merged state: lost local data is
+  /// restored and the identity token re-aligns. Defaults to `false` (the
+  /// projection is always trusted).
+  ///
+  /// A domain may be claimed by several adapters; the reconciler retains the
+  /// domain if *any* of them returns `true`.
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
+}
+
+/// Optional capability for adapters that hold long-lived resources (e.g. the
+/// auth adapter's lazily opened SQLite connection).
+///
+/// The service calls [dispose] when the engine is rebuilt or shut down;
+/// without it, every rebuild leaks the held file handle. Adapters that open
+/// per-operation connections need not implement it.
+abstract interface class SyncDisposableAdapter {
+  void dispose();
 }
 
 /// Optional capability for adapters that reference content-addressed blobs

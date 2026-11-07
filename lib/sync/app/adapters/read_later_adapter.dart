@@ -15,6 +15,7 @@ import '../../domains.dart';
 import '../../key_codec.dart';
 import '../../op.dart';
 import '../../store.dart';
+import '../business_db_token.dart';
 import '../sync_app_adapter.dart';
 
 /// Adapter for [SyncDomains.readLater].
@@ -35,6 +36,15 @@ class ReadLaterAdapter implements SyncAppAdapter {
   final Future<void> Function()? _reload;
   final void Function(String message)? _onWarning;
 
+  static final BusinessDbToken _dbToken = BusinessDbToken(
+    storeMetaKey: 'businessToken:read_later.db',
+  );
+
+  /// State of the most recent [readLocalRecords] pass; see [HistoryAdapter]
+  /// for the unreadable-projection rationale.
+  bool _lastReadUnreadable = false;
+  int? _lastReadToken;
+
   @override
   Set<String> get domains => const <String>{SyncDomains.readLater};
 
@@ -44,10 +54,24 @@ class ReadLaterAdapter implements SyncAppAdapter {
 
   @override
   Future<List<AdapterRecord>> readLocalRecords() async {
-    final db = _open();
+    Database db;
     try {
+      db = _open();
+    } catch (error) {
+      _markUnreadable('read_later database cannot be opened', error);
+      return const <AdapterRecord>[];
+    }
+    try {
+      _lastReadToken = _dbToken.read(db);
+      _lastReadUnreadable = false;
       if (!_tableExists(db, 'read_later')) {
-        _warn('read_later table is missing; no local records projected');
+        // The manager recreates an empty schema when the file is missing, so
+        // a missing table means the business data is gone or unreadable — not
+        // that the user deleted it. Report the projection as unreadable: the
+        // reconciler keeps the stored records and re-projects the merged
+        // state, which restores the data.
+        _lastReadUnreadable = true;
+        _warn('read_later table is missing; keeping synced records');
         return const <AdapterRecord>[];
       }
       final records = <AdapterRecord>[];
@@ -79,6 +103,9 @@ class ReadLaterAdapter implements SyncAppAdapter {
         }
       }
       return records;
+    } catch (error) {
+      _markUnreadable('read_later database read failed', error);
+      return const <AdapterRecord>[];
     } finally {
       db.dispose();
     }
@@ -114,6 +141,7 @@ class ReadLaterAdapter implements SyncAppAdapter {
 
     // 2. Project into the business database atomically.
     final db = _open();
+    int? token;
     try {
       if (!_tableExists(db, 'read_later')) {
         _warn('read_later table is missing; remote state not applied');
@@ -154,6 +182,10 @@ class ReadLaterAdapter implements SyncAppAdapter {
           }
         }
 
+        // Stamp the file identity inside the projection transaction so the
+        // token can never describe data that was not committed.
+        _dbToken.write(db);
+        token = _dbToken.read(db);
         db.execute('COMMIT;');
       } catch (_) {
         try {
@@ -167,6 +199,7 @@ class ReadLaterAdapter implements SyncAppAdapter {
       db.dispose();
     }
 
+    await _dbToken.mirror(store, token);
     await reload();
   }
 
@@ -180,6 +213,19 @@ class ReadLaterAdapter implements SyncAppAdapter {
 
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async {
+    if (_lastReadUnreadable) return true;
+    final projected = await store.getMeta(_dbToken.storeMetaKey);
+    return !_dbToken.matchesProjection(_lastReadToken, projected);
+  }
+
+  void _markUnreadable(String message, Object error) {
+    _lastReadUnreadable = true;
+    _lastReadToken = null;
+    _warn('$message; keeping synced records ($error)');
+  }
 
   // ---------------------------------------------------------------------------
   // Business row mapping

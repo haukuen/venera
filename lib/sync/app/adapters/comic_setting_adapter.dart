@@ -144,6 +144,10 @@ class ComicSettingAdapter implements SyncAppAdapter {
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
 
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
+
   /// Extracts the comic key from a store key.
   ///
   /// The canonical form is `[comicKey, '']`; a bare `[comicKey]` is also

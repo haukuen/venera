@@ -15,6 +15,7 @@ import '../../domains.dart';
 import '../../key_codec.dart';
 import '../../op.dart';
 import '../../store.dart';
+import '../business_db_token.dart';
 import '../sync_app_adapter.dart';
 
 /// One merged history row, assembled from the visible store records.
@@ -41,6 +42,18 @@ class HistoryAdapter implements SyncAppAdapter {
   final Future<void> Function()? _reload;
   final void Function(String message)? _onWarning;
 
+  /// Identity of the shared `history.db` file. The image-favorites adapter
+  /// projects the same file and must use the same store key.
+  static final BusinessDbToken _dbToken = BusinessDbToken(
+    storeMetaKey: 'businessToken:history.db',
+  );
+
+  /// State of the most recent [readLocalRecords] pass: `true` when the
+  /// business table could not be read, so its emptiness is not a deletion
+  /// signal; the file token read in the same pass (`null` when unreadable).
+  bool _lastReadUnreadable = false;
+  int? _lastReadToken;
+
   @override
   Set<String> get domains => const <String>{SyncDomains.history};
 
@@ -50,10 +63,24 @@ class HistoryAdapter implements SyncAppAdapter {
 
   @override
   Future<List<AdapterRecord>> readLocalRecords() async {
-    final db = _open();
+    Database db;
     try {
+      db = _open();
+    } catch (error) {
+      _markUnreadable('history database cannot be opened', error);
+      return const <AdapterRecord>[];
+    }
+    try {
+      _lastReadToken = _dbToken.read(db);
+      _lastReadUnreadable = false;
       if (!_tableExists(db, 'history')) {
-        _warn('history table is missing; no local records projected');
+        // The manager recreates an empty schema when the file is missing, so
+        // a missing table means the business data is gone or unreadable — not
+        // that the user deleted it. Report the projection as unreadable: the
+        // reconciler keeps the stored records and re-projects the merged
+        // state, which restores the data.
+        _lastReadUnreadable = true;
+        _warn('history table is missing; keeping synced records');
         return const <AdapterRecord>[];
       }
       final records = <AdapterRecord>[];
@@ -102,6 +129,9 @@ class HistoryAdapter implements SyncAppAdapter {
         }
       }
       return records;
+    } catch (error) {
+      _markUnreadable('history database read failed', error);
+      return const <AdapterRecord>[];
     } finally {
       db.dispose();
     }
@@ -150,6 +180,7 @@ class HistoryAdapter implements SyncAppAdapter {
 
     // 2. Project into the business database atomically.
     final db = _open();
+    int? token;
     try {
       if (!_tableExists(db, 'history')) {
         _warn('history table is missing; remote state not applied');
@@ -190,6 +221,10 @@ class HistoryAdapter implements SyncAppAdapter {
           }
         }
 
+        // Stamp the file identity inside the projection transaction so the
+        // token can never describe data that was not committed.
+        _dbToken.write(db);
+        token = _dbToken.read(db);
         db.execute('COMMIT;');
       } catch (_) {
         try {
@@ -203,6 +238,7 @@ class HistoryAdapter implements SyncAppAdapter {
       db.dispose();
     }
 
+    await _dbToken.mirror(store, token);
     await reload();
   }
 
@@ -216,6 +252,19 @@ class HistoryAdapter implements SyncAppAdapter {
 
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async {
+    if (_lastReadUnreadable) return true;
+    final projected = await store.getMeta(_dbToken.storeMetaKey);
+    return !_dbToken.matchesProjection(_lastReadToken, projected);
+  }
+
+  void _markUnreadable(String message, Object error) {
+    _lastReadUnreadable = true;
+    _lastReadToken = null;
+    _warn('$message; keeping synced records ($error)');
+  }
 
   // ---------------------------------------------------------------------------
   // Business row mapping

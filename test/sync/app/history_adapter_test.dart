@@ -264,6 +264,50 @@ void main() {
       );
       expect(await adapter.readLocalRecords(), isEmpty);
       expect(warnings, isNotEmpty);
+      // A missing table is an unreadable projection, not an emptied library:
+      // the reconciler must keep the stored records of the domain.
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.history),
+        isTrue,
+      );
+    });
+
+    test('trusts a readable projection with aligned identity', () async {
+      insertRow(id: 'comic-a', type: 1);
+      final adapter = newAdapter();
+      await adapter.readLocalRecords();
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.history),
+        isFalse,
+      );
+    });
+
+    test('keeps records while the file identity diverges', () async {
+      insertRow(id: 'comic-a', type: 1);
+      final adapter = newAdapter();
+      await adapter.readLocalRecords();
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.history),
+        isFalse,
+      );
+
+      // A projection stamped the file, then the file was recreated (token
+      // lost): the emptiness of a fresh file must not read as a deletion.
+      await store.setMeta('businessToken:history.db', '12345');
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.history),
+        isTrue,
+      );
+
+      // Re-stamping the file (what a re-projection does) restores trust.
+      final db = openBusinessDb();
+      db.execute('PRAGMA user_version = 12345;');
+      db.dispose();
+      await adapter.readLocalRecords();
+      expect(
+        await adapter.retainsDomainRecords(store, SyncDomains.history),
+        isFalse,
+      );
     });
 
     test('skips malformed rows instead of throwing', () async {

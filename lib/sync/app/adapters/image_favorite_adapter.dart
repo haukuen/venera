@@ -34,6 +34,7 @@ import '../../domains.dart';
 import '../../key_codec.dart';
 import '../../op.dart';
 import '../../store.dart';
+import '../business_db_token.dart';
 import '../sync_app_adapter.dart';
 
 /// Business columns carried by the row-level register, in table order.
@@ -77,6 +78,17 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
   final Future<void> Function()? _reload;
   final void Function(String message)? _onWarning;
 
+  /// Identity of the shared `history.db` file; must match [HistoryAdapter]'s
+  /// store key because both adapters project the same file.
+  static final BusinessDbToken _dbToken = BusinessDbToken(
+    storeMetaKey: 'businessToken:history.db',
+  );
+
+  /// State of the most recent [readLocalRecords] pass; see [HistoryAdapter]
+  /// for the unreadable-projection rationale.
+  bool _lastReadUnreadable = false;
+  int? _lastReadToken;
+
   @override
   Set<String> get domains => const <String>{SyncDomains.imageFavorite};
 
@@ -86,10 +98,19 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
 
   @override
   Future<List<AdapterRecord>> readLocalRecords() async {
-    final db = _open();
+    Database db;
     try {
+      db = _open();
+    } catch (error) {
+      _markUnreadable('image_favorites database cannot be opened', error);
+      return const <AdapterRecord>[];
+    }
+    try {
+      _lastReadToken = _dbToken.read(db);
+      _lastReadUnreadable = false;
       if (!_tableExists(db, 'image_favorites')) {
-        _warn('image_favorites table is missing; no local records projected');
+        _lastReadUnreadable = true;
+        _warn('image_favorites table is missing; keeping synced records');
         return const <AdapterRecord>[];
       }
       final records = <AdapterRecord>[];
@@ -134,6 +155,9 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
         }
       }
       return records;
+    } catch (error) {
+      _markUnreadable('image_favorites database read failed', error);
+      return const <AdapterRecord>[];
     } finally {
       db.dispose();
     }
@@ -180,6 +204,7 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
 
     // 2. Project into the business database atomically.
     final db = _open();
+    int? token;
     try {
       if (!_tableExists(db, 'image_favorites')) {
         _warn('image_favorites table is missing; remote state not applied');
@@ -218,6 +243,11 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
           }
         }
 
+        // Stamp the file identity inside the projection transaction so the
+        // token can never describe data that was not committed. Shared with
+        // HistoryAdapter: one file, one token.
+        _dbToken.write(db);
+        token = _dbToken.read(db);
         db.execute('COMMIT;');
       } catch (_) {
         try {
@@ -231,6 +261,7 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
       db.dispose();
     }
 
+    await _dbToken.mirror(store, token);
     await reload();
   }
 
@@ -244,6 +275,19 @@ class ImageFavoriteAdapter implements SyncAppAdapter {
 
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async {
+    if (_lastReadUnreadable) return true;
+    final projected = await store.getMeta(_dbToken.storeMetaKey);
+    return !_dbToken.matchesProjection(_lastReadToken, projected);
+  }
+
+  void _markUnreadable(String message, Object error) {
+    _lastReadUnreadable = true;
+    _lastReadToken = null;
+    _warn('$message; keeping synced records ($error)');
+  }
 
   // ---------------------------------------------------------------------------
   // Business row mapping

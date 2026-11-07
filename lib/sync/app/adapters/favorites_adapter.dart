@@ -23,6 +23,7 @@ import '../../domains.dart';
 import '../../key_codec.dart';
 import '../../op.dart';
 import '../../store.dart';
+import '../business_db_token.dart';
 import '../folder_guard.dart';
 import '../sync_app_adapter.dart';
 
@@ -130,6 +131,15 @@ class FavoritesAdapter implements SyncAppAdapter {
   final Future<void> Function()? _reload;
   final void Function(String message)? _onWarning;
 
+  static final BusinessDbToken _dbToken = BusinessDbToken(
+    storeMetaKey: 'businessToken:local_favorite.db',
+  );
+
+  /// State of the most recent [readLocalRecords] pass; see [HistoryAdapter]
+  /// for the unreadable-projection rationale.
+  bool _lastReadUnreadable = false;
+  int? _lastReadToken;
+
   /// Constant key of the single `favoriteOrder` register (§3: "单值").
   static final SyncKey orderKey = SyncKey(const <String>['order']);
 
@@ -170,13 +180,26 @@ class FavoritesAdapter implements SyncAppAdapter {
   Future<List<AdapterRecord>> readLocalRecords() async {
     final file = File(_dbPath);
     if (!file.existsSync()) {
-      // The favorites manager creates the database lazily on first launch.
-      // Project an empty order register instead of no order record at all so
-      // the service does not treat the missing record as a delete.
-      return <AdapterRecord>[_orderRecord(const <String>[])];
+      // The favorites manager creates the database lazily on first launch. A
+      // missing database is an unreadable projection, not an emptied library:
+      // report it as such so the reconciler keeps the stored records (and
+      // re-projects them, restoring the file) instead of tombstoning the
+      // whole collection.
+      _lastReadUnreadable = true;
+      _lastReadToken = null;
+      _warn('favorites database does not exist; keeping synced records');
+      return const <AdapterRecord>[];
     }
-    final db = _open();
+    Database db;
     try {
+      db = _open();
+    } catch (error) {
+      _markUnreadable('favorites database cannot be opened', error);
+      return const <AdapterRecord>[];
+    }
+    try {
+      _lastReadToken = _dbToken.read(db);
+      _lastReadUnreadable = false;
       final tables = _readTableNames(db);
       final folders = _folderTables(tables);
       final order = tables.contains(folderOrderTable)
@@ -195,6 +218,9 @@ class FavoritesAdapter implements SyncAppAdapter {
       }
       records.add(_orderRecord(_orderedFolders(folders, order)));
       return records;
+    } catch (error) {
+      _markUnreadable('favorites database read failed', error);
+      return const <AdapterRecord>[];
     } finally {
       db.dispose();
     }
@@ -217,10 +243,15 @@ class FavoritesAdapter implements SyncAppAdapter {
 
     // 2. Project it into the business database in one transaction.
     final db = _open(createParent: true);
+    int? token;
     try {
       db.execute('BEGIN IMMEDIATE;');
       try {
         _applyRemoteState(db, state, hasLinkRecords: hasLinkRecords);
+        // Stamp the file identity inside the projection transaction so the
+        // token can never describe data that was not committed.
+        _dbToken.write(db);
+        token = _dbToken.read(db);
         db.execute('COMMIT;');
       } catch (_) {
         try {
@@ -234,6 +265,7 @@ class FavoritesAdapter implements SyncAppAdapter {
       db.dispose();
     }
 
+    await _dbToken.mirror(store, token);
     await reload();
   }
 
@@ -247,6 +279,19 @@ class FavoritesAdapter implements SyncAppAdapter {
 
   @override
   bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async {
+    if (_lastReadUnreadable) return true;
+    final projected = await store.getMeta(_dbToken.storeMetaKey);
+    return !_dbToken.matchesProjection(_lastReadToken, projected);
+  }
+
+  void _markUnreadable(String message, Object error) {
+    _lastReadUnreadable = true;
+    _lastReadToken = null;
+    _warn('$message; keeping synced records ($error)');
+  }
 
   // ---------------------------------------------------------------------------
   // Parsing merged store records
