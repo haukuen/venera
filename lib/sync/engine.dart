@@ -1943,6 +1943,22 @@ class SyncEngine {
         // additionally requires every record domain to be declared.
         if (!_enabledDomains.contains(record.domain)) continue;
         if (!syncDomainRegExp.hasMatch(record.domain)) continue;
+        // The snapshot must not carry more than its watermark claims
+        // (§7.2 step 6: applied[self] = selfWatermark). Records whose
+        // self-version is still pending in the outbox (seq > selfWatermark)
+        // stay out; they reach peers as change files, or through a later
+        // snapshot once pushed. Absence never deletes on peers, so this only
+        // delays visibility until delivery, and LWW replays converge.
+        if (record.version.hlc.deviceId == self &&
+            record.version.seq > selfWatermark) {
+          continue;
+        }
+        final deletedVersion = record.deletedVersion;
+        if (deletedVersion != null &&
+            deletedVersion.hlc.deviceId == self &&
+            deletedVersion.seq > selfWatermark) {
+          continue;
+        }
         records.add(
           SnapshotRecord(
             domain: record.domain,
@@ -1958,9 +1974,18 @@ class SyncEngine {
       final clears = <String, Version>{};
       for (final clear in await _store.dumpClears(domains: _enabledDomains)) {
         if (!_enabledDomains.contains(clear.domain)) continue;
+        // Same watermark invariant as the records above: a clear that is still
+        // pending in the outbox (seq > selfWatermark) must not ride along in
+        // a snapshot that declares a lower self watermark. A premature clear
+        // cutoff would tombstone peers' newer data, so delay it until the
+        // change file (or a later snapshot) delivers it.
+        final cutoff = clear.cutoff;
+        if (cutoff.hlc.deviceId == self && cutoff.seq > selfWatermark) {
+          continue;
+        }
         final previous = clears[clear.domain];
-        if (previous == null || clear.cutoff > previous) {
-          clears[clear.domain] = clear.cutoff;
+        if (previous == null || cutoff > previous) {
+          clears[clear.domain] = cutoff;
         }
       }
 
@@ -2036,6 +2061,12 @@ class SyncEngine {
         lastChangeOverride: stateLastChange,
       );
       await _store.setLastSnapshot(info);
+      // §7.6: the snapshot that just landed covers its change files — sweep
+      // them now. Best effort: a failed sweep only delays deletion until the
+      // next snapshot, and must not fail the snapshot itself.
+      try {
+        await _gc();
+      } catch (_) {}
       return SyncSnapshotResult(
         info: info,
         records: records.length,

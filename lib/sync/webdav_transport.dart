@@ -619,6 +619,10 @@ class WebDavSyncTransport implements SyncTransport {
           if (hlcDeviceIdRegExp.hasMatch(name)) ids.add(name);
           continue;
         }
+        // `.json.tmp` are in-flight atomic-write artifacts; a crash can leave
+        // them behind. They never announce a device on their own: the device
+        // is discovered through its real state document or its directory.
+        if (name.endsWith('.json.tmp')) continue;
         if (!name.endsWith('.json')) continue;
         final deviceId = name.substring(0, name.length - 5);
         if (hlcDeviceIdRegExp.hasMatch(deviceId)) ids.add(deviceId);

@@ -1120,6 +1120,59 @@ void main() {
       );
     });
 
+    test('snapshot prunes its covered change files automatically', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      await _emitProgress(fixture.storeA, _comic2, 2);
+      expect((await fixture.engineA.push()).opsPushed, 2);
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      // No explicit gc(): the sweep is chained onto the snapshot upload.
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      expect(await fixture.transport.listChanges(_deviceA), isEmpty);
+
+      // Peers still converge — via the snapshot instead of the changes.
+      final pull = await fixture.engineB.pull();
+      expect(pull.success, isTrue, reason: pull.errors.join('\n'));
+      expect(await fixture.storeB.getAppliedSeq(_deviceA), 2);
+      expect(
+        fixture.storeB.fingerprint(),
+        equals(fixture.storeA.fingerprint()),
+      );
+    });
+
+    test('pending clear cutoff stays out of the periodic snapshot', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      // One delivered op establishes a snapshot watermark of 1.
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+
+      // A clear emitted *after* the push is still pending (seq 2 > watermark).
+      await fixture.storeA.emitClear(SyncDomains.history);
+
+      final snapshot = await fixture.engineA.snapshot();
+      expect(snapshot.success, isTrue, reason: '$snapshot');
+      expect(snapshot.info!.applied[_deviceA], 1);
+      // No clear line may ride along: the cutoff is still pending delivery.
+      expect(snapshot.clears, 0);
+
+      // The peer must see the delivered record but NOT the pending cutoff: a
+      // premature clear would tombstone newer data on other devices.
+      final pull = await fixture.engineB.pull();
+      expect(pull.success, isTrue, reason: pull.errors.join('\n'));
+      expect(
+        await fixture.storeB.recordOf(
+          SyncDomains.history,
+          _historyKey(_comic1),
+          SyncFields.progress,
+        ),
+        isNotNull,
+      );
+      expect(await fixture.storeB.dumpClears(), isEmpty);
+    });
+
     test('corrupt change file is repaired from the snapshot', () async {
       final fixture = _Fixture();
       await fixture.init();

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show gzip;
+import 'dart:io'
+    show ContentType, HttpClient, HttpServer, InternetAddress, gzip;
 import 'dart:math' show Random;
 import 'dart:typed_data';
 
@@ -12,6 +13,7 @@ import 'package:dio/dio.dart'
         RequestOptions,
         Response,
         ResponseBody;
+import 'package:dio/io.dart' show IOHttpClientAdapter;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:venera/sync/fake_transport.dart';
 import 'package:venera/sync/hlc.dart';
@@ -252,6 +254,75 @@ void main() {
       throwsArgumentError,
     );
     expect(created, 0);
+  });
+
+  test('listDevices ignores stale .json.tmp atomic-write leftovers', () async {
+    // A minimal WebDAV server that only answers PROPFIND on /devices with
+    // a fixed directory listing: one live state file, one in-flight tmp and
+    // unrelated junk names.
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    // The first response must be the directory itself: the webdav_client
+    // parser skips it by position (not href), and rejects listings whose
+    // first entry is not a collection.
+    const body =
+        ''
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<D:multistatus xmlns:D="DAV:">'
+        '<D:response><D:href>/dav/v2/devices/</D:href>'
+        '<D:propstat><D:prop><D:resourcetype><D:collection/></D:resourcetype>'
+        '</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/$_deviceA.json</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/$_deviceB.json.tmp</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/not-a-device.json</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '</D:multistatus>';
+    server.listen((request) async {
+      // Ignore anything but the devices listing (e.g. keep-alive probes).
+      // The client normalizes the path with a trailing slash.
+      final normalized = request.uri.path.replaceAll(RegExp(r'/+$'), '');
+      if (request.method != 'PROPFIND' || !normalized.endsWith('/devices')) {
+        request.response
+          ..statusCode = 404
+          ..close();
+        return;
+      }
+      request.response
+        ..statusCode = 207
+        ..headers.contentType = ContentType('application', 'xml')
+        ..write(body)
+        ..close();
+    });
+
+    final transport = WebDavSyncTransport.connect(
+      baseUrl: 'http://127.0.0.1:${server.port}/dav',
+      user: 'user',
+      password: 'pass',
+      // The app default uses a rust-backed adapter that is unavailable in
+      // the flutter_test sandbox; plain dart:io HTTP works here.
+      clientFactory: (baseUrl, user, password) => webdav.newClient(
+        baseUrl,
+        user: user,
+        password: password,
+        adapter: IOHttpClientAdapter(createHttpClient: () => HttpClient()),
+      ),
+    );
+    addTearDown(transport.close);
+
+    final devices = await transport.listDevices();
+    // The tmp leftover must not surface as a ghost device; junk names are
+    // filtered; the real state document is discovered.
+    expect(devices.map((info) => info.deviceId), [_deviceA]);
+    expect(devices.map((info) => info.deviceId), isNot(contains(_deviceB)));
+    expect(
+      devices.map((info) => info.deviceId),
+      isNot(contains('not-a-device')),
+    );
   });
 
   group('WebDavPaths', () {
