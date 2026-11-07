@@ -511,7 +511,18 @@ class _SyncDevicesDialogState extends State<_SyncDevicesDialog> {
     });
   }
 
-  Future<void> _remove(String deviceId) async {
+  void _remove(String deviceId) {
+    showConfirmDialog(
+      context: context,
+      title: "Remove Device".tl,
+      content:
+          "Delete device @d from the sync server? Changes not yet synced to other devices will be lost."
+              .tlParams({'d': deviceId}),
+      onConfirm: () => _removeDevice(deviceId),
+    );
+  }
+
+  Future<void> _removeDevice(String deviceId) async {
     final result = await DataSync.removeSyncDevice(deviceId);
     if (!mounted) return;
     if (result.error) {
@@ -562,7 +573,7 @@ class _SyncDevicesDialogState extends State<_SyncDevicesDialog> {
                         '${device['lastSeen'] ?? ''}',
                       ),
                       trailing: device['isSelf'] == true
-                          ? const Text("This device")
+                          ? Text("This device".tl)
                           : IconButton(
                               tooltip: "Remove".tl,
                               icon: const Icon(Icons.delete_outline),
