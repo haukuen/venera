@@ -24,6 +24,7 @@ import 'package:venera/foundation/cache_manager.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/consts.dart';
+import 'package:venera/sync/app/sync_v2_service.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/global_state.dart';
 import 'package:venera/foundation/history.dart';
@@ -197,8 +198,26 @@ class _ReaderState extends State<Reader>
 
   _ReaderScaffoldState? _scaffoldState;
 
+  int _syncHistoryRevision = 0;
+
+  void _onSyncChanged() {
+    if (!mounted) return;
+    final revision = SyncV2Service.instance.historyRevision;
+    if (revision == _syncHistoryRevision) return;
+    _syncHistoryRevision = revision;
+    final latest = HistoryManager().find(widget.cid, widget.type);
+    if (latest == null) return;
+    final remoteAhead =
+        latest.ep > chapter || (latest.ep == chapter && latest.page > page);
+    if (remoteAhead) {
+      context.showMessage(message: "已同步其它设备的阅读进度");
+    }
+  }
+
   @override
   void initState() {
+    _syncHistoryRevision = SyncV2Service.instance.historyRevision;
+    SyncV2Service.instance.addListener(_onSyncChanged);
     page = widget.initialPage ?? 1;
     if (page < 1) {
       page = 1;
@@ -274,6 +293,7 @@ class _ReaderState extends State<Reader>
 
   @override
   void dispose() {
+    SyncV2Service.instance.removeListener(_onSyncChanged);
     if (isFullscreen) {
       fullscreen();
     }

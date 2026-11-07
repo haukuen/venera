@@ -547,7 +547,11 @@
     "Change": "修改",
     "PIN is stored locally and cannot be recovered. If forgotten, app data must be cleared.": "PIN 仅保存在本机并且无法找回，遗忘后需清除应用数据",
     "Use PIN to unlock": "使用 PIN 码解锁",
-    "About PIN": "关于 PIN 码"
+    "About PIN": "关于 PIN 码",
+    "No devices": "没有设备",
+    "This device": "本设备",
+    "Remove Device": "删除设备",
+    "Delete device @d from the sync server? Changes not yet synced to other devices will be lost.": "将从同步服务器删除设备 @d？该设备尚未同步到其他设备的更改将会丢失。"
   },
   "zh_TW": {
     "Home": "首頁",
@@ -1097,6 +1101,10 @@
     "Change": "修改",
     "PIN is stored locally and cannot be recovered. If forgotten, app data must be cleared.": "PIN 僅儲存於本機並且無法找回，遺忘後需清除應用資料",
     "Use PIN to unlock": "使用 PIN 碼解鎖",
-    "About PIN": "關於 PIN 碼"
+    "About PIN": "關於 PIN 碼",
+    "No devices": "沒有裝置",
+    "This device": "本裝置",
+    "Remove Device": "刪除裝置",
+    "Delete device @d from the sync server? Changes not yet synced to other devices will be lost.": "將從同步伺服器刪除裝置 @d？該裝置尚未同步到其他裝置的變更將會遺失。"
   }
 }
