@@ -115,6 +115,7 @@ class SyncV2Service extends ChangeNotifier {
   String? _lastError;
   int _historyRevision = 0;
   Timer? _debounce;
+  Timer? _flushDebounce;
   Timer? _pollTimer;
   AppLifecycleListener? _lifecycle;
   Future<void>? _operation;
@@ -790,6 +791,13 @@ class SyncV2Service extends ChangeNotifier {
       }
     } else {
       _stopPolling();
+      // Leaving the foreground (or losing focus on desktop): push whatever
+      // the debounce is still holding before the OS suspends us.
+      if (state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden) {
+        _flushPendingPush();
+      }
     }
   }
 
@@ -844,12 +852,55 @@ class SyncV2Service extends ChangeNotifier {
 
   // -------------------------------------------------------------- lifecycle --
 
+  /// Push debounce: every local change restarts the timer, so a burst of
+  /// edits becomes one push. 15s (not 3s) for two reasons:
+  ///  * every push is a full HTTP round trip on a short-connection WebDAV —
+  ///    steady reading used to produce one push (and one 1-op change file)
+  ///    per ~3s page turn;
+  ///  * the store coalesces same-key pending ops in place, but only while
+  ///    they are unfrozen — a longer window lets page turns of the same comic
+  ///    collapse into a single op before the first one is delivered.
+  /// Matches Chrome Sync's Sessions nudge (15s), the largest of its type
+  /// delays for exactly this class of high-frequency overwrite writes.
+  static const Duration _pushDebounce = Duration(seconds: 15);
+
+  /// Max-latency cap (Syncthing's 10s→60s rule): the debounce above is
+  /// restarted by every change, so continuous reading would postpone the
+  /// push indefinitely. Whatever happens, pending local changes leave this
+  /// device within 60s.
+  static const Duration _pushMaxLatency = Duration(seconds: 60);
+
   void _onManagerChanged() {
     if (_disposed || !_initialized || !autoSyncEnabled) return;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 3), () {
+    _debounce = Timer(_pushDebounce, () {
+      _flushDebounce?.cancel();
+      _flushDebounce = null;
       pushNow();
     });
+    // The cap timer is NOT restarted by later changes: it measures since the
+    // first unsent change of the current burst.
+    _flushDebounce ??= Timer(_pushMaxLatency, () {
+      _debounce?.cancel();
+      _debounce = null;
+      pushNow();
+    });
+  }
+
+  /// Pushes immediately when the app leaves the foreground. Event-boundary
+  /// flush is the industry default (Chrome/CKSyncEngine commit on lifecycle
+  /// events): the 15s debounce must not hold changes hostage while the app
+  /// sits in the background with the OS about to suspend it.
+  void _flushPendingPush() {
+    if (_disposed) return;
+    final debounce = _debounce;
+    // Nothing pending: `isActive` would throw on a null timer.
+    if (debounce == null || !debounce.isActive) return;
+    debounce.cancel();
+    _debounce = null;
+    _flushDebounce?.cancel();
+    _flushDebounce = null;
+    pushNow();
   }
 
   /// Rebuilds the engine/adapters, e.g. after the "sync login state" toggle
@@ -867,6 +918,8 @@ class SyncV2Service extends ChangeNotifier {
     _lifecycle = null;
     _debounce?.cancel();
     _debounce = null;
+    _flushDebounce?.cancel();
+    _flushDebounce = null;
     if (_initialized) {
       HistoryManager().removeListener(_onManagerChanged);
       LocalFavoritesManager().removeListener(_onManagerChanged);
