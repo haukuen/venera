@@ -223,7 +223,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
         return const Res.error('Local comic not found');
       }
       try {
-        await SyncV2Service.instance.pullNow();
+        await SyncV2Service.instance.pullNowFast();
       } catch (_) {}
       var history = HistoryManager().find(widget.id, ComicType.local);
       if (isFirst) {

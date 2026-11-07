@@ -12,6 +12,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'hlc.dart';
@@ -337,6 +338,27 @@ class SnapshotCodec {
     }
     return ParsedSnapshot(info: info, clears: clears, records: records);
   }
+
+  /// [encode] off the calling isolate. Snapshots reach megabytes, so the
+  /// JSON encode + gzip always run outside the UI isolate.
+  ///
+  /// [records] is materialized on the caller side first: only concrete
+  /// sendable objects may cross the isolate boundary, and a lazy iterable
+  /// would fail [Isolate.run].
+  static Future<Uint8List> encodeAsync(
+    SnapshotInfo info,
+    Map<String, Version> clears,
+    Iterable<SnapshotRecord> records,
+  ) {
+    final snapshotRecords = List<SnapshotRecord>.of(records);
+    return Isolate.run(() => encode(info, clears, snapshotRecords));
+  }
+
+  /// [decode] off the calling isolate; see [encodeAsync].
+  static Future<ParsedSnapshot> decodeAsync(
+    Uint8List bytes, {
+    String? expectedDeviceId,
+  }) => Isolate.run(() => decode(bytes, expectedDeviceId: expectedDeviceId));
 
   static Uint8List _gunzip(Uint8List bytes) {
     if (bytes.length > maxCompressedBytes) {

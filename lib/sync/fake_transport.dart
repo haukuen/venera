@@ -571,6 +571,15 @@ class FakeTransport implements SyncTransport {
   }
 
   @override
+  Future<bool> blobExists(String deviceId, String sha256) async {
+    _checkDeviceId(deviceId);
+    _checkSha256(sha256);
+    return _read('blobExists:$deviceId:$sha256', () {
+      return remote._blobs[deviceId]?.containsKey(sha256) ?? false;
+    });
+  }
+
+  @override
   Future<void> writeBlob(
     String deviceId,
     String sha256,

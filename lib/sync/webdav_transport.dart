@@ -764,6 +764,15 @@ class WebDavSyncTransport implements SyncTransport {
   }
 
   @override
+  Future<bool> blobExists(String deviceId, String sha256) async {
+    final path = paths.blobPath(deviceId, sha256);
+    // Range probe of the first byte: 404 answers null, a present blob answers
+    // 206 (or 200 with the full body on servers without range support).
+    final head = await _guard('blobExists', () => _io.readHead(path, 1));
+    return head != null;
+  }
+
+  @override
   Future<List<String>> listBlobs(String deviceId) {
     final blobsDir = '${paths.deviceDir(deviceId)}/blobs';
     return _guard('listBlobs', () async {

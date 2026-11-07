@@ -11,6 +11,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 import 'package:venera/foundation/app.dart';
@@ -134,6 +135,22 @@ class SyncV2Service extends ChangeNotifier {
   /// merged records.
   static const String _implicitProjectionSeeded = 'syncV2ProjectionSeeded';
 
+  /// Store meta key persisting the blob ledger: sha256 -> last-verified
+  /// epoch ms. Backs [BlobSync] so already-uploaded blobs are never probed
+  /// or re-downloaded on subsequent pushes.
+  static const String _metaBlobLedger = 'blobLedger';
+
+  /// Store meta key holding the epoch ms of the last blob GC run.
+  static const String _metaBlobGcAt = 'blobGcAt';
+
+  /// Minimum interval between blob GC sweeps that had no new uploads.
+  static const Duration _blobGcInterval = Duration(hours: 1);
+
+  /// Upper bound for open-path pulls ([pullNowFast]): the reader and comic
+  /// details wait this long for fresh cross-device progress before opening
+  /// with the local state.
+  static const Duration quickPullTimeout = Duration(seconds: 2);
+
   bool get isInitialized => _initialized;
 
   bool get isUploading => _isUploading;
@@ -220,6 +237,21 @@ class SyncV2Service extends ChangeNotifier {
     final blobSync = BlobSync(
       transport: transport,
       localDeviceId: store.deviceId,
+      ledgerLoader: () async {
+        final raw = await store.getMeta(_metaBlobLedger);
+        if (raw == null || raw.isEmpty) return null;
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is! Map) return null;
+          return decoded.map<String, int>(
+            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+          );
+        } catch (_) {
+          return null;
+        }
+      },
+      ledgerSaver: (ledger) =>
+          store.setMeta(_metaBlobLedger, jsonEncode(ledger)),
     );
     _blobSync = blobSync;
     final adapters = <SyncAppAdapter>[
@@ -418,6 +450,19 @@ class SyncV2Service extends ChangeNotifier {
     return _serialized(_pullInternal);
   }
 
+  /// Pull that gives up after [quickPullTimeout] instead of stalling open
+  /// paths (reader, comic details). The underlying pull keeps running in the
+  /// operation queue; a pull that applies remote history notifies the reader
+  /// through [historyRevision].
+  Future<bool> pullNowFast() async {
+    try {
+      final result = await pullNow().timeout(quickPullTimeout);
+      return result.success;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<Res<bool>> pushNow() {
     return _serialized(_pushInternal);
   }
@@ -469,13 +514,11 @@ class SyncV2Service extends ChangeNotifier {
       // Project anything a previous pull merged but never wrote back before
       // reconciliation can classify those records as local deletions.
       await _projectPendingIfNeeded(syncStore);
-      final retained = await _reconciler!.reconcileLocal(syncStore);
-      if (retained.isNotEmpty) {
-        // The local business data was recreated or unreadable: restore it
-        // from the merged store now instead of waiting for the next remote
-        // change. This also re-aligns the business database identity tokens.
-        await _projectRemote(syncStore);
-      }
+      // No reconcileLocal here on purpose: its output (local tombstones and
+      // the retained-domain self-heal) only matters before a *push* — it
+      // cannot leave this device through a pull. Running the full business
+      // scan on every poll or reader-open pull was pure overhead; the push
+      // path reconciles right before uploading.
       final result = await syncEngine.pull();
       changedAnything = result.changed;
       if (result.changed) {
@@ -522,6 +565,19 @@ class SyncV2Service extends ChangeNotifier {
         // See _pullInternal: re-project recreated/unreadable business data
         // before pushing, so the next reconciliation sees restored rows.
         await _projectRemote(syncStore);
+      }
+      // Amortized ledger re-verification: a couple of range probes per push
+      // keep the ledger honest, so blobs pruned manually on the server are
+      // re-uploaded within minutes instead of silently assumed present.
+      final blobSyncForReverify = _blobSync;
+      if (blobSyncForReverify != null) {
+        try {
+          await blobSyncForReverify.reverifyOldest(
+            blobSyncForReverify.ledgerReverifyCount,
+          );
+        } catch (error, stack) {
+          Log.error('Sync v2', 'Blob ledger reverify failed', stack);
+        }
       }
       final blobFailures = await _ensureBlobs();
       if (blobFailures > 0) {
@@ -594,6 +650,10 @@ class SyncV2Service extends ChangeNotifier {
   /// Deletes blobs on this device's branch that no *visible* record of the
   /// local store references anymore.
   ///
+  /// Throttled: the sweep costs a full store dump plus a remote blob listing,
+  /// so it runs right after a push that uploaded blobs, and otherwise at most
+  /// once per [_blobGcInterval].
+  ///
   /// Safe only after a successful push + snapshot: the snapshot carries the
   /// surviving references, and content-addressed names make a re-upload of
   /// still-needed content a no-op even if a concurrent device still holds an
@@ -604,6 +664,13 @@ class SyncV2Service extends ChangeNotifier {
     final blobSync = _blobSync;
     final store = _store;
     if (blobSync == null || store == null) return;
+    final uploadedSomething = blobSync.uploadsSinceLastGc > 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (!uploadedSomething) {
+      final lastGc =
+          int.tryParse(await store.getMeta(_metaBlobGcAt) ?? '') ?? 0;
+      if (nowMs - lastGc < _blobGcInterval.inMilliseconds) return;
+    }
     try {
       final referenced = <String>{};
       for (final record in await store.dumpRecords()) {
@@ -615,6 +682,8 @@ class SyncV2Service extends ChangeNotifier {
       if (deleted > 0) {
         Log.info('Sync v2', 'Blob GC removed $deleted unreferenced blob(s)');
       }
+      await store.setMeta(_metaBlobGcAt, '$nowMs');
+      blobSync.resetUploadCounter();
     } catch (error, stack) {
       // Garbage collection must never fail the push.
       Log.error('Sync v2', 'Blob GC failed', stack);

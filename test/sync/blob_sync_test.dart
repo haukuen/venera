@@ -9,6 +9,46 @@ import 'package:venera/sync/transport.dart';
 const _deviceA = 'aaaaaaaa-0000-0000-0000-00000000000a';
 const _deviceB = 'bbbbbbbb-0000-0000-0000-00000000000b';
 
+/// Counts blob traffic so ledger tests can assert that repeated uploads stay
+/// off the network.
+class _CountingTransport extends FakeTransport {
+  _CountingTransport(super.remote, {required super.label});
+
+  int readBlobCalls = 0;
+  int writeBlobCalls = 0;
+  int blobExistsCalls = 0;
+  bool failBlobExists = false;
+
+  void resetCounters() {
+    readBlobCalls = 0;
+    writeBlobCalls = 0;
+    blobExistsCalls = 0;
+  }
+
+  @override
+  Future<Uint8List?> readBlob(String deviceId, String sha256) {
+    readBlobCalls++;
+    return super.readBlob(deviceId, sha256);
+  }
+
+  @override
+  Future<void> writeBlob(String deviceId, String sha256, Uint8List bytes) {
+    writeBlobCalls++;
+    return super.writeBlob(deviceId, sha256, bytes);
+  }
+
+  @override
+  Future<bool> blobExists(String deviceId, String sha256) {
+    blobExistsCalls++;
+    if (failBlobExists) {
+      return Future.error(
+        SyncTransportException('probe failed', statusCode: 500),
+      );
+    }
+    return super.blobExists(deviceId, sha256);
+  }
+}
+
 void main() {
   late FakeRemote remote;
   late FakeTransport transportA;
@@ -125,5 +165,109 @@ void main() {
 
     expect(deleted, 0);
     expect(remote.debugBlobs(_deviceA), isNotEmpty);
+  });
+
+  group('blob ledger', () {
+    test('repeated uploads stay off the network', () async {
+      final transport = _CountingTransport(remote, label: _deviceA);
+      final blobs = BlobSync(transport: transport, localDeviceId: _deviceA);
+      final bytes = Uint8List.fromList(utf8.encode('ledger probe'));
+
+      await blobs.upload(bytes);
+      expect(transport.writeBlobCalls, 1);
+      expect(transport.readBlobCalls, 1);
+
+      await blobs.upload(bytes);
+      expect(transport.writeBlobCalls, 1, reason: 'no second write');
+      expect(transport.readBlobCalls, 1, reason: 'no existence probe');
+
+      final other = Uint8List.fromList(utf8.encode('other content'));
+      await blobs.upload(other);
+      expect(transport.writeBlobCalls, 2);
+      expect(transport.readBlobCalls, 2);
+    });
+
+    test('ledger persists across instances', () async {
+      final persisted = <String, int>{};
+      final transport = _CountingTransport(remote, label: _deviceA);
+      BlobSync blobs() => BlobSync(
+        transport: transport,
+        localDeviceId: _deviceA,
+        ledgerLoader: () async =>
+            persisted.isEmpty ? null : Map<String, int>.of(persisted),
+        ledgerSaver: (ledger) async {
+          persisted
+            ..clear()
+            ..addAll(ledger);
+        },
+      );
+
+      final bytes = Uint8List.fromList(utf8.encode('persisted ledger'));
+      final sha = await blobs().upload(bytes);
+      expect(persisted.keys, contains(sha));
+
+      transport.resetCounters();
+      // A fresh instance (e.g. after an app restart) trusts the ledger.
+      await blobs().upload(bytes);
+      expect(transport.readBlobCalls, 0);
+      expect(transport.writeBlobCalls, 0);
+    });
+
+    test('reverifyOldest re-uploads blobs the server lost', () async {
+      final transport = _CountingTransport(remote, label: _deviceA);
+      final blobs = BlobSync(transport: transport, localDeviceId: _deviceA);
+      final bytes = Uint8List.fromList(utf8.encode('lost on server'));
+      final sha = await blobs.upload(bytes);
+      expect(blobs.uploadsSinceLastGc, 1);
+
+      // Manual server-side pruning.
+      await transport.deleteBlob(_deviceA, sha);
+
+      // Blob still ledgered: plain upload stays off the network...
+      transport.resetCounters();
+      await blobs.upload(bytes);
+      expect(transport.writeBlobCalls, 0);
+
+      // ...but the amortized re-verify drops the stale entry and the next
+      // upload re-sends the content.
+      expect(await blobs.reverifyOldest(4), 1);
+      transport.resetCounters();
+      final uploaded = await blobs.upload(bytes);
+      expect(uploaded, sha);
+      expect(transport.writeBlobCalls, 1);
+      expect(transport.readBlobCalls, 1);
+      expect(remote.debugBlobs(_deviceA)[sha], isNotNull);
+    });
+
+    test('reverifyOldest probe failures keep entries', () async {
+      final transport = _CountingTransport(remote, label: _deviceA);
+      final blobs = BlobSync(transport: transport, localDeviceId: _deviceA);
+      final bytes = Uint8List.fromList(utf8.encode('probe failure'));
+      await blobs.upload(bytes);
+
+      transport.failBlobExists = true;
+      expect(await blobs.reverifyOldest(4), 0);
+
+      // The entry survived, so the upload still skips the network.
+      transport.resetCounters();
+      await blobs.upload(bytes);
+      expect(transport.writeBlobCalls, 0);
+      expect(transport.readBlobCalls, 0);
+    });
+
+    test('upload counter tracks real writes only', () async {
+      final transport = _CountingTransport(remote, label: _deviceA);
+      final blobs = BlobSync(transport: transport, localDeviceId: _deviceA);
+      final bytes = Uint8List.fromList(utf8.encode('counter check'));
+
+      expect(blobs.uploadsSinceLastGc, 0);
+      await blobs.upload(bytes);
+      expect(blobs.uploadsSinceLastGc, 1);
+      await blobs.upload(bytes);
+      expect(blobs.uploadsSinceLastGc, 1, reason: 'ledger hit is not a write');
+
+      blobs.resetUploadCounter();
+      expect(blobs.uploadsSinceLastGc, 0);
+    });
   });
 }

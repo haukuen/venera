@@ -746,7 +746,7 @@ class SyncEngine {
 
       final Uint8List bytes;
       try {
-        bytes = SyncOpCodec.encode(pending);
+        bytes = await SyncOpCodec.encodeAsync(pending);
       } catch (encodeError) {
         error = encodeError;
         break;
@@ -1013,7 +1013,7 @@ class SyncEngine {
             gap = true;
             break;
           }
-          ops = SyncOpCodec.decode(
+          ops = await SyncOpCodec.decodeAsync(
             bytes,
             expectedDeviceId: remote,
             lo: range.lo,
@@ -1261,7 +1261,7 @@ class SyncEngine {
         );
         return false;
       }
-      ops = SyncOpCodec.decode(
+      ops = await SyncOpCodec.decodeAsync(
         bytes,
         expectedDeviceId: remote,
         lo: range.lo,
@@ -1375,7 +1375,7 @@ class SyncEngine {
 
     final ParsedSnapshot parsed;
     try {
-      parsed = SnapshotCodec.decode(bytes, expectedDeviceId: remote);
+      parsed = await SnapshotCodec.decodeAsync(bytes, expectedDeviceId: remote);
     } catch (error) {
       builder.warnings.add(
         SyncPullError(
@@ -1677,7 +1677,7 @@ class SyncEngine {
 
       final ParsedSnapshot parsed;
       try {
-        parsed = SnapshotCodec.decode(
+        parsed = await SnapshotCodec.decodeAsync(
           bytes,
           expectedDeviceId: candidate.deviceId,
         );
@@ -1990,7 +1990,7 @@ class SyncEngine {
 
       final Uint8List bytes;
       try {
-        bytes = SnapshotCodec.encode(info, clears, records);
+        bytes = await SnapshotCodec.encodeAsync(info, clears, records);
       } catch (error) {
         return SyncSnapshotResult(
           info: info,

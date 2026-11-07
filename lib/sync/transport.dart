@@ -189,6 +189,13 @@ abstract class SyncTransport {
   /// Reads a content-addressed blob, or `null` when absent.
   Future<Uint8List?> readBlob(String deviceId, String sha256);
 
+  /// Whether a content-addressed blob exists on the remote.
+  ///
+  /// Existence-only probe: implementations must not transfer the full body
+  /// when the server supports range requests. Used by the blob ledger to
+  /// re-verify previously uploaded blobs cheaply.
+  Future<bool> blobExists(String deviceId, String sha256);
+
   /// Lists the sha256 names of a device's uploaded blobs.
   Future<List<String>> listBlobs(String deviceId);
 
