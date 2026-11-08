@@ -860,6 +860,56 @@ class WebDavSyncTransport implements SyncTransport {
   }
 
   @override
+  Future<int> deleteStaleTemporaryFiles(
+    String deviceId, {
+    Duration maxAge = staleTemporaryFileAge,
+  }) {
+    return _guard('deleteStaleTemporaryFiles', () async {
+      final cutoff = DateTime.now().toUtc().subtract(maxAge);
+      // Remote names are never trusted (§12.3): only delete names that match
+      // this protocol's own in-flight artifacts, so a hostile listing can
+      // never turn the sweep into a path traversal or delete foreign data.
+      // Device ids are [0-9a-f-], so the encoded state tmp name is exact.
+      final stateTmpName = RegExp.escape('$deviceId.json.tmp');
+      final patterns = <String, RegExp>{
+        paths.devicesDir: RegExp('^$stateTmpName\$'),
+        paths.deviceDir(deviceId): RegExp(
+          r'^snapshot(\.prev)?\.jsonl\.gz\.tmp$',
+        ),
+        paths.changesDir(deviceId): RegExp(r'^\d{12}-\d{12}\.jsonl\.gz\.tmp$'),
+        '${paths.deviceDir(deviceId)}/blobs': RegExp(
+          r'^[0-9a-f]{64}\.gz\.tmp$',
+        ),
+      };
+      final stale = <String>[];
+      for (final entry in patterns.entries) {
+        final entries = await _io.list(entry.key);
+        if (entries == null) continue;
+        for (final file in entries) {
+          if (file.isDirectory) continue;
+          if (!entry.value.hasMatch(file.name)) continue;
+          final modified = file.modified;
+          // Without a server-reported modification time a stale leftover
+          // cannot be told apart from an in-flight write; keep the file.
+          if (modified == null || modified.isAfter(cutoff)) continue;
+          // The matched names contain no separators, so joining is safe.
+          stale.add('${entry.key}/${file.name}');
+        }
+      }
+      var deleted = 0;
+      for (final path in stale) {
+        try {
+          await _io.remove(path);
+          deleted++;
+        } on SyncTransportException {
+          // Keep sweeping; the file stays for the next run.
+        }
+      }
+      return deleted;
+    });
+  }
+
+  @override
   Future<void> deleteDevice(String deviceId) async {
     final deviceDir = paths.deviceDir(deviceId);
     final state = paths.statePath(deviceId);

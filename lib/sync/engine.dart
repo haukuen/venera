@@ -2126,6 +2126,9 @@ class SyncEngine {
     final watermark = snapshot.applied[_store.deviceId] ?? 0;
     final upTo = watermark - gcRetainChanges;
     if (upTo <= 0) {
+      // Stale tmp artifacts are independent of change-file coverage; sweep
+      // them even when there is nothing to prune yet.
+      await _sweepTemporaryFiles();
       return SyncGcResult(skipped: true, snapshotWatermark: watermark);
     }
     try {
@@ -2133,11 +2136,25 @@ class SyncEngine {
     } catch (error) {
       return SyncGcResult(snapshotWatermark: watermark, error: error);
     }
+    await _sweepTemporaryFiles();
     return SyncGcResult(
       deleted: true,
       deletedUpTo: upTo,
       snapshotWatermark: watermark,
     );
+  }
+
+  /// Best-effort sweep of stale in-flight artifacts (`*.tmp`) on this
+  /// device's branch (protocol §7.2 step 4): a crash between the temporary
+  /// write and the atomic rename leaves them behind forever, and the
+  /// protocol listings skip them without ever removing them. Hygiene only —
+  /// a failed sweep must never fail the GC.
+  Future<void> _sweepTemporaryFiles() async {
+    try {
+      await _transport.deleteStaleTemporaryFiles(_store.deviceId);
+    } catch (_) {
+      // Ignored: the next snapshot retries the sweep.
+    }
   }
 
   // ---------------------------------------------------------------------------

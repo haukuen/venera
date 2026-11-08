@@ -91,6 +91,10 @@ class FakeRemote {
   final Map<String, Uint8List> _snapshotPrev = {};
   final Map<String, Map<String, Uint8List>> _blobs = {};
 
+  /// In-flight `.tmp` artifacts per device, keyed by file name and holding
+  /// the simulated modification time (UTC).
+  final Map<String, Map<String, DateTime>> _temporaryFiles = {};
+
   /// Device directories that exist even when they currently hold no files.
   final Set<String> _deviceDirs = {};
 
@@ -149,6 +153,17 @@ class FakeRemote {
 
   Map<String, Uint8List> debugBlobs(String deviceId) =>
       Map.unmodifiable(_blobs[deviceId] ?? const {});
+
+  /// `.tmp` artifacts currently stored for [deviceId], keyed by file name.
+  Map<String, DateTime> debugTemporaryFiles(String deviceId) =>
+      Map.unmodifiable(_temporaryFiles[deviceId] ?? const {});
+
+  /// Plants a `.tmp` artifact on [deviceId]'s branch (crash leftover).
+  void injectTemporaryFile(String deviceId, String name, {DateTime? modified}) {
+    _checkDeviceId(deviceId);
+    _temporaryFiles.putIfAbsent(deviceId, () => {})[name] =
+        modified ?? DateTime.now().toUtc();
+  }
 
   // ---------------------------------------------------------- fault control --
 
@@ -505,6 +520,29 @@ class FakeTransport implements SyncTransport {
     });
   }
 
+  @override
+  Future<int> deleteStaleTemporaryFiles(
+    String deviceId, {
+    Duration maxAge = staleTemporaryFileAge,
+  }) async {
+    _checkDeviceId(deviceId);
+    if (maxAge.isNegative) {
+      throw ArgumentError.value(maxAge, 'maxAge', 'Must be >= 0');
+    }
+    var deleted = 0;
+    await _write('deleteStaleTemporaryFiles:$deviceId', () {
+      final cutoff = DateTime.now().toUtc().subtract(maxAge);
+      final files = remote._temporaryFiles[deviceId];
+      if (files == null) return;
+      files.removeWhere((name, modified) {
+        if (modified.isAfter(cutoff)) return false;
+        deleted++;
+        return true;
+      });
+    });
+    return deleted;
+  }
+
   // --------------------------------------------------------------- snapshot --
 
   @override
@@ -623,6 +661,7 @@ class FakeTransport implements SyncTransport {
       remote._snapshots.remove(deviceId);
       remote._snapshotPrev.remove(deviceId);
       remote._blobs.remove(deviceId);
+      remote._temporaryFiles.remove(deviceId);
       remote._deviceDirs.remove(deviceId);
       remote._staleStates.remove(deviceId);
       remote._partialSnapshots.remove(deviceId);

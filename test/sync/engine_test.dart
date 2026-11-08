@@ -665,6 +665,29 @@ class _FakeTransport implements SyncTransport {
     files.removeWhere((key, _) => _parseRange(key).hi <= upToSeq);
   }
 
+  /// Planted `.tmp` artifacts per device (name -> modification time, UTC).
+  final Map<String, Map<String, DateTime>> temporaryFiles = {};
+
+  int sweepTemporaryFilesCallCount = 0;
+
+  @override
+  Future<int> deleteStaleTemporaryFiles(
+    String deviceId, {
+    Duration maxAge = staleTemporaryFileAge,
+  }) async {
+    sweepTemporaryFilesCallCount++;
+    final files = temporaryFiles[deviceId];
+    if (files == null) return 0;
+    final cutoff = DateTime.now().toUtc().subtract(maxAge);
+    var deleted = 0;
+    files.removeWhere((_, modified) {
+      if (modified.isAfter(cutoff)) return false;
+      deleted++;
+      return true;
+    });
+    return deleted;
+  }
+
   @override
   Future<void> deleteDevice(String deviceId) async {
     devices.remove(deviceId);
@@ -672,6 +695,7 @@ class _FakeTransport implements SyncTransport {
     changes.remove(deviceId);
     snapshots.remove(deviceId);
     blobs.remove(deviceId);
+    temporaryFiles.remove(deviceId);
   }
 
   @override
@@ -1176,6 +1200,33 @@ void main() {
         fixture.storeB.fingerprint(),
         equals(fixture.storeA.fingerprint()),
       );
+    });
+
+    test('gc sweeps stale tmp artifacts on the own branch', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      fixture.transport.sweepTemporaryFilesCallCount = 0;
+
+      final now = DateTime.now().toUtc();
+      fixture.transport.temporaryFiles[_deviceA] = {
+        'snapshot.jsonl.gz.tmp': now.subtract(const Duration(hours: 30)),
+        '000000000001-000000000002.jsonl.gz.tmp': now.subtract(
+          const Duration(hours: 30),
+        ),
+        // A live write never keeps its tmp beyond the transport timeout:
+        // this one must survive the sweep.
+        '000000000001-000000000002.in-flight.jsonl.gz.tmp': now,
+      };
+
+      final gc = await fixture.engineA.gc();
+      expect(gc.deleted, isTrue);
+      expect(fixture.transport.sweepTemporaryFilesCallCount, 1);
+      expect(fixture.transport.temporaryFiles[_deviceA]!.keys, [
+        '000000000001-000000000002.in-flight.jsonl.gz.tmp',
+      ]);
     });
 
     test('pending clear cutoff stays out of the periodic snapshot', () async {

@@ -115,6 +115,10 @@ class _FakeWebDavIo implements WebDavIo {
   final Map<String, Uint8List> files = {};
   final List<String> requests = [];
 
+  /// Per-entry modification times keyed by the listed (last) name segment;
+  /// names without an entry are listed without a modification time.
+  final Map<String, DateTime> modified = {};
+
   bool moveSupported = true;
   bool failMoves = false;
   Exception? readError;
@@ -145,6 +149,7 @@ class _FakeWebDavIo implements WebDavIo {
           path: '$prefix$name',
           isDirectory: entries[name]!,
           etag: 'etag:$name',
+          modified: modified[name],
         ),
     ];
   }
@@ -718,6 +723,52 @@ void main() {
       },
     );
 
+    test('deleteStaleTemporaryFiles removes stale crash leftovers', () async {
+      final now = DateTime.now().toUtc();
+      remote.injectTemporaryFile(
+        _deviceA,
+        '000000000001-000000000002.jsonl.gz.tmp',
+        modified: now.subtract(const Duration(hours: 30)),
+      );
+      remote.injectTemporaryFile(_deviceA, 'snapshot.jsonl.gz.tmp');
+      remote.injectTemporaryFile(
+        _deviceB,
+        '000000000001-000000000002.jsonl.gz.tmp',
+        modified: now.subtract(const Duration(hours: 30)),
+      );
+      expect(remote.debugTemporaryFiles(_deviceA), hasLength(2));
+
+      final deleted = await transport.deleteStaleTemporaryFiles(_deviceA);
+      expect(deleted, 1);
+      expect(
+        remote.debugTemporaryFiles(_deviceA).keys,
+        ['snapshot.jsonl.gz.tmp'],
+        reason: 'a fresh tmp models an in-flight write and is kept',
+      );
+      expect(remote.debugTemporaryFiles(_deviceB), hasLength(1));
+
+      // A zero age sweeps everything older than *now*; invalid inputs are
+      // rejected before any remote access.
+      expect(
+        await transport.deleteStaleTemporaryFiles(
+          _deviceB,
+          maxAge: Duration.zero,
+        ),
+        1,
+      );
+      await expectLater(
+        transport.deleteStaleTemporaryFiles('../evil'),
+        throwsArgumentError,
+      );
+      await expectLater(
+        transport.deleteStaleTemporaryFiles(
+          _deviceA,
+          maxAge: const Duration(days: -1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('snapshot read/write keeps the previous snapshot', () async {
       final info = _info(_deviceA);
       final first = _snapshotBytes(info);
@@ -1048,6 +1099,101 @@ void main() {
       final ranges = await transport.listChanges(_deviceA);
       expect(ranges.map((range) => '${range.lo}-${range.hi}'), ['5-9']);
     });
+
+    test(
+      'deleteStaleTemporaryFiles sweeps only own stale .tmp artifacts',
+      () async {
+        final now = DateTime.now().toUtc();
+        final old = now.subtract(const Duration(hours: 30));
+
+        // Crash leftovers of this device's own branch, older than the cap.
+        io.files['${paths.statePath(_deviceA)}.tmp'] = Uint8List(1);
+        io.modified['$_deviceA.json.tmp'] = old;
+        io.files['${paths.snapshotPath(_deviceA)}.tmp'] = Uint8List(1);
+        io.modified['snapshot.jsonl.gz.tmp'] = old;
+        io
+          ..files['${paths.changesDir(_deviceA)}/'
+              '000000000001-000000000002.jsonl.gz.tmp'] = Uint8List(
+            1,
+          )
+          ..modified['000000000001-000000000002.jsonl.gz.tmp'] = old;
+        io
+          ..files['${paths.deviceDir(_deviceA)}/blobs/$_sha.gz.tmp'] =
+              Uint8List(1)
+          ..modified['$_sha.gz.tmp'] = old;
+
+        // Must be kept: an in-flight write, another device's artifact, a
+        // name that is not one of this protocol's tmp artifacts, and a file
+        // whose age the server did not report.
+        io
+          ..files['${paths.changesDir(_deviceA)}/'
+              '000000000003-000000000004.jsonl.gz.tmp'] = Uint8List(
+            1,
+          )
+          ..modified['000000000003-000000000004.jsonl.gz.tmp'] = now;
+        io
+          ..files['${paths.statePath(_deviceB)}.tmp'] = Uint8List(1)
+          ..modified['$_deviceB.json.tmp'] = old;
+        io
+          ..files['${paths.deviceDir(_deviceA)}/notes.tmp'] = Uint8List(1)
+          ..modified['notes.tmp'] = old;
+        io.files['${paths.changesDir(_deviceA)}/'
+            '000000000005-000000000006.jsonl.gz.tmp'] = Uint8List(
+          1,
+        );
+
+        final deleted = await transport.deleteStaleTemporaryFiles(_deviceA);
+        expect(deleted, 4);
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceA)}.tmp'),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey('${paths.snapshotPath(_deviceA)}.tmp'),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000001-000000000002.jsonl.gz.tmp',
+          ),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.deviceDir(_deviceA)}/blobs/$_sha.gz.tmp',
+          ),
+          isFalse,
+        );
+
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000003-000000000004.jsonl.gz.tmp',
+          ),
+          isTrue,
+          reason: 'a live write must survive the sweep',
+        );
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceB)}.tmp'),
+          isTrue,
+          reason: 'another device\'s branch must not be touched',
+        );
+        expect(
+          io.files.containsKey('${paths.deviceDir(_deviceA)}/notes.tmp'),
+          isTrue,
+          reason: 'unknown names must never be deleted',
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000005-000000000006.jsonl.gz.tmp',
+          ),
+          isTrue,
+          reason: 'files without a modification time are kept',
+        );
+      },
+    );
 
     test('snapshot write preserves the previous snapshot via MOVE', () async {
       final first = _snapshotBytes(_info(_deviceA));
