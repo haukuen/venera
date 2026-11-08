@@ -45,7 +45,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
   bool multiSelectMode = false;
 
-  int? lastSelectedIndex;
+  /// The anchor of range selection, stored as the item itself so the range
+  /// can be resolved against the list currently shown in the grid.
+  FavoriteItem? lastSelectedComic;
 
   bool get isAllFolder => widget.folder == _localAllFolderLabel;
 
@@ -154,6 +156,18 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
     return filtered;
   }
 
+  /// The comics the grid actually displays: search results in search mode,
+  /// otherwise the folder list with the current read-status filter and sort
+  /// applied, minus the comics hidden by blocked keywords (SliverGridComics
+  /// filters those internally). All selection logic — range select, select
+  /// all, invert — must index into this list: the raw [comics] list has a
+  /// different order and includes invisible items, so ranges computed on it
+  /// would silently select comics the user never saw.
+  List<FavoriteItem> buildDisplayComics() {
+    var list = searchMode ? searchResults : filterComics(comics);
+    return list.where((c) => isBlocked(c) == null).toList();
+  }
+
   bool matchKeyword(String keyword, FavoriteItem comic) {
     var list = keyword.split(" ");
     for (var k in list) {
@@ -243,31 +257,19 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
 
   void selectAll() {
     setState(() {
-      if (searchMode) {
-        selectedComics = searchResults.asMap().map((k, v) => MapEntry(v, true));
-      } else {
-        selectedComics = comics.asMap().map((k, v) => MapEntry(v, true));
-      }
+      selectedComics = buildDisplayComics().asMap().map(
+        (k, v) => MapEntry(v, true),
+      );
     });
   }
 
   void invertSelection() {
     setState(() {
-      if (searchMode) {
-        for (var c in searchResults) {
-          if (selectedComics.containsKey(c)) {
-            selectedComics.remove(c);
-          } else {
-            selectedComics[c] = true;
-          }
-        }
-      } else {
-        for (var c in comics) {
-          if (selectedComics.containsKey(c)) {
-            selectedComics.remove(c);
-          } else {
-            selectedComics[c] = true;
-          }
+      for (var c in buildDisplayComics()) {
+        if (selectedComics.containsKey(c)) {
+          selectedComics.remove(c);
+        } else {
+          selectedComics[c] = true;
         }
       }
     });
@@ -310,6 +312,8 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
     if (title == _localAllFolderLabel) {
       title = "All".tl;
     }
+
+    var displayComics = buildDisplayComics();
 
     Widget body = SmoothCustomScrollView(
       controller: scrollController,
@@ -692,7 +696,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           )
         else
           SliverGridComics(
-            comics: searchMode ? searchResults : filterComics(comics),
+            comics: displayComics,
             selections: selectedComics,
             menuBuilder: (c) {
               return [
@@ -742,7 +746,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                       } else {
                         selectedComics[c] = true;
                       }
-                      lastSelectedIndex = comics.indexOf(c);
+                      lastSelectedComic = c;
                     });
                   },
                 ),
@@ -776,7 +780,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                   } else {
                     selectedComics[c] = true;
                   }
-                  lastSelectedIndex = comics.indexOf(c);
+                  lastSelectedComic = c;
                 });
               } else if (appdata.settings["onClickFavorite"] == "viewDetail") {
                 App.mainNavigatorKey?.currentContext?.to(
@@ -796,16 +800,20 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
             },
             onLongPressed: (c, heroID) {
               setState(() {
+                var item = c as FavoriteItem;
                 if (!multiSelectMode) {
                   multiSelectMode = true;
-                  if (!selectedComics.containsKey(c as FavoriteItem)) {
-                    selectedComics[c] = true;
+                  if (!selectedComics.containsKey(item)) {
+                    selectedComics[item] = true;
                   }
-                  lastSelectedIndex = comics.indexOf(c);
-                } else {
-                  if (lastSelectedIndex != null) {
-                    int start = lastSelectedIndex!;
-                    int end = comics.indexOf(c as FavoriteItem);
+                } else if (lastSelectedComic != null) {
+                  // Resolve both ends against the list currently shown in the
+                  // grid, so the range matches exactly what the user sees.
+                  int anchorIndex = displayComics.indexOf(lastSelectedComic!);
+                  int endIndex = displayComics.indexOf(item);
+                  if (anchorIndex != -1 && endIndex != -1) {
+                    int start = anchorIndex;
+                    int end = endIndex;
                     if (start > end) {
                       int temp = start;
                       start = end;
@@ -813,9 +821,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                     }
 
                     for (int i = start; i <= end; i++) {
-                      if (i == lastSelectedIndex) continue;
+                      if (i == anchorIndex) continue;
 
-                      var comic = comics[i];
+                      var comic = displayComics[i];
                       if (selectedComics.containsKey(comic)) {
                         selectedComics.remove(comic);
                       } else {
@@ -823,8 +831,8 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                       }
                     }
                   }
-                  lastSelectedIndex = comics.indexOf(c as FavoriteItem);
                 }
+                lastSelectedComic = item;
                 _checkExitSelectMode();
               });
             },
