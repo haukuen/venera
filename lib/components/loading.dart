@@ -178,7 +178,14 @@ abstract class LoadingState<T extends StatefulWidget, S extends Object>
   Future<Res<S>> loadDataWithRetry() async {
     int retry = 0;
     while (true) {
-      var res = await loadData();
+      Res<S> res;
+      try {
+        res = await loadData();
+      } catch (e) {
+        // A comic source throwing an exception instead of returning an error
+        // result must not leave the page loading forever.
+        res = Res.error(e.toString());
+      }
       if (res.success) {
         return res;
       } else {
@@ -212,9 +219,11 @@ abstract class LoadingState<T extends StatefulWidget, S extends Object>
       error = null;
     });
     loadDataWithRetry().then((value) async {
+      if (!mounted) return;
       if (value.success) {
         data = value.data;
         await onDataLoaded();
+        if (!mounted) return;
         setState(() {
           isLoading = false;
         });
@@ -241,6 +250,7 @@ abstract class LoadingState<T extends StatefulWidget, S extends Object>
         if (value.success) {
           data = value.data;
           await onDataLoaded();
+          if (!mounted) return;
           setState(() {
             isLoading = false;
           });
