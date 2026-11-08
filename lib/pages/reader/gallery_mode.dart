@@ -159,10 +159,13 @@ class _GalleryModeState extends State<_GalleryMode>
       },
       onPointerMove: (event) {
         if (isLongPressing) {
-          var controller = photoViewControllers[reader.page]!;
-          Offset value = event.delta;
-          if (isLongPressing) {
-            controller.updateMultiple(position: controller.position + value);
+          // The chapter comments page has no PhotoView controller; the page
+          // may also change while a press is still held down.
+          var controller = photoViewControllers[reader.page];
+          if (controller != null) {
+            controller.updateMultiple(
+              position: controller.position + event.delta,
+            );
           }
         }
       },
@@ -374,7 +377,9 @@ class _GalleryModeState extends State<_GalleryMode>
       context.readerScaffold.addImageFavorite();
       return;
     }
-    var controller = photoViewControllers[reader.page]!;
+    // The chapter comments page is not an image page and has no controller.
+    var controller = photoViewControllers[reader.page];
+    if (controller == null) return;
     controller.onDoubleClick?.call();
   }
 
@@ -383,7 +388,9 @@ class _GalleryModeState extends State<_GalleryMode>
     if (!appdata.settings['enableLongPressToZoom'] || fingers != 1) {
       return;
     }
-    var photoViewController = photoViewControllers[reader.page]!;
+    // The chapter comments page is not an image page and has no controller.
+    var photoViewController = photoViewControllers[reader.page];
+    if (photoViewController == null) return;
     double target = photoViewController.getInitialScale!.call()! * 1.75;
     var size = reader.size;
     Offset zoomPosition;
@@ -404,7 +411,13 @@ class _GalleryModeState extends State<_GalleryMode>
     if (!appdata.settings['enableLongPressToZoom'] || !isLongPressing) {
       return;
     }
-    var photoViewController = photoViewControllers[reader.page]!;
+    var photoViewController = photoViewControllers[reader.page];
+    if (photoViewController == null) {
+      // The page changed while the press was held (e.g. onto the chapter
+      // comments page); nothing to zoom back.
+      isLongPressing = false;
+      return;
+    }
     double target = photoViewController.getInitialScale!.call()!;
     photoViewController.animateScale?.call(target);
     isLongPressing = false;
