@@ -338,6 +338,7 @@ class SyncV2Service extends ChangeNotifier {
       adapters: adapters,
       enabledDomains: enabledDomains,
       clearableDomains: _clearableDomains,
+      onWarning: _logAdapterWarning,
     );
 
     final engine = SyncEngine(

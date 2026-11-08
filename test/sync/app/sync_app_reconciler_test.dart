@@ -383,6 +383,78 @@ void main() {
       expect(await reconciler.reconcileLocal(store), {SyncDomains.auth});
       expect(await visibleRecords({SyncDomains.auth}), hasLength(1));
     });
+
+    test(
+      'a throwing adapter is isolated: its domain retained, others not',
+      () async {
+        _createHistoryDb(paths.history, [
+          _HistoryRow(id: 'c1', type: 1, ep: 2, title: 'Comic 1'),
+          _HistoryRow(id: 'c2', type: 1, ep: 1, title: 'Comic 2'),
+        ]);
+        _createCookieDb(paths.cookies, [
+          _CookieRow(domain: 'example.com', name: 'sid', value: 'keep'),
+        ]);
+        final authAdapter = AuthAdapter(
+          dbPath: paths.cookies,
+          reload: () async {},
+        );
+        _trackAdapters([authAdapter]);
+        // Seed the store from healthy projections first.
+        final seeding = SyncAppReconciler(
+          adapters: [
+            HistoryAdapter(dbPath: paths.history, reload: () async {}),
+            authAdapter,
+          ],
+          enabledDomains: {SyncDomains.history, SyncDomains.auth},
+        );
+        await seeding.reconcileLocal(store);
+
+        // The auth projection becomes unreadable (corrupt database) and a
+        // normal history deletion happens at the same time. The broken adapter
+        // must not abort the whole reconciliation, must not tombstone its own
+        // domain, and must not retain the *other* domains.
+        final warnings = <String>[];
+        final reconciler = SyncAppReconciler(
+          adapters: [
+            HistoryAdapter(dbPath: paths.history, reload: () async {}),
+            _ThrowingAdapter({SyncDomains.auth}),
+          ],
+          enabledDomains: {SyncDomains.history, SyncDomains.auth},
+          clearableDomains: {SyncDomains.history},
+          onWarning: warnings.add,
+        );
+        final db = sqlite3.open(paths.cookies);
+        db.execute('DELETE FROM cookies;');
+        db.dispose();
+        final historyDb = sqlite3.open(paths.history);
+        historyDb.execute("DELETE FROM history WHERE id = 'c1';");
+        historyDb.dispose();
+
+        expect(await reconciler.reconcileLocal(store), {SyncDomains.auth});
+        expect(warnings, hasLength(1));
+
+        final cookie = await store.recordOf(
+          SyncDomains.auth,
+          SyncKeys.authCookieKey('example.com', '/', 'sid'),
+          '',
+        );
+        expect(
+          cookie!.visible,
+          isTrue,
+          reason: 'an unreadable projection must never read as a logout',
+        );
+        final history = await store.recordOf(
+          SyncDomains.history,
+          SyncKeys.historyKey('c1', '1'),
+          SyncFields.progress,
+        );
+        expect(
+          history!.visible,
+          isFalse,
+          reason: 'healthy domains keep detecting deletions',
+        );
+      },
+    );
   });
 }
 
@@ -406,6 +478,39 @@ class _RetainingAuthAdapter implements SyncAppAdapter {
   @override
   Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
       true;
+}
+
+/// An adapter whose projection throws (corrupt/unopenable business database).
+/// It deliberately does *not* use the retention hooks: the reconciler must
+/// treat a thrown [readLocalRecords] as "unreadable" on its own.
+class _ThrowingAdapter implements SyncAppAdapter {
+  _ThrowingAdapter(this._domains);
+
+  final Set<String> _domains;
+
+  @override
+  Set<String> get domains => _domains;
+
+  @override
+  Future<List<AdapterRecord>> readLocalRecords() async {
+    throw StateError('simulated unreadable business database');
+  }
+
+  @override
+  Future<void> applyRemote(SyncStore store) async {}
+
+  @override
+  Future<void> reload() async {}
+
+  // The defaults, spelled out: the reconciler must not rely on these hooks
+  // for a thrown readLocalRecords — only the throw itself marks the adapter
+  // as unreadable.
+  @override
+  bool retainsMissingRecord(StoredRecord record) => false;
+
+  @override
+  Future<bool> retainsDomainRecords(SyncStore store, String domain) async =>
+      false;
 }
 
 void _createFavoritesDb(String path, {required List<String> folders}) {
