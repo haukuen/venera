@@ -12,6 +12,13 @@ class _ReaderImagesState extends State<_ReaderImages> {
 
   bool inProgress = false;
 
+  /// Whether the current page list was read from the pages cache. A cached
+  /// list may hold expired image URLs, so one failed image justifies a single
+  /// reload with a freshly fetched list. A failure on a freshly fetched or
+  /// local list is a dead image; reloading would loop forever, so the
+  /// per-image error UI handles it instead.
+  bool _pagesFromCache = false;
+
   late _ReaderState reader;
 
   void _savePagesCache(String key, List<String> images) async {
@@ -37,7 +44,13 @@ class _ReaderImagesState extends State<_ReaderImages> {
   }
 
   void _onPagesCacheInvalid() {
-    if (!mounted || inProgress) return;
+    if (!mounted || inProgress || !_pagesFromCache) return;
+    _pagesFromCache = false;
+    // Drop the suspect cache, otherwise the reload would read the same
+    // expired URLs again.
+    CacheManager().delete(
+      "loadComicPages@${reader.type.sourceKey}@${reader.cid}@${reader.eid}",
+    );
     setState(() {
       error = null;
       reader.isLoading = true;
@@ -72,6 +85,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
         if (!mounted) return;
         setState(() {
           reader.images = images;
+          _pagesFromCache = false;
           reader.isLoading = false;
           inProgress = false;
           _handleJumpToLastPage();
@@ -102,6 +116,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
           if (!mounted) return;
           setState(() {
             reader.images = cacheList;
+            _pagesFromCache = true;
             reader.isLoading = false;
             inProgress = false;
             _handleJumpToLastPage();
@@ -132,6 +147,7 @@ class _ReaderImagesState extends State<_ReaderImages> {
         _savePagesCache(cacheKey, res.data);
         setState(() {
           reader.images = res.data;
+          _pagesFromCache = false;
           reader.isLoading = false;
           inProgress = false;
           _handleJumpToLastPage();
