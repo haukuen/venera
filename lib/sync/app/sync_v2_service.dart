@@ -619,6 +619,28 @@ class SyncV2Service extends ChangeNotifier {
       }
       final result = await syncEngine.push();
       if (result.error != null) {
+        // §7.2 step 7: when the outbox cannot be delivered as change files
+        // (e.g. a single oversized op poisons every batch), a snapshot
+        // substitutes the pending range so the rest of the data is not
+        // blocked behind it. Gated by the pending threshold inside the
+        // engine — a no-op for small or transiently failing outboxes.
+        try {
+          final compaction = await syncEngine.compactSnapshotIfNeeded();
+          if (!compaction.skipped && compaction.error != null) {
+            Log.error(
+              'Sync v2',
+              'Outbox compaction failed: ${compaction.error}',
+            );
+          } else if (!compaction.skipped) {
+            Log.info(
+              'Sync v2',
+              'Outbox compaction substituted a snapshot '
+                  '(${compaction.records} records) for the stuck push',
+            );
+          }
+        } catch (error, stack) {
+          Log.error('Sync v2', 'Outbox compaction failed', stack);
+        }
         _lastError = result.error.toString();
         return Res.error(_lastError!);
       }
