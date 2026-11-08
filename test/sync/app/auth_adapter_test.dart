@@ -1,13 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3/sqlite3.dart' hide Version;
 import 'package:venera/sync/app/adapters/auth_adapter.dart';
 import 'package:venera/sync/app/sync_app_adapter.dart';
 import 'package:venera/sync/domains.dart';
+import 'package:venera/sync/hlc.dart';
 import 'package:venera/sync/key_codec.dart';
 import 'package:venera/sync/op.dart';
 import 'package:venera/sync/sqlite_store.dart';
+import 'package:venera/sync/store.dart';
+import 'package:venera/sync/version.dart';
 
 const _deviceId = 'bbbbbbbb-1111-2222-3333-444444444444';
 
@@ -442,6 +445,30 @@ void main() {
       // Non-zero numbers are true.
       expect(rows.single['httpOnly'], 1);
     });
+  });
+
+  test('missing cookies table is unreadable, not a global logout', () async {
+    // A recreated/empty cookie.db has no table: the read must neither throw
+    // (which would abort every push) nor report an empty projection (which
+    // would tombstone every cookie network-wide).
+    final emptyDb = '${dir.path}/empty.db';
+    final fresh = AuthAdapter(dbPath: emptyDb, onWarning: warnings.add);
+    addTearDown(fresh.dispose);
+
+    expect(await fresh.readLocalRecords(), isEmpty);
+    expect(warnings, isNotEmpty);
+    expect(
+      fresh.retainsMissingRecord(
+        StoredRecord(
+          domain: SyncDomains.auth,
+          key: SyncKeys.authCookieKey('example.com', '/', 'sid'),
+          field: '',
+          version: Version(Hlc(ms: 1, counter: 1, deviceId: _deviceId), 1),
+        ),
+      ),
+      isTrue,
+    );
+    expect(await fresh.retainsDomainRecords(store, SyncDomains.auth), isTrue);
   });
 
   test('read -> store -> apply roundtrips cookies across databases', () async {

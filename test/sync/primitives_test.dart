@@ -421,6 +421,36 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('rejects clear for an undeclared domain and non-positive seqs', () {
+      final parsed = sample();
+
+      // A clear line for a domain the snapshot does not declare would
+      // tombstone data the snapshot never covered. `setting` is not declared
+      // by sample()'s info.
+      final badClear = SnapshotCodec.encode(parsed.info, {
+        'setting': Version(Hlc(ms: 2, counter: 0, deviceId: _deviceA), 1),
+      }, parsed.records);
+      expect(
+        () => SnapshotCodec.decode(badClear, expectedDeviceId: _deviceA),
+        throwsFormatException,
+      );
+
+      final badSeqRecord = SnapshotRecord(
+        domain: parsed.records.first.domain,
+        key: parsed.records.first.key,
+        field: '',
+        version: Version(Hlc(ms: 1, counter: 0, deviceId: _deviceA), 0),
+        data: {'ep': 1},
+      );
+      final badSeq = SnapshotCodec.encode(parsed.info, parsed.clears, [
+        badSeqRecord,
+      ]);
+      expect(
+        () => SnapshotCodec.decode(badSeq, expectedDeviceId: _deviceA),
+        throwsFormatException,
+      );
+    });
   });
 
   group('resolveSyncDeviceId', () {

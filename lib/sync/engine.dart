@@ -746,7 +746,7 @@ class SyncEngine {
 
       final Uint8List bytes;
       try {
-        bytes = SyncOpCodec.encode(pending);
+        bytes = await SyncOpCodec.encodeAsync(pending);
       } catch (encodeError) {
         error = encodeError;
         break;
@@ -1013,7 +1013,7 @@ class SyncEngine {
             gap = true;
             break;
           }
-          ops = SyncOpCodec.decode(
+          ops = await SyncOpCodec.decodeAsync(
             bytes,
             expectedDeviceId: remote,
             lo: range.lo,
@@ -1261,7 +1261,7 @@ class SyncEngine {
         );
         return false;
       }
-      ops = SyncOpCodec.decode(
+      ops = await SyncOpCodec.decodeAsync(
         bytes,
         expectedDeviceId: remote,
         lo: range.lo,
@@ -1375,7 +1375,7 @@ class SyncEngine {
 
     final ParsedSnapshot parsed;
     try {
-      parsed = SnapshotCodec.decode(bytes, expectedDeviceId: remote);
+      parsed = await SnapshotCodec.decodeAsync(bytes, expectedDeviceId: remote);
     } catch (error) {
       builder.warnings.add(
         SyncPullError(
@@ -1677,7 +1677,7 @@ class SyncEngine {
 
       final ParsedSnapshot parsed;
       try {
-        parsed = SnapshotCodec.decode(
+        parsed = await SnapshotCodec.decodeAsync(
           bytes,
           expectedDeviceId: candidate.deviceId,
         );
@@ -1943,6 +1943,22 @@ class SyncEngine {
         // additionally requires every record domain to be declared.
         if (!_enabledDomains.contains(record.domain)) continue;
         if (!syncDomainRegExp.hasMatch(record.domain)) continue;
+        // The snapshot must not carry more than its watermark claims
+        // (§7.2 step 6: applied[self] = selfWatermark). Records whose
+        // self-version is still pending in the outbox (seq > selfWatermark)
+        // stay out; they reach peers as change files, or through a later
+        // snapshot once pushed. Absence never deletes on peers, so this only
+        // delays visibility until delivery, and LWW replays converge.
+        if (record.version.hlc.deviceId == self &&
+            record.version.seq > selfWatermark) {
+          continue;
+        }
+        final deletedVersion = record.deletedVersion;
+        if (deletedVersion != null &&
+            deletedVersion.hlc.deviceId == self &&
+            deletedVersion.seq > selfWatermark) {
+          continue;
+        }
         records.add(
           SnapshotRecord(
             domain: record.domain,
@@ -1958,9 +1974,18 @@ class SyncEngine {
       final clears = <String, Version>{};
       for (final clear in await _store.dumpClears(domains: _enabledDomains)) {
         if (!_enabledDomains.contains(clear.domain)) continue;
+        // Same watermark invariant as the records above: a clear that is still
+        // pending in the outbox (seq > selfWatermark) must not ride along in
+        // a snapshot that declares a lower self watermark. A premature clear
+        // cutoff would tombstone peers' newer data, so delay it until the
+        // change file (or a later snapshot) delivers it.
+        final cutoff = clear.cutoff;
+        if (cutoff.hlc.deviceId == self && cutoff.seq > selfWatermark) {
+          continue;
+        }
         final previous = clears[clear.domain];
-        if (previous == null || clear.cutoff > previous) {
-          clears[clear.domain] = clear.cutoff;
+        if (previous == null || cutoff > previous) {
+          clears[clear.domain] = cutoff;
         }
       }
 
@@ -1990,7 +2015,7 @@ class SyncEngine {
 
       final Uint8List bytes;
       try {
-        bytes = SnapshotCodec.encode(info, clears, records);
+        bytes = await SnapshotCodec.encodeAsync(info, clears, records);
       } catch (error) {
         return SyncSnapshotResult(
           info: info,
@@ -2013,15 +2038,18 @@ class SyncEngine {
 
       // An upload that cannot be read back must not become a local pointer:
       // advertising it would make peers treat a missing snapshot as usable.
+      // An *unknown* read-back (probe error) is not consent either — only a
+      // verified match confirms the upload.
       final uploaded = await _remoteSnapshotMatches(info);
-      if (uploaded == false) {
+      if (uploaded != true) {
         _remoteSnapshotConfirmed = false;
         return SyncSnapshotResult(
           info: info,
           records: records.length,
           clears: clears.length,
           error: StateError(
-            'Snapshot upload was not found on the remote after writing it',
+            'Snapshot upload could not be confirmed on the remote after '
+            'writing it',
           ),
         );
       }
@@ -2036,6 +2064,12 @@ class SyncEngine {
         lastChangeOverride: stateLastChange,
       );
       await _store.setLastSnapshot(info);
+      // §7.6: the snapshot that just landed covers its change files — sweep
+      // them now. Best effort: a failed sweep only delays deletion until the
+      // next snapshot, and must not fail the snapshot itself.
+      try {
+        await _gc();
+      } catch (_) {}
       return SyncSnapshotResult(
         info: info,
         records: records.length,
@@ -2076,20 +2110,25 @@ class SyncEngine {
       return const SyncGcResult(skipped: true);
     }
     // Pruning changes is only safe while the snapshot that covers them is
-    // really on the remote. A stale local pointer must never delete data.
-    if (await _remoteSnapshotMatches(snapshot) == false) {
+    // really on the remote. A stale local pointer must never delete data, and
+    // neither may an *unknown* probe result: a network hiccup during the
+    // check must be treated as "cannot prove it is there", never as consent.
+    if (await _remoteSnapshotMatches(snapshot) != true) {
       return SyncGcResult(
         skipped: true,
         snapshotWatermark: snapshot.applied[_store.deviceId] ?? 0,
         error: StateError(
-          'Refusing to delete change files: the snapshot is missing on the '
-          'remote',
+          'Refusing to delete change files: the snapshot could not be '
+          'confirmed on the remote',
         ),
       );
     }
     final watermark = snapshot.applied[_store.deviceId] ?? 0;
     final upTo = watermark - gcRetainChanges;
     if (upTo <= 0) {
+      // Stale tmp artifacts are independent of change-file coverage; sweep
+      // them even when there is nothing to prune yet.
+      await _sweepTemporaryFiles();
       return SyncGcResult(skipped: true, snapshotWatermark: watermark);
     }
     try {
@@ -2097,11 +2136,25 @@ class SyncEngine {
     } catch (error) {
       return SyncGcResult(snapshotWatermark: watermark, error: error);
     }
+    await _sweepTemporaryFiles();
     return SyncGcResult(
       deleted: true,
       deletedUpTo: upTo,
       snapshotWatermark: watermark,
     );
+  }
+
+  /// Best-effort sweep of stale in-flight artifacts (`*.tmp`) on this
+  /// device's branch (protocol §7.2 step 4): a crash between the temporary
+  /// write and the atomic rename leaves them behind forever, and the
+  /// protocol listings skip them without ever removing them. Hygiene only —
+  /// a failed sweep must never fail the GC.
+  Future<void> _sweepTemporaryFiles() async {
+    try {
+      await _transport.deleteStaleTemporaryFiles(_store.deviceId);
+    } catch (_) {
+      // Ignored: the next snapshot retries the sweep.
+    }
   }
 
   // ---------------------------------------------------------------------------

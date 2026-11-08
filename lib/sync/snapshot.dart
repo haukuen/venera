@@ -12,6 +12,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'hlc.dart';
@@ -316,11 +317,30 @@ class SnapshotCodec {
             cutoffSeq is! int) {
           throw const FormatException('Invalid snapshot clear');
         }
+        // Same coverage contract as records below: an undeclared domain
+        // claims authority over data the snapshot does not carry, which would
+        // silently hide newer records behind its cutoff.
+        if (!info.domains.contains(domain)) {
+          throw const FormatException(
+            'Snapshot contains a clear for a domain it does not declare',
+          );
+        }
         final version = Version(Hlc.parse(cutoffHlc), cutoffSeq);
+        if (version.seq <= 0) {
+          throw const FormatException('Invalid snapshot clear seq');
+        }
         final existing = clears[domain];
         if (existing == null || version > existing) clears[domain] = version;
       } else if (type == 'reg') {
-        records.add(SnapshotRecord.fromJson(json));
+        final record = SnapshotRecord.fromJson(json);
+        if (record.version.seq <= 0) {
+          throw const FormatException('Invalid snapshot record seq');
+        }
+        final deleted = record.deletedVersion;
+        if (deleted != null && deleted.seq <= 0) {
+          throw const FormatException('Invalid snapshot record delete seq');
+        }
+        records.add(record);
         if (records.length > maxRecords) {
           throw const FormatException('Too many snapshot records');
         }
@@ -337,6 +357,27 @@ class SnapshotCodec {
     }
     return ParsedSnapshot(info: info, clears: clears, records: records);
   }
+
+  /// [encode] off the calling isolate. Snapshots reach megabytes, so the
+  /// JSON encode + gzip always run outside the UI isolate.
+  ///
+  /// [records] is materialized on the caller side first: only concrete
+  /// sendable objects may cross the isolate boundary, and a lazy iterable
+  /// would fail [Isolate.run].
+  static Future<Uint8List> encodeAsync(
+    SnapshotInfo info,
+    Map<String, Version> clears,
+    Iterable<SnapshotRecord> records,
+  ) {
+    final snapshotRecords = List<SnapshotRecord>.of(records);
+    return Isolate.run(() => encode(info, clears, snapshotRecords));
+  }
+
+  /// [decode] off the calling isolate; see [encodeAsync].
+  static Future<ParsedSnapshot> decodeAsync(
+    Uint8List bytes, {
+    String? expectedDeviceId,
+  }) => Isolate.run(() => decode(bytes, expectedDeviceId: expectedDeviceId));
 
   static Uint8List _gunzip(Uint8List bytes) {
     if (bytes.length > maxCompressedBytes) {

@@ -105,7 +105,7 @@ abstract mixin class _ComicPageActions {
   /// [group] the chapter group number, start from 1
   Future<void> read([int? ep, int? page, int? group]) async {
     try {
-      await SyncV2Service.instance.pullNow();
+      await SyncV2Service.instance.pullNowFast();
     } catch (_) {}
     final latestHistory =
         HistoryManager().find(comic.id, comic.comicType) ?? history;

@@ -14,6 +14,7 @@ class SyncAppReconciler {
     required List<SyncAppAdapter> adapters,
     required Set<String> enabledDomains,
     this.clearableDomains = const <String>{},
+    this.onWarning,
   }) : adapters = List.unmodifiable(adapters),
        enabledDomains = Set.unmodifiable(enabledDomains);
 
@@ -23,6 +24,9 @@ class SyncAppReconciler {
   /// Domains where an empty local projection is represented by one clear
   /// cutoff instead of a delete per record.
   final Set<String> clearableDomains;
+
+  /// Operational warnings (unreadable adapters, skipped projections).
+  void Function(String message)? onWarning;
 
   /// Emits local business differences into [store].
   ///
@@ -39,12 +43,28 @@ class SyncAppReconciler {
   Future<Set<String>> reconcileLocal(SyncStore store) async {
     final adaptersByDomain = <String, List<SyncAppAdapter>>{};
     final desired = <String, AdapterRecord>{};
+    // Adapters whose readLocalRecords threw. Their projection is unknown, so
+    // every domain they claim is retained — a corrupt/unopenable business
+    // database must neither abort the whole reconciliation (which would fail
+    // every pull *and* push forever) nor be read as "the user deleted
+    // everything".
+    final failedAdapters = <SyncAppAdapter>{};
     for (final adapter in adapters) {
       if (adapter.domains.intersection(enabledDomains).isEmpty) continue;
       for (final domain in adapter.domains) {
         adaptersByDomain.putIfAbsent(domain, () => []).add(adapter);
       }
-      final records = await adapter.readLocalRecords();
+      final List<AdapterRecord> records;
+      try {
+        records = await adapter.readLocalRecords();
+      } catch (error) {
+        failedAdapters.add(adapter);
+        onWarning?.call(
+          'reconcile: ${adapter.runtimeType} readLocalRecords failed; '
+          'keeping stored records of ${adapter.domains}: $error',
+        );
+        continue;
+      }
       for (final adapterRecord in records) {
         if (!enabledDomains.contains(adapterRecord.domain)) continue;
         desired[adapterRecord.identity] = adapterRecord;
@@ -71,7 +91,8 @@ class SyncAppReconciler {
       final stored = storedByDomain[domain]!;
       var retained = false;
       for (final adapter in domainAdapters) {
-        if (await adapter.retainsDomainRecords(store, domain)) {
+        if (failedAdapters.contains(adapter) ||
+            await adapter.retainsDomainRecords(store, domain)) {
           retained = true;
           break;
         }

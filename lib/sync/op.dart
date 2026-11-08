@@ -8,6 +8,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'hlc.dart';
@@ -271,6 +272,35 @@ class SyncOpCodec {
       throw const FormatException('Invalid first line');
     }
     return decoded.cast<String, Object?>();
+  }
+
+  static const int _isolateEncodeOps = 256;
+  static const int _isolateDecodeBytes = 64 * 1024;
+
+  /// [encode] off the calling isolate for large batches. Small batches stay
+  /// inline: spawning an isolate costs more than gzipping a few ops, and the
+  /// engine pushes one-op change files while the user is reading.
+  static Future<Uint8List> encodeAsync(List<SyncOp> ops) {
+    if (ops.length < _isolateEncodeOps) return Future.value(encode(ops));
+    return Isolate.run(() => encode(ops));
+  }
+
+  /// [decode] off the calling isolate for large change files. The engine
+  /// pulls many small files per pass, so the size gate matters here.
+  static Future<List<SyncOp>> decodeAsync(
+    Uint8List bytes, {
+    required String expectedDeviceId,
+    required int lo,
+    required int hi,
+  }) {
+    if (bytes.length < _isolateDecodeBytes) {
+      return Future.value(
+        decode(bytes, expectedDeviceId: expectedDeviceId, lo: lo, hi: hi),
+      );
+    }
+    return Isolate.run(
+      () => decode(bytes, expectedDeviceId: expectedDeviceId, lo: lo, hi: hi),
+    );
   }
 
   static Uint8List _gunzip(Uint8List bytes) {

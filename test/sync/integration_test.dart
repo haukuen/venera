@@ -286,22 +286,31 @@ void main() {
     await a.engine.push();
     await b.engine.pull();
 
+    // The snapshot covers the delivered changes (and its automatic sweep
+    // removes them), so the remaining corruption target is a change file
+    // above the snapshot watermark.
     await writeProgress(a, 'comic-2', 2);
     await a.engine.push();
     await a.engine.snapshot();
 
-    // The second change file is the last uploaded range.
+    await writeProgress(a, 'comic-3', 3);
+    await a.engine.push();
+
     final ranges = remote.debugChanges(_deviceA).keys.toList()..sort();
-    final secondRange = ranges.last.split('-');
+    expect(ranges, isNotEmpty);
+    final tailRange = ranges.last.split('-');
     remote.corruptChange(
       _deviceA,
-      int.parse(secondRange[0]),
-      int.parse(secondRange[1]),
+      int.parse(tailRange[0]),
+      int.parse(tailRange[1]),
     );
 
+    // The peer falls back to the snapshot for everything it covers; the
+    // corrupt tail stays missing until the producer re-delivers it.
     final pull = await b.engine.pull();
     expect(pull.snapshotsApplied, greaterThanOrEqualTo(1));
     expect((await progress(b, 'comic-2'))!['ep'], 2);
+    expect(await progress(b, 'comic-3'), isNull);
   });
 
   test('disabled domain ops advance watermark but are not applied', () async {

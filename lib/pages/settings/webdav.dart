@@ -38,9 +38,10 @@ class _WebdavSettingState extends State<_WebdavSetting> {
   void onAutoSyncChanged(bool value) {
     setState(() {
       autoSync = value;
-      appdata.implicitData['webdavAutoSync'] = value;
-      appdata.writeImplicitData();
     });
+    // Persisted through DataSync so the service can also drop a pending
+    // auto-push timer that was armed while the setting was still on.
+    DataSync.setAutoSyncEnabled(value);
   }
 
   @override

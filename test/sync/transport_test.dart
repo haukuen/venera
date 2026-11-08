@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show gzip;
+import 'dart:io'
+    show ContentType, HttpClient, HttpServer, InternetAddress, gzip;
 import 'dart:math' show Random;
 import 'dart:typed_data';
 
@@ -12,6 +13,7 @@ import 'package:dio/dio.dart'
         RequestOptions,
         Response,
         ResponseBody;
+import 'package:dio/io.dart' show IOHttpClientAdapter;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:venera/sync/fake_transport.dart';
 import 'package:venera/sync/hlc.dart';
@@ -113,7 +115,12 @@ class _FakeWebDavIo implements WebDavIo {
   final Map<String, Uint8List> files = {};
   final List<String> requests = [];
 
+  /// Per-entry modification times keyed by the listed (last) name segment;
+  /// names without an entry are listed without a modification time.
+  final Map<String, DateTime> modified = {};
+
   bool moveSupported = true;
+  bool failMoves = false;
   Exception? readError;
   bool closed = false;
 
@@ -142,6 +149,7 @@ class _FakeWebDavIo implements WebDavIo {
           path: '$prefix$name',
           isDirectory: entries[name]!,
           etag: 'etag:$name',
+          modified: modified[name],
         ),
     ];
   }
@@ -168,6 +176,12 @@ class _FakeWebDavIo implements WebDavIo {
   }
 
   @override
+  Future<bool> exists(String path) async {
+    _record('PROPFIND-ONE', path);
+    return files.containsKey(path);
+  }
+
+  @override
   Future<void> write(String path, Uint8List bytes) async {
     _record('PUT', path);
     files[path] = Uint8List.fromList(bytes);
@@ -176,6 +190,9 @@ class _FakeWebDavIo implements WebDavIo {
   @override
   Future<WebDavMoveResult> move(String from, String to) async {
     _record('MOVE', from, extra: to);
+    if (failMoves) {
+      throw SyncTransportException('MOVE failed', statusCode: 500);
+    }
     if (!moveSupported) return WebDavMoveResult.unsupported;
     final bytes = files.remove(from);
     if (bytes == null) return WebDavMoveResult.notFound;
@@ -252,6 +269,75 @@ void main() {
       throwsArgumentError,
     );
     expect(created, 0);
+  });
+
+  test('listDevices ignores stale .json.tmp atomic-write leftovers', () async {
+    // A minimal WebDAV server that only answers PROPFIND on /devices with
+    // a fixed directory listing: one live state file, one in-flight tmp and
+    // unrelated junk names.
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    // The first response must be the directory itself: the webdav_client
+    // parser skips it by position (not href), and rejects listings whose
+    // first entry is not a collection.
+    const body =
+        ''
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<D:multistatus xmlns:D="DAV:">'
+        '<D:response><D:href>/dav/v2/devices/</D:href>'
+        '<D:propstat><D:prop><D:resourcetype><D:collection/></D:resourcetype>'
+        '</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/$_deviceA.json</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/$_deviceB.json.tmp</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '<D:response><D:href>/dav/v2/devices/not-a-device.json</D:href>'
+        '<D:propstat><D:prop><D:resourcetype/></D:prop>'
+        '<D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
+        '</D:multistatus>';
+    server.listen((request) async {
+      // Ignore anything but the devices listing (e.g. keep-alive probes).
+      // The client normalizes the path with a trailing slash.
+      final normalized = request.uri.path.replaceAll(RegExp(r'/+$'), '');
+      if (request.method != 'PROPFIND' || !normalized.endsWith('/devices')) {
+        request.response
+          ..statusCode = 404
+          ..close();
+        return;
+      }
+      request.response
+        ..statusCode = 207
+        ..headers.contentType = ContentType('application', 'xml')
+        ..write(body)
+        ..close();
+    });
+
+    final transport = WebDavSyncTransport.connect(
+      baseUrl: 'http://127.0.0.1:${server.port}/dav',
+      user: 'user',
+      password: 'pass',
+      // The app default uses a rust-backed adapter that is unavailable in
+      // the flutter_test sandbox; plain dart:io HTTP works here.
+      clientFactory: (baseUrl, user, password) => webdav.newClient(
+        baseUrl,
+        user: user,
+        password: password,
+        adapter: IOHttpClientAdapter(createHttpClient: () => HttpClient()),
+      ),
+    );
+    addTearDown(transport.close);
+
+    final devices = await transport.listDevices();
+    // The tmp leftover must not surface as a ghost device; junk names are
+    // filtered; the real state document is discovered.
+    expect(devices.map((info) => info.deviceId), [_deviceA]);
+    expect(devices.map((info) => info.deviceId), isNot(contains(_deviceB)));
+    expect(
+      devices.map((info) => info.deviceId),
+      isNot(contains('not-a-device')),
+    );
   });
 
   group('WebDavPaths', () {
@@ -637,6 +723,52 @@ void main() {
       },
     );
 
+    test('deleteStaleTemporaryFiles removes stale crash leftovers', () async {
+      final now = DateTime.now().toUtc();
+      remote.injectTemporaryFile(
+        _deviceA,
+        '000000000001-000000000002.jsonl.gz.tmp',
+        modified: now.subtract(const Duration(hours: 30)),
+      );
+      remote.injectTemporaryFile(_deviceA, 'snapshot.jsonl.gz.tmp');
+      remote.injectTemporaryFile(
+        _deviceB,
+        '000000000001-000000000002.jsonl.gz.tmp',
+        modified: now.subtract(const Duration(hours: 30)),
+      );
+      expect(remote.debugTemporaryFiles(_deviceA), hasLength(2));
+
+      final deleted = await transport.deleteStaleTemporaryFiles(_deviceA);
+      expect(deleted, 1);
+      expect(
+        remote.debugTemporaryFiles(_deviceA).keys,
+        ['snapshot.jsonl.gz.tmp'],
+        reason: 'a fresh tmp models an in-flight write and is kept',
+      );
+      expect(remote.debugTemporaryFiles(_deviceB), hasLength(1));
+
+      // A zero age sweeps everything older than *now*; invalid inputs are
+      // rejected before any remote access.
+      expect(
+        await transport.deleteStaleTemporaryFiles(
+          _deviceB,
+          maxAge: Duration.zero,
+        ),
+        1,
+      );
+      await expectLater(
+        transport.deleteStaleTemporaryFiles('../evil'),
+        throwsArgumentError,
+      );
+      await expectLater(
+        transport.deleteStaleTemporaryFiles(
+          _deviceA,
+          maxAge: const Duration(days: -1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
     test('snapshot read/write keeps the previous snapshot', () async {
       final info = _info(_deviceA);
       final first = _snapshotBytes(info);
@@ -861,6 +993,37 @@ void main() {
       _expectState(await transport.readState(_deviceA), state);
     });
 
+    test(
+      'failing MOVE degrades to plain PUT instead of failing the write',
+      () async {
+        // Some servers (Alist/OpenList) answer every MOVE with 5xx; writes must
+        // still succeed and later writes must skip the doomed tmp+MOVE dance.
+        io.failMoves = true;
+        final state = _state(_deviceA, lastChange: 5);
+        await transport.writeState(_deviceA, state);
+        expect(io.files.containsKey(paths.statePath(_deviceA)), isTrue);
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceA)}.tmp'),
+          isFalse,
+          reason: 'fallback must clean up the tmp file',
+        );
+        _expectState(await transport.readState(_deviceA), state);
+
+        io.requests.clear();
+        await transport.writeState(_deviceA, _state(_deviceA, lastChange: 6));
+        expect(
+          io.requestsOf('MOVE'),
+          isEmpty,
+          reason: 'a failed MOVE must disable tmp+MOVE for the session',
+        );
+        expect(io.requestsOf('PUT').length, greaterThanOrEqualTo(1));
+        _expectState(
+          await transport.readState(_deviceA),
+          _state(_deviceA, lastChange: 6),
+        );
+      },
+    );
+
     test('MOVE fallback writes via PUT and stops trying MOVE', () async {
       io.moveSupported = false;
       final state = _state(_deviceA);
@@ -936,6 +1099,101 @@ void main() {
       final ranges = await transport.listChanges(_deviceA);
       expect(ranges.map((range) => '${range.lo}-${range.hi}'), ['5-9']);
     });
+
+    test(
+      'deleteStaleTemporaryFiles sweeps only own stale .tmp artifacts',
+      () async {
+        final now = DateTime.now().toUtc();
+        final old = now.subtract(const Duration(hours: 30));
+
+        // Crash leftovers of this device's own branch, older than the cap.
+        io.files['${paths.statePath(_deviceA)}.tmp'] = Uint8List(1);
+        io.modified['$_deviceA.json.tmp'] = old;
+        io.files['${paths.snapshotPath(_deviceA)}.tmp'] = Uint8List(1);
+        io.modified['snapshot.jsonl.gz.tmp'] = old;
+        io
+          ..files['${paths.changesDir(_deviceA)}/'
+              '000000000001-000000000002.jsonl.gz.tmp'] = Uint8List(
+            1,
+          )
+          ..modified['000000000001-000000000002.jsonl.gz.tmp'] = old;
+        io
+          ..files['${paths.deviceDir(_deviceA)}/blobs/$_sha.gz.tmp'] =
+              Uint8List(1)
+          ..modified['$_sha.gz.tmp'] = old;
+
+        // Must be kept: an in-flight write, another device's artifact, a
+        // name that is not one of this protocol's tmp artifacts, and a file
+        // whose age the server did not report.
+        io
+          ..files['${paths.changesDir(_deviceA)}/'
+              '000000000003-000000000004.jsonl.gz.tmp'] = Uint8List(
+            1,
+          )
+          ..modified['000000000003-000000000004.jsonl.gz.tmp'] = now;
+        io
+          ..files['${paths.statePath(_deviceB)}.tmp'] = Uint8List(1)
+          ..modified['$_deviceB.json.tmp'] = old;
+        io
+          ..files['${paths.deviceDir(_deviceA)}/notes.tmp'] = Uint8List(1)
+          ..modified['notes.tmp'] = old;
+        io.files['${paths.changesDir(_deviceA)}/'
+            '000000000005-000000000006.jsonl.gz.tmp'] = Uint8List(
+          1,
+        );
+
+        final deleted = await transport.deleteStaleTemporaryFiles(_deviceA);
+        expect(deleted, 4);
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceA)}.tmp'),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey('${paths.snapshotPath(_deviceA)}.tmp'),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000001-000000000002.jsonl.gz.tmp',
+          ),
+          isFalse,
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.deviceDir(_deviceA)}/blobs/$_sha.gz.tmp',
+          ),
+          isFalse,
+        );
+
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000003-000000000004.jsonl.gz.tmp',
+          ),
+          isTrue,
+          reason: 'a live write must survive the sweep',
+        );
+        expect(
+          io.files.containsKey('${paths.statePath(_deviceB)}.tmp'),
+          isTrue,
+          reason: 'another device\'s branch must not be touched',
+        );
+        expect(
+          io.files.containsKey('${paths.deviceDir(_deviceA)}/notes.tmp'),
+          isTrue,
+          reason: 'unknown names must never be deleted',
+        );
+        expect(
+          io.files.containsKey(
+            '${paths.changesDir(_deviceA)}/'
+            '000000000005-000000000006.jsonl.gz.tmp',
+          ),
+          isTrue,
+          reason: 'files without a modification time are kept',
+        );
+      },
+    );
 
     test('snapshot write preserves the previous snapshot via MOVE', () async {
       final first = _snapshotBytes(_info(_deviceA));

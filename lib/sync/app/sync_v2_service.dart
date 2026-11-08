@@ -11,7 +11,9 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
@@ -114,6 +116,7 @@ class SyncV2Service extends ChangeNotifier {
   String? _lastError;
   int _historyRevision = 0;
   Timer? _debounce;
+  Timer? _flushDebounce;
   Timer? _pollTimer;
   AppLifecycleListener? _lifecycle;
   Future<void>? _operation;
@@ -133,6 +136,33 @@ class SyncV2Service extends ChangeNotifier {
   /// upgrading from a build where snapshot-only pulls did not project their
   /// merged records.
   static const String _implicitProjectionSeeded = 'syncV2ProjectionSeeded';
+
+  /// Store meta key prefix persisting the blob ledger: sha256 -> last-verified
+  /// epoch ms. Backs [BlobSync] so already-uploaded blobs are never probed
+  /// or re-downloaded on subsequent pushes. Suffixed per server account.
+  static const String _metaBlobLedgerPrefix = 'blobLedger.';
+
+  /// Per-account ledger meta key. Purely derived from the WebDAV config so
+  /// switching servers can never inherit the previous account's "uploaded"
+  /// claims. Not release-compatible sensitive: the ledger shipped nowhere yet.
+  static String blobLedgerMetaKey(String url, String user, String password) {
+    final digest = sha256.convert(utf8.encode('$url\n$user\n$password'));
+    return '$_metaBlobLedgerPrefix${digest.toString().substring(0, 16)}';
+  }
+
+  static String _blobLedgerMetaKey(List<String> config) =>
+      blobLedgerMetaKey(config[0], config[1], config[2]);
+
+  /// Store meta key holding the epoch ms of the last blob GC run.
+  static const String _metaBlobGcAt = 'blobGcAt';
+
+  /// Minimum interval between blob GC sweeps that had no new uploads.
+  static const Duration _blobGcInterval = Duration(hours: 1);
+
+  /// Upper bound for open-path pulls ([pullNowFast]): the reader and comic
+  /// details wait this long for fresh cross-device progress before opening
+  /// with the local state.
+  static const Duration quickPullTimeout = Duration(seconds: 2);
 
   bool get isInitialized => _initialized;
 
@@ -217,9 +247,29 @@ class SyncV2Service extends ChangeNotifier {
     );
     _transport = transport;
 
+    // The ledger is scoped to the server account: a ledger hit claims "this
+    // blob is present on the remote", which is meaningless after switching
+    // URL/credentials. Keying the meta by a hash of the config makes every
+    // account start from an empty ledger automatically — no reconfigure hook
+    // and no stale claims about a server we no longer talk to.
+    final blobLedgerKey = _blobLedgerMetaKey(config);
     final blobSync = BlobSync(
       transport: transport,
       localDeviceId: store.deviceId,
+      ledgerLoader: () async {
+        final raw = await store.getMeta(blobLedgerKey);
+        if (raw == null || raw.isEmpty) return null;
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is! Map) return null;
+          return decoded.map<String, int>(
+            (key, value) => MapEntry(key.toString(), (value as num).toInt()),
+          );
+        } catch (_) {
+          return null;
+        }
+      },
+      ledgerSaver: (ledger) => store.setMeta(blobLedgerKey, jsonEncode(ledger)),
     );
     _blobSync = blobSync;
     final adapters = <SyncAppAdapter>[
@@ -288,6 +338,7 @@ class SyncV2Service extends ChangeNotifier {
       adapters: adapters,
       enabledDomains: enabledDomains,
       clearableDomains: _clearableDomains,
+      onWarning: _logAdapterWarning,
     );
 
     final engine = SyncEngine(
@@ -418,6 +469,19 @@ class SyncV2Service extends ChangeNotifier {
     return _serialized(_pullInternal);
   }
 
+  /// Pull that gives up after [quickPullTimeout] instead of stalling open
+  /// paths (reader, comic details). The underlying pull keeps running in the
+  /// operation queue; a pull that applies remote history notifies the reader
+  /// through [historyRevision].
+  Future<bool> pullNowFast() async {
+    try {
+      final result = await pullNow().timeout(quickPullTimeout);
+      return result.success;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<Res<bool>> pushNow() {
     return _serialized(_pushInternal);
   }
@@ -469,6 +533,16 @@ class SyncV2Service extends ChangeNotifier {
       // Project anything a previous pull merged but never wrote back before
       // reconciliation can classify those records as local deletions.
       await _projectPendingIfNeeded(syncStore);
+      // Reconcile BEFORE pulling, unconditionally. Both directions of the
+      // race need it:
+      //  * deletions: a pull must not project the still-alive store record
+      //    back over a row the user just deleted (resurrection + suppressed
+      //    tombstone);
+      //  * insertions: the incoming projection must not delete local rows
+      //    that have not been emitted into the store yet (a fresh cookie or
+      //    favorite folder would be wiped by any remote change).
+      // This is local SQLite work only; the expensive parts of a pull are on
+      // the network and untouched by this scan.
       final retained = await _reconciler!.reconcileLocal(syncStore);
       if (retained.isNotEmpty) {
         // The local business data was recreated or unreadable: restore it
@@ -523,6 +597,19 @@ class SyncV2Service extends ChangeNotifier {
         // before pushing, so the next reconciliation sees restored rows.
         await _projectRemote(syncStore);
       }
+      // Amortized ledger re-verification: a couple of range probes per push
+      // keep the ledger honest, so blobs pruned manually on the server are
+      // re-uploaded within minutes instead of silently assumed present.
+      final blobSyncForReverify = _blobSync;
+      if (blobSyncForReverify != null) {
+        try {
+          await blobSyncForReverify.reverifyOldest(
+            blobSyncForReverify.ledgerReverifyCount,
+          );
+        } catch (error, stack) {
+          Log.error('Sync v2', 'Blob ledger reverify failed', stack);
+        }
+      }
       final blobFailures = await _ensureBlobs();
       if (blobFailures > 0) {
         // The outbox keeps its ops; the next push retries both the blob and
@@ -532,6 +619,28 @@ class SyncV2Service extends ChangeNotifier {
       }
       final result = await syncEngine.push();
       if (result.error != null) {
+        // §7.2 step 7: when the outbox cannot be delivered as change files
+        // (e.g. a single oversized op poisons every batch), a snapshot
+        // substitutes the pending range so the rest of the data is not
+        // blocked behind it. Gated by the pending threshold inside the
+        // engine — a no-op for small or transiently failing outboxes.
+        try {
+          final compaction = await syncEngine.compactSnapshotIfNeeded();
+          if (!compaction.skipped && compaction.error != null) {
+            Log.error(
+              'Sync v2',
+              'Outbox compaction failed: ${compaction.error}',
+            );
+          } else if (!compaction.skipped) {
+            Log.info(
+              'Sync v2',
+              'Outbox compaction substituted a snapshot '
+                  '(${compaction.records} records) for the stuck push',
+            );
+          }
+        } catch (error, stack) {
+          Log.error('Sync v2', 'Outbox compaction failed', stack);
+        }
         _lastError = result.error.toString();
         return Res.error(_lastError!);
       }
@@ -594,6 +703,10 @@ class SyncV2Service extends ChangeNotifier {
   /// Deletes blobs on this device's branch that no *visible* record of the
   /// local store references anymore.
   ///
+  /// Throttled: the sweep costs a full store dump plus a remote blob listing,
+  /// so it runs right after a push that uploaded blobs, and otherwise at most
+  /// once per [_blobGcInterval].
+  ///
   /// Safe only after a successful push + snapshot: the snapshot carries the
   /// surviving references, and content-addressed names make a re-upload of
   /// still-needed content a no-op even if a concurrent device still holds an
@@ -604,6 +717,13 @@ class SyncV2Service extends ChangeNotifier {
     final blobSync = _blobSync;
     final store = _store;
     if (blobSync == null || store == null) return;
+    final uploadedSomething = blobSync.uploadsSinceLastGc > 0;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (!uploadedSomething) {
+      final lastGc =
+          int.tryParse(await store.getMeta(_metaBlobGcAt) ?? '') ?? 0;
+      if (nowMs - lastGc < _blobGcInterval.inMilliseconds) return;
+    }
     try {
       final referenced = <String>{};
       for (final record in await store.dumpRecords()) {
@@ -615,6 +735,8 @@ class SyncV2Service extends ChangeNotifier {
       if (deleted > 0) {
         Log.info('Sync v2', 'Blob GC removed $deleted unreferenced blob(s)');
       }
+      await store.setMeta(_metaBlobGcAt, '$nowMs');
+      blobSync.resetUploadCounter();
     } catch (error, stack) {
       // Garbage collection must never fail the push.
       Log.error('Sync v2', 'Blob GC failed', stack);
@@ -721,6 +843,13 @@ class SyncV2Service extends ChangeNotifier {
       }
     } else {
       _stopPolling();
+      // Leaving the foreground (or losing focus on desktop): push whatever
+      // the debounce is still holding before the OS suspends us.
+      if (state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden) {
+        _flushPendingPush();
+      }
     }
   }
 
@@ -775,12 +904,76 @@ class SyncV2Service extends ChangeNotifier {
 
   // -------------------------------------------------------------- lifecycle --
 
+  /// Push debounce: every local change restarts the timer, so a burst of
+  /// edits becomes one push. 15s (not 3s) for two reasons:
+  ///  * every push is a full HTTP round trip on a short-connection WebDAV —
+  ///    steady reading used to produce one push (and one 1-op change file)
+  ///    per ~3s page turn;
+  ///  * the store coalesces same-key pending ops in place, but only while
+  ///    they are unfrozen — a longer window lets page turns of the same comic
+  ///    collapse into a single op before the first one is delivered.
+  /// Matches Chrome Sync's Sessions nudge (15s), the largest of its type
+  /// delays for exactly this class of high-frequency overwrite writes.
+  static const Duration _pushDebounce = Duration(seconds: 15);
+
+  /// Max-latency cap (Syncthing's 10s→60s rule): the debounce above is
+  /// restarted by every change, so continuous reading would postpone the
+  /// push indefinitely. Whatever happens, pending local changes leave this
+  /// device within 60s.
+  static const Duration _pushMaxLatency = Duration(seconds: 60);
+
   void _onManagerChanged() {
     if (_disposed || !_initialized || !autoSyncEnabled) return;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 3), () {
-      pushNow();
+    _debounce = Timer(_pushDebounce, () {
+      _debounce = null;
+      _flushDebounce?.cancel();
+      _flushDebounce = null;
+      _autoPush();
     });
+    // The cap timer is NOT restarted by later changes: it measures since the
+    // first unsent change of the current burst. Clearing itself when it fires
+    // is what allows `??=` to arm a fresh cap for the next burst — without
+    // it, the cap would protect exactly one burst per app session.
+    _flushDebounce ??= Timer(_pushMaxLatency, () {
+      _flushDebounce = null;
+      _debounce?.cancel();
+      _debounce = null;
+      _autoPush();
+    });
+  }
+
+  /// Fires a debounced auto-push, re-checking the setting at fire time: the
+  /// user can turn auto sync off while a timer is still armed, and an armed
+  /// timer must never push against the now-disabled setting.
+  void _autoPush() {
+    if (_disposed || !_initialized || !autoSyncEnabled) return;
+    pushNow();
+  }
+
+  /// Cancels the pending auto-push timers without touching the outbox.
+  ///
+  /// Called when the user turns auto sync off: local changes stay pending and
+  /// are delivered by the next explicit push, or automatically once auto sync
+  /// is enabled again and the next change arms a fresh timer.
+  void cancelPendingAutoPush() {
+    _debounce?.cancel();
+    _debounce = null;
+    _flushDebounce?.cancel();
+    _flushDebounce = null;
+  }
+
+  /// Pushes immediately when the app leaves the foreground. Event-boundary
+  /// flush is the industry default (Chrome/CKSyncEngine commit on lifecycle
+  /// events): the 15s debounce must not hold changes hostage while the app
+  /// sits in the background with the OS about to suspend it.
+  void _flushPendingPush() {
+    if (_disposed || !autoSyncEnabled) return;
+    final debounce = _debounce;
+    // Nothing pending: `isActive` would throw on a null timer.
+    if (debounce == null || !debounce.isActive) return;
+    cancelPendingAutoPush();
+    pushNow();
   }
 
   /// Rebuilds the engine/adapters, e.g. after the "sync login state" toggle
@@ -798,6 +991,8 @@ class SyncV2Service extends ChangeNotifier {
     _lifecycle = null;
     _debounce?.cancel();
     _debounce = null;
+    _flushDebounce?.cancel();
+    _flushDebounce = null;
     if (_initialized) {
       HistoryManager().removeListener(_onManagerChanged);
       LocalFavoritesManager().removeListener(_onManagerChanged);

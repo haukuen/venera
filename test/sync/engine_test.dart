@@ -492,6 +492,8 @@ class _FakeTransport implements SyncTransport {
   bool failWriteState = false;
   bool failWriteSnapshot = false;
   bool failReadChanges = false;
+  bool failReadSnapshotInfo = false;
+  bool failDeleteChanges = false;
   final Set<int> failWriteChangesCalls = <int>{};
   final Set<String> corruptStateDevices = <String>{};
   final Set<String> corruptChangeFiles = <String>{};
@@ -569,6 +571,9 @@ class _FakeTransport implements SyncTransport {
 
   @override
   Future<SnapshotInfo?> readSnapshotInfo(String deviceId) async {
+    if (failReadSnapshotInfo) {
+      throw StateError('simulated network failure');
+    }
     final bytes = snapshots[deviceId];
     if (bytes == null) return null;
     try {
@@ -636,6 +641,10 @@ class _FakeTransport implements SyncTransport {
       blobs[deviceId]?[sha256];
 
   @override
+  Future<bool> blobExists(String deviceId, String sha256) async =>
+      blobs[deviceId]?.containsKey(sha256) ?? false;
+
+  @override
   Future<List<String>> listBlobs(String deviceId) async {
     final names = blobs[deviceId]?.keys.toList() ?? const <String>[];
     return List<String>.of(names..sort());
@@ -648,9 +657,35 @@ class _FakeTransport implements SyncTransport {
 
   @override
   Future<void> deleteChanges(String deviceId, int upToSeq) async {
+    if (failDeleteChanges) {
+      throw StateError('simulated delete failure');
+    }
     final files = changes[deviceId];
     if (files == null) return;
     files.removeWhere((key, _) => _parseRange(key).hi <= upToSeq);
+  }
+
+  /// Planted `.tmp` artifacts per device (name -> modification time, UTC).
+  final Map<String, Map<String, DateTime>> temporaryFiles = {};
+
+  int sweepTemporaryFilesCallCount = 0;
+
+  @override
+  Future<int> deleteStaleTemporaryFiles(
+    String deviceId, {
+    Duration maxAge = staleTemporaryFileAge,
+  }) async {
+    sweepTemporaryFilesCallCount++;
+    final files = temporaryFiles[deviceId];
+    if (files == null) return 0;
+    final cutoff = DateTime.now().toUtc().subtract(maxAge);
+    var deleted = 0;
+    files.removeWhere((_, modified) {
+      if (modified.isAfter(cutoff)) return false;
+      deleted++;
+      return true;
+    });
+    return deleted;
   }
 
   @override
@@ -660,6 +695,7 @@ class _FakeTransport implements SyncTransport {
     changes.remove(deviceId);
     snapshots.remove(deviceId);
     blobs.remove(deviceId);
+    temporaryFiles.remove(deviceId);
   }
 
   @override
@@ -1114,6 +1150,114 @@ void main() {
         fixture.storeB.fingerprint(),
         equals(fixture.storeA.fingerprint()),
       );
+    });
+
+    test('gc refuses to delete when the snapshot probe fails', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+      // Simulate the chained sweep failing transiently: the snapshot uploads
+      // fine but its covered change file survives below the watermark.
+      fixture.transport.failDeleteChanges = true;
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      fixture.transport.failDeleteChanges = false;
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      // A network failure during the presence probe is *unknown*, not
+      // consent: pruning must be refused, never skipped silently.
+      fixture.transport.failReadSnapshotInfo = true;
+      final refused = await fixture.engineA.gc();
+      expect(refused.skipped, isTrue);
+      expect(refused.deleted, isFalse);
+      expect(refused.error, isNotNull);
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      fixture.transport.failReadSnapshotInfo = false;
+      final ok = await fixture.engineA.gc();
+      expect(ok.error, isNull);
+      expect(ok.deleted, isTrue);
+      expect(await fixture.transport.listChanges(_deviceA), isEmpty);
+    });
+
+    test('snapshot prunes its covered change files automatically', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      await _emitProgress(fixture.storeA, _comic2, 2);
+      expect((await fixture.engineA.push()).opsPushed, 2);
+      expect(await fixture.transport.listChanges(_deviceA), isNotEmpty);
+
+      // No explicit gc(): the sweep is chained onto the snapshot upload.
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      expect(await fixture.transport.listChanges(_deviceA), isEmpty);
+
+      // Peers still converge — via the snapshot instead of the changes.
+      final pull = await fixture.engineB.pull();
+      expect(pull.success, isTrue, reason: pull.errors.join('\n'));
+      expect(await fixture.storeB.getAppliedSeq(_deviceA), 2);
+      expect(
+        fixture.storeB.fingerprint(),
+        equals(fixture.storeA.fingerprint()),
+      );
+    });
+
+    test('gc sweeps stale tmp artifacts on the own branch', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+      expect((await fixture.engineA.snapshot()).success, isTrue);
+      fixture.transport.sweepTemporaryFilesCallCount = 0;
+
+      final now = DateTime.now().toUtc();
+      fixture.transport.temporaryFiles[_deviceA] = {
+        'snapshot.jsonl.gz.tmp': now.subtract(const Duration(hours: 30)),
+        '000000000001-000000000002.jsonl.gz.tmp': now.subtract(
+          const Duration(hours: 30),
+        ),
+        // A live write never keeps its tmp beyond the transport timeout:
+        // this one must survive the sweep.
+        '000000000001-000000000002.in-flight.jsonl.gz.tmp': now,
+      };
+
+      final gc = await fixture.engineA.gc();
+      expect(gc.deleted, isTrue);
+      expect(fixture.transport.sweepTemporaryFilesCallCount, 1);
+      expect(fixture.transport.temporaryFiles[_deviceA]!.keys, [
+        '000000000001-000000000002.in-flight.jsonl.gz.tmp',
+      ]);
+    });
+
+    test('pending clear cutoff stays out of the periodic snapshot', () async {
+      final fixture = _Fixture();
+      await fixture.init();
+      // One delivered op establishes a snapshot watermark of 1.
+      await _emitProgress(fixture.storeA, _comic1, 1);
+      expect((await fixture.engineA.push()).opsPushed, 1);
+
+      // A clear emitted *after* the push is still pending (seq 2 > watermark).
+      await fixture.storeA.emitClear(SyncDomains.history);
+
+      final snapshot = await fixture.engineA.snapshot();
+      expect(snapshot.success, isTrue, reason: '$snapshot');
+      expect(snapshot.info!.applied[_deviceA], 1);
+      // No clear line may ride along: the cutoff is still pending delivery.
+      expect(snapshot.clears, 0);
+
+      // The peer must see the delivered record but NOT the pending cutoff: a
+      // premature clear would tombstone newer data on other devices.
+      final pull = await fixture.engineB.pull();
+      expect(pull.success, isTrue, reason: pull.errors.join('\n'));
+      expect(
+        await fixture.storeB.recordOf(
+          SyncDomains.history,
+          _historyKey(_comic1),
+          SyncFields.progress,
+        ),
+        isNotNull,
+      );
+      expect(await fixture.storeB.dumpClears(), isEmpty);
     });
 
     test('corrupt change file is repaired from the snapshot', () async {
