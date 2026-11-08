@@ -903,9 +903,10 @@ class SyncV2Service extends ChangeNotifier {
     if (_disposed || !_initialized || !autoSyncEnabled) return;
     _debounce?.cancel();
     _debounce = Timer(_pushDebounce, () {
+      _debounce = null;
       _flushDebounce?.cancel();
       _flushDebounce = null;
-      pushNow();
+      _autoPush();
     });
     // The cap timer is NOT restarted by later changes: it measures since the
     // first unsent change of the current burst. Clearing itself when it fires
@@ -915,8 +916,28 @@ class SyncV2Service extends ChangeNotifier {
       _flushDebounce = null;
       _debounce?.cancel();
       _debounce = null;
-      pushNow();
+      _autoPush();
     });
+  }
+
+  /// Fires a debounced auto-push, re-checking the setting at fire time: the
+  /// user can turn auto sync off while a timer is still armed, and an armed
+  /// timer must never push against the now-disabled setting.
+  void _autoPush() {
+    if (_disposed || !_initialized || !autoSyncEnabled) return;
+    pushNow();
+  }
+
+  /// Cancels the pending auto-push timers without touching the outbox.
+  ///
+  /// Called when the user turns auto sync off: local changes stay pending and
+  /// are delivered by the next explicit push, or automatically once auto sync
+  /// is enabled again and the next change arms a fresh timer.
+  void cancelPendingAutoPush() {
+    _debounce?.cancel();
+    _debounce = null;
+    _flushDebounce?.cancel();
+    _flushDebounce = null;
   }
 
   /// Pushes immediately when the app leaves the foreground. Event-boundary
@@ -924,14 +945,11 @@ class SyncV2Service extends ChangeNotifier {
   /// events): the 15s debounce must not hold changes hostage while the app
   /// sits in the background with the OS about to suspend it.
   void _flushPendingPush() {
-    if (_disposed) return;
+    if (_disposed || !autoSyncEnabled) return;
     final debounce = _debounce;
     // Nothing pending: `isActive` would throw on a null timer.
     if (debounce == null || !debounce.isActive) return;
-    debounce.cancel();
-    _debounce = null;
-    _flushDebounce?.cancel();
-    _flushDebounce = null;
+    cancelPendingAutoPush();
     pushNow();
   }
 

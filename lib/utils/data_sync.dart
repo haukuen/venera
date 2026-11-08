@@ -249,6 +249,19 @@ class DataSync with ChangeNotifier {
     }
   }
 
+  /// Called after the "auto sync" toggle changes.
+  ///
+  /// Disabling must also drop an armed auto-push timer: a debounce armed
+  /// before the toggle would otherwise fire a push against the now-disabled
+  /// setting (the old 3s window made this negligible; 15s/60s do not).
+  static Future<void> setAutoSyncEnabled(bool enabled) async {
+    appdata.implicitData['webdavAutoSync'] = enabled;
+    await appdata.writeImplicitData();
+    if (!enabled) {
+      SyncV2Service.instance.cancelPendingAutoPush();
+    }
+  }
+
   /// Diagnostics for the settings page (plain maps keep the UI decoupled from
   /// the service types).
   static Future<Map<String, Object?>> syncDiagnostics() async {
