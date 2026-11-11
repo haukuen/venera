@@ -293,6 +293,8 @@ class _ReaderState extends State<Reader>
 
   @override
   void dispose() {
+    _disposed = true;
+    _flushHistory();
     SyncV2Service.instance.removeListener(_onSyncChanged);
     if (isFullscreen) {
       fullscreen();
@@ -400,45 +402,84 @@ class _ReaderState extends State<Reader>
   /// `HistoryManager().addHistoryAsync` is a high-cost operation because it creates a new isolate.
   Timer? _updateHistoryTimer;
 
+  bool _disposed = false;
+
   void updateHistory() {
-    if (history != null) {
-      // page >= maxPage handles both last image page and chapter comments page
-      if (page >= maxPage) {
-        /// Record the last image of chapter
-        history!.page = images?.length ?? 1;
+    final history = this.history;
+    final images = this.images;
+    // Images identify the chapter's page count. Before they are loaded (or
+    // after a chapter switch cleared them) `maxPage` falls back to 1, so
+    // writing here would reset a real saved page to page 1. The image loader
+    // calls `updateHistory` again once the list is available.
+    if (_disposed || history == null || images == null || images.isEmpty) {
+      return;
+    }
+    // page >= maxPage handles both last image page and chapter comments page
+    if (page >= maxPage) {
+      /// Record the last image of chapter
+      history.page = images.length;
+    } else {
+      /// Record the first image of the page
+      if (!showSingleImageOnFirstPage() || imagesPerPage == 1) {
+        history.page = (page - 1) * imagesPerPage + 1;
       } else {
-        /// Record the first image of the page
-        if (!showSingleImageOnFirstPage() || imagesPerPage == 1) {
-          history!.page = (page - 1) * imagesPerPage + 1;
+        if (page == 1) {
+          history.page = 1;
         } else {
-          if (page == 1) {
-            history!.page = 1;
-          } else {
-            history!.page = (page - 2) * imagesPerPage + 2;
-          }
+          history.page = (page - 2) * imagesPerPage + 2;
         }
       }
-      history!.maxPage = images?.length ?? 1;
-      if (widget.chapters?.isGrouped ?? false) {
-        int g = 0;
-        int c = chapter;
-        while (c > widget.chapters!.getGroupByIndex(g).length) {
-          c -= widget.chapters!.getGroupByIndex(g).length;
-          g++;
-        }
-        history!.readEpisode.add('${g + 1}-$c');
-        history!.ep = c;
-        history!.group = g + 1;
-      } else {
-        history!.readEpisode.add(chapter.toString());
-        history!.ep = chapter;
+    }
+    history.maxPage = images.length;
+    if (widget.chapters?.isGrouped ?? false) {
+      int g = 0;
+      int c = chapter;
+      while (c > widget.chapters!.getGroupByIndex(g).length) {
+        c -= widget.chapters!.getGroupByIndex(g).length;
+        g++;
       }
-      history!.time = DateTime.now();
-      _updateHistoryTimer?.cancel();
-      _updateHistoryTimer = Timer(const Duration(seconds: 1), () {
-        HistoryManager().addHistoryAsync(history!);
-        _updateHistoryTimer = null;
-      });
+      history.readEpisode.add('${g + 1}-$c');
+      history.ep = c;
+      history.group = g + 1;
+    } else {
+      history.readEpisode.add(chapter.toString());
+      history.ep = chapter;
+    }
+    history.time = DateTime.now();
+    _updateHistoryTimer?.cancel();
+    _updateHistoryTimer = Timer(const Duration(seconds: 1), () {
+      _updateHistoryTimer = null;
+      _saveHistory(history);
+    });
+  }
+
+  void _saveHistory(History history) {
+    unawaited(
+      HistoryManager().addHistoryAsync(history).catchError((
+        Object error,
+        StackTrace stackTrace,
+      ) {
+        Log.error(
+          "Reader",
+          "Failed to save reading progress: $error\n$stackTrace",
+        );
+      }),
+    );
+  }
+
+  /// Persist a debounced page change before the reader is torn down. Without
+  /// this, flipping pages and immediately going back (or closing the app)
+  /// leaves the previous progress in the database.
+  void _flushHistory() {
+    final timer = _updateHistoryTimer;
+    if (timer == null) {
+      return;
+    }
+    timer.cancel();
+    _updateHistoryTimer = null;
+    final history = this.history;
+    if (history != null) {
+      _saveHistory(history);
     }
   }
 
@@ -691,6 +732,10 @@ abstract mixin class _ReaderLocation {
 
   ComicType get type;
 
+  List<String>? get images;
+
+  set images(List<String>? value);
+
   void update();
 
   bool enablePageAnimation(String cid, ComicType type) => appdata.settings
@@ -771,6 +816,11 @@ abstract mixin class _ReaderLocation {
   bool toChapter(int c, {bool toLastPage = false}) {
     if (_validateChapter(c) && !isLoading) {
       chapter = c;
+      // Drop the previous chapter's images before touching `page`. Otherwise
+      // the page setter records a history entry for the new chapter using the
+      // old chapter's image list/maxPage, which can overwrite real progress if
+      // the new chapter is slow to load or fails to load at all.
+      images = null;
       page = 1;
       _jumpToLastPageOnLoad = toLastPage;
       update();

@@ -86,6 +86,11 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
 
   @override
   void onReadEnd() {
+    isReading = false;
+    if (!mounted) return;
+    // `read()` passed this exact instance to the reader, which updates it on
+    // every page turn. The fallback only handles a history created elsewhere
+    // while this page was loading.
     history ??= HistoryManager().find(
       widget.id,
       ComicType(widget.sourceKey.hashCode),
@@ -134,14 +139,30 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
   void initState() {
     scrollController.addListener(onScroll);
     ReadLaterManager().addListener(update);
+    HistoryManager().addListener(_onHistoryChanged);
     super.initState();
   }
 
   @override
   void dispose() {
+    HistoryManager().removeListener(_onHistoryChanged);
     scrollController.removeListener(onScroll);
     ReadLaterManager().removeListener(update);
     super.dispose();
+  }
+
+  void _onHistoryChanged() {
+    if (!mounted || isReading) return;
+    final latest = HistoryManager().findLatest(
+      history,
+      widget.id,
+      ComicType(widget.sourceKey.hashCode),
+    );
+    if (latest == null || identical(latest, history)) {
+      return;
+    }
+    history = latest;
+    update();
   }
 
   @override
@@ -478,7 +499,7 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                 ),
               ],
             ).paddingHorizontal(16).paddingVertical(8),
-          if (history != null)
+          if (history != null && (history!.ep > 0 || history!.page > 0))
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

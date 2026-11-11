@@ -302,29 +302,41 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
 
   void addImageFavorite() async {
     try {
-      if (context.reader.images![0].contains('file://')) {
+      final reader = context.reader;
+      final images = reader.images;
+      // The toolbar stays interactive while a chapter loads; `images` is null
+      // during that window (and empty for a chapter without pages).
+      if (reader.isLoading || images == null || images.isEmpty) {
+        return;
+      }
+      if (images[0].contains('file://')) {
         showToast(
           message: "Local comic collection is not supported at present".tl,
           context: context,
         );
         return;
       }
-      String id = context.reader.cid;
-      int ep = context.reader.chapter;
-      String eid = context.reader.eid;
-      String title = context.reader.history!.title;
-      String subTitle = context.reader.history!.subtitle;
-      int maxPage = context.reader.images!.length;
+      String id = reader.cid;
+      int ep = reader.chapter;
+      String eid = reader.eid;
+      String title = reader.history!.title;
+      String subTitle = reader.history!.subtitle;
+      int maxPage = images.length;
       int? page = await selectImage();
       if (page == null) return;
       if (!mounted) return;
+      // The chapter can change while the selection overlay is open. Never mix
+      // an index from the old image list with the new chapter's metadata.
+      if (!identical(reader.images, images) || reader.chapter != ep) {
+        return;
+      }
       page += 1;
-      String sourceKey = context.reader.type.sourceKey;
-      String imageKey = context.reader.images![page - 1];
-      List<String> tags = context.reader.widget.tags;
-      String author = context.reader.widget.author;
+      String sourceKey = reader.type.sourceKey;
+      String imageKey = images[page - 1];
+      List<String> tags = reader.widget.tags;
+      String author = reader.widget.author;
 
-      var epName = context.reader.chapterDisplayName;
+      var epName = reader.chapterDisplayName;
       var translatedTags = tags.map((e) => e.translateTagsToCN).toList();
 
       if (isLiked()) {
@@ -373,7 +385,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
             var copy = imageFavorite.copyWith(
               page: firstPage,
               isAutoFavorite: true,
-              imageKey: context.reader.images![0],
+              imageKey: images[0],
             );
             // 不是第一页的话, 自动塞一个封面进去
             imageFavoritesEp = ImageFavoritesEp(
@@ -902,11 +914,11 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
   Future<int?> selectImage() async {
     var reader = context.reader;
     var imageViewController = context.reader._imageViewController;
+    final images = reader.images;
+    final chapter = reader.chapter;
 
     // 评论页无图片，或图片未加载，直接返回，避免弹出选择框或崩溃
-    if (reader.isOnChapterCommentsPage ||
-        reader.images == null ||
-        reader.images!.isEmpty) {
+    if (reader.isOnChapterCommentsPage || images == null || images.isEmpty) {
       return null;
     }
 
@@ -937,11 +949,16 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       if (location == null) {
         return null;
       }
+      if (!mounted ||
+          reader.chapter != chapter ||
+          !identical(reader.images, images)) {
+        return null;
+      }
       var imageKey = imageViewController!.getImageKeyByOffset(location);
       if (imageKey == null) {
         return null;
       }
-      return reader.images!.indexOf(imageKey);
+      return images.indexOf(imageKey);
     }
   }
 
@@ -953,7 +970,11 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       return null;
     }
     if (!mounted) return null;
-    var imageKey = context.reader.images![i];
+    final images = context.reader.images;
+    if (images == null || i < 0 || i >= images.length) {
+      return null;
+    }
+    var imageKey = images[i];
     Uint8List data;
     if (imageKey.startsWith("file://")) {
       data = await File(imageKey.substring(7)).readAsBytes();

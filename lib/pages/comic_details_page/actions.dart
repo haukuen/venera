@@ -9,6 +9,14 @@ abstract mixin class _ComicPageActions {
 
   History? get history;
 
+  set history(History? value);
+
+  /// Whether a reader opened from this page is currently on the navigation
+  /// stack. History notifications are ignored while reading so they cannot
+  /// replace the instance the reader is mutating (sync reloads clear the
+  /// in-memory cache and would otherwise hand us an older database row).
+  bool isReading = false;
+
   bool isLiking = false;
 
   bool isLiked = false;
@@ -107,9 +115,19 @@ abstract mixin class _ComicPageActions {
     try {
       await SyncV2Service.instance.pullNowFast();
     } catch (_) {}
-    final latestHistory =
-        HistoryManager().find(comic.id, comic.comicType) ?? history;
+    final latestHistory = HistoryManager().findLatest(
+      history,
+      comic.id,
+      comic.comicType,
+    );
     if (!App.rootContext.mounted) return;
+    // Share the exact instance with the reader. The reader mutates it on every
+    // page turn, so this page (and Continue) sees the new progress immediately
+    // when the reader is popped, even before the debounced database write.
+    final readerHistory =
+        latestHistory ?? History.fromModel(model: comic, ep: 0, page: 0);
+    history = readerHistory;
+    isReading = true;
     App.rootContext
         .to(
           () => Reader(
@@ -120,22 +138,26 @@ abstract mixin class _ComicPageActions {
             initialChapter: ep,
             initialPage: page,
             initialChapterGroup: group,
-            history:
-                latestHistory ??
-                History.fromModel(model: comic, ep: 0, page: 0),
+            history: readerHistory,
             author: comic.findAuthor() ?? '',
             tags: comic.plainTags,
           ),
         )
         .then((_) {
+          isReading = false;
           onReadEnd();
         });
   }
 
   void continueRead() {
-    var ep = history?.ep ?? 1;
-    var page = history?.page ?? 1;
-    var group = history?.group ?? 1;
+    final latest = HistoryManager().findLatest(
+      history,
+      comic.id,
+      comic.comicType,
+    );
+    var ep = latest?.ep ?? 1;
+    var page = latest?.page ?? 1;
+    var group = latest?.group ?? 1;
     read(ep, page, group);
   }
 

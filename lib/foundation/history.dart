@@ -194,8 +194,13 @@ class HistoryManager with ChangeNotifier {
   /// Cache of history ids. Improve the performance of find operation.
   Set<String>? _cachedHistoryIds;
 
-  /// Cache records recently modified by the app. Improve the performance of listeners.
+  /// Cache records recently modified by the app. Improve the performance of
+  /// listeners. Keyed by (id, type) so the same comic id from different sources
+  /// cannot overwrite each other.
   final cachedHistories = <String, History>{};
+
+  static String _historyCacheKey(String id, HistoryType type) =>
+      '${id}_${type.value}';
 
   bool isInitialized = false;
 
@@ -305,12 +310,13 @@ class HistoryManager with ChangeNotifier {
     } finally {
       _haveAsyncTask = false;
     }
+    final key = _historyCacheKey(newItem.id, newItem.type);
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {
-      _cachedHistoryIds!.add('${newItem.id}_${newItem.type.value}');
+      _cachedHistoryIds!.add(key);
     }
-    cachedHistories[newItem.id] = newItem;
+    cachedHistories[key] = newItem;
     if (cachedHistories.length > 10) {
       cachedHistories.remove(cachedHistories.keys.first);
     }
@@ -337,9 +343,9 @@ class HistoryManager with ChangeNotifier {
     if (_cachedHistoryIds == null) {
       updateCache();
     } else {
-      _cachedHistoryIds!.add('${newItem.id}_${newItem.type.value}');
+      _cachedHistoryIds!.add(_historyCacheKey(newItem.id, newItem.type));
     }
-    cachedHistories[newItem.id] = newItem;
+    cachedHistories[_historyCacheKey(newItem.id, newItem.type)] = newItem;
     if (cachedHistories.length > 10) {
       cachedHistories.remove(cachedHistories.keys.first);
     }
@@ -417,13 +423,14 @@ class HistoryManager with ChangeNotifier {
       """);
     for (var element in res) {
       _cachedHistoryIds!.add(
-        '${element["id"] as String}_${element["type"] as int}',
+        _historyCacheKey(
+          element["id"] as String,
+          HistoryType(element["type"] as int),
+        ),
       );
     }
     for (var key in cachedHistories.keys.toList()) {
-      // cachedHistories is keyed by id only; check if any type variant exists
-      var hasMatch = _cachedHistoryIds!.any((e) => e.startsWith('${key}_'));
-      if (!hasMatch) {
+      if (!_cachedHistoryIds!.contains(key)) {
         cachedHistories.remove(key);
       }
     }
@@ -433,11 +440,12 @@ class HistoryManager with ChangeNotifier {
     if (_cachedHistoryIds == null) {
       updateCache();
     }
-    if (!_cachedHistoryIds!.contains('${id}_${type.value}')) {
+    final key = _historyCacheKey(id, type);
+    if (!_cachedHistoryIds!.contains(key)) {
       return null;
     }
-    if (cachedHistories.containsKey(id)) {
-      return cachedHistories[id];
+    if (cachedHistories.containsKey(key)) {
+      return cachedHistories[key];
     }
 
     var res = _db.select(
@@ -451,6 +459,37 @@ class HistoryManager with ChangeNotifier {
       return null;
     }
     return History.fromRow(res.first);
+  }
+
+  /// Returns the in-memory instance for [id] and [type], if the app has modified
+  /// it recently. The reader updates this instance synchronously on every page
+  /// turn, so it can be newer than the database row returned by [find].
+  History? findCached(String id, ComicType type) {
+    return cachedHistories[_historyCacheKey(id, type)];
+  }
+
+  /// Returns the freshest reading progress known for [id] and [type].
+  ///
+  /// [current] is typically the instance held by the details page. It is
+  /// preferred when it is at least as new as the database row because the
+  /// reader mutates it synchronously while the database write is debounced.
+  /// A placeholder with no chapter/page and no read chapters must not mask a
+  /// real row loaded or synced later.
+  History? findLatest(History? current, String id, ComicType type) {
+    if (current != null &&
+        current.ep <= 0 &&
+        current.page <= 0 &&
+        current.readEpisode.isEmpty) {
+      current = null;
+    }
+    final found = find(id, type);
+    if (found == null) {
+      return current;
+    }
+    if (current == null) {
+      return found;
+    }
+    return found.time.isAfter(current.time) ? found : current;
   }
 
   List<History> getAll() {
