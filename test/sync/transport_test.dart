@@ -121,6 +121,9 @@ class _FakeWebDavIo implements WebDavIo {
 
   bool moveSupported = true;
   bool failMoves = false;
+  Object? moveError;
+  String? writeErrorPath;
+  bool failRemove = false;
   Exception? readError;
   bool closed = false;
 
@@ -184,12 +187,14 @@ class _FakeWebDavIo implements WebDavIo {
   @override
   Future<void> write(String path, Uint8List bytes) async {
     _record('PUT', path);
+    if (path == writeErrorPath) throw SyncTransportException('PUT failed');
     files[path] = Uint8List.fromList(bytes);
   }
 
   @override
   Future<WebDavMoveResult> move(String from, String to) async {
     _record('MOVE', from, extra: to);
+    if (moveError != null) throw moveError!;
     if (failMoves) {
       throw SyncTransportException('MOVE failed', statusCode: 500);
     }
@@ -203,6 +208,7 @@ class _FakeWebDavIo implements WebDavIo {
   @override
   Future<void> remove(String path) async {
     _record('DELETE', path);
+    if (failRemove) throw SyncTransportException('DELETE failed');
     files.remove(path);
   }
 
@@ -338,6 +344,59 @@ void main() {
       devices.map((info) => info.deviceId),
       isNot(contains('not-a-device')),
     );
+  });
+
+  test('MOVE 207 falls back to PUT and removes the temporary file', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    final files = <String, List<int>>{};
+    var moves = 0;
+    server.listen((request) async {
+      final bytes = await request.fold<List<int>>(
+        [],
+        (all, chunk) => all..addAll(chunk),
+      );
+      final path = request.uri.path;
+      switch (request.method) {
+        case 'MOVE':
+          moves++;
+          request.response
+            ..statusCode = 207
+            ..headers.contentType = ContentType('application', 'xml')
+            ..write(
+              '<D:multistatus xmlns:D="DAV:"><D:response>'
+              '<D:href>$path</D:href>'
+              '<D:status>HTTP/1.1 500 Internal Server Error</D:status>'
+              '</D:response></D:multistatus>',
+            );
+        case 'PUT':
+          files[path] = bytes;
+          request.response.statusCode = 201;
+        case 'DELETE':
+          files.remove(path);
+          request.response.statusCode = 204;
+        case 'MKCOL':
+          request.response.statusCode = 201;
+        default:
+          request.response.statusCode = 200;
+      }
+      await request.response.close();
+    });
+    final client = webdav.newClient(
+      'http://127.0.0.1:${server.port}/',
+      user: 'user',
+      password: 'pass',
+      adapter: IOHttpClientAdapter(createHttpClient: () => HttpClient()),
+    );
+    final transport = WebDavSyncTransport.withIo(PackageWebDavIo(client));
+    addTearDown(transport.close);
+    final path = '/${transport.paths.changeFilePath(_deviceA, 1, 1)}';
+    await transport.writeChanges(_deviceA, 1, 1, Uint8List.fromList([1]));
+    expect(files[path], [1]);
+    expect(files.containsKey('$path.tmp'), isFalse);
+    await transport.writeChanges(_deviceA, 1, 1, Uint8List.fromList([2]));
+    expect(files[path], [2]);
+    expect(moves, 2);
   });
 
   group('WebDavPaths', () {
@@ -996,8 +1055,6 @@ void main() {
     test(
       'failing MOVE degrades to plain PUT instead of failing the write',
       () async {
-        // Some servers (Alist/OpenList) answer every MOVE with 5xx; writes must
-        // still succeed and later writes must skip the doomed tmp+MOVE dance.
         io.failMoves = true;
         final state = _state(_deviceA, lastChange: 5);
         await transport.writeState(_deviceA, state);
@@ -1013,8 +1070,8 @@ void main() {
         await transport.writeState(_deviceA, _state(_deviceA, lastChange: 6));
         expect(
           io.requestsOf('MOVE'),
-          isEmpty,
-          reason: 'a failed MOVE must disable tmp+MOVE for the session',
+          hasLength(1),
+          reason: 'a failed MOVE does not prove MOVE is unsupported',
         );
         expect(io.requestsOf('PUT').length, greaterThanOrEqualTo(1));
         _expectState(
@@ -1038,6 +1095,49 @@ void main() {
         await transport.readState(_deviceA),
         _state(_deviceA, lastChange: 4),
       );
+    });
+
+    test('Dio MOVE failure falls back to PUT without disabling MOVE', () async {
+      final range = ChangeRange(lo: 1, hi: 1);
+      final path = paths.changeFilePath(_deviceA, 1, 1);
+      final bytes = Uint8List.fromList([1]);
+      io.moveError = DioException(
+        requestOptions: RequestOptions(path: path),
+        type: DioExceptionType.connectionError,
+      );
+      await transport.writeChanges(_deviceA, 1, 1, bytes);
+      expect(await transport.readChanges(_deviceA, range), bytes);
+      expect(io.files.containsKey('$path.tmp'), isFalse);
+      expect(await transport.listChanges(_deviceA), hasLength(1));
+      expect(io.requestsOf('DELETE'), hasLength(1));
+
+      io.moveError = null;
+      await transport.writeChanges(_deviceA, 1, 1, bytes);
+      expect(await transport.readChanges(_deviceA, range), bytes);
+      expect(io.files.containsKey('$path.tmp'), isFalse);
+      expect(io.requestsOf('MOVE'), hasLength(2));
+    });
+
+    test('failed fallback PUT preserves the error and pending tmp', () async {
+      final path = paths.changeFilePath(_deviceA, 1, 1);
+      io.failMoves = true;
+      io.writeErrorPath = path;
+      await expectLater(
+        transport.writeChanges(_deviceA, 1, 1, Uint8List(0)),
+        throwsA(isA<SyncTransportException>()),
+      );
+      expect(io.files.containsKey(path), isFalse);
+      expect(io.files.containsKey('$path.tmp'), isTrue);
+    });
+
+    test('fallback cleanup failure does not fail an empty write', () async {
+      final path = paths.changeFilePath(_deviceA, 1, 1);
+      io.failMoves = true;
+      io.failRemove = true;
+      await transport.writeChanges(_deviceA, 1, 1, Uint8List(0));
+      expect(io.files[path], isEmpty);
+      expect(io.files.containsKey('$path.tmp'), isTrue);
+      expect(io.requestsOf('DELETE'), hasLength(1));
     });
 
     test('readState maps absent/corrupt files', () async {
@@ -1214,6 +1314,22 @@ void main() {
       expect(fallback, first);
       expect((await transport.readSnapshotInfo(_deviceA))?.rangeHi, 7);
     });
+
+    test(
+      'snapshot backup Dio MOVE failure still publishes the snapshot',
+      () async {
+        final path = paths.snapshotPath(_deviceA);
+        io.moveError = DioException(
+          requestOptions: RequestOptions(path: path),
+          type: DioExceptionType.connectionError,
+        );
+        final bytes = _snapshotBytes(_info(_deviceA));
+        await transport.writeSnapshot(_deviceA, bytes);
+        expect(await transport.readSnapshot(_deviceA), bytes);
+        expect(io.files.containsKey('$path.tmp'), isFalse);
+        expect(io.requestsOf('MOVE'), hasLength(2));
+      },
+    );
 
     test('readSnapshotInfo fetches only a prefix of the snapshot', () async {
       // A snapshot whose meta line is well inside the first deflate block:
