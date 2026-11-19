@@ -799,9 +799,11 @@ void main() {
 
       final deleted = await transport.deleteStaleTemporaryFiles(_deviceA);
       expect(deleted, 1);
-      expect(remote.debugTemporaryFiles(_deviceA).keys, [
-        'snapshot.jsonl.gz.tmp',
-      ], reason: 'a fresh tmp models an in-flight write and is kept');
+      expect(
+        remote.debugTemporaryFiles(_deviceA).keys,
+        ['snapshot.jsonl.gz.tmp'],
+        reason: 'a fresh tmp models an in-flight write and is kept',
+      );
       expect(remote.debugTemporaryFiles(_deviceB), hasLength(1));
 
       // A zero age sweeps everything older than *now*; invalid inputs are
