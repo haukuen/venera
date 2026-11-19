@@ -76,7 +76,7 @@ void main() {
     final originalPlatform = ScreenRetrieverPlatform.instance;
     ScreenRetrieverPlatform.instance = _TestScreens();
     final calls = <String>[];
-    var bounds = const Rect.fromLTWH(5000, 5000, 900, 600);
+    var bounds = const Rect.fromLTWH(5000, 5000, 1280, 600);
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(const MethodChannel('window_manager'), (
@@ -89,6 +89,13 @@ void main() {
           return false;
         case 'setBounds':
           final args = call.arguments as Map;
+          if (!args.containsKey('x')) {
+            calls.add('resize');
+            bounds = bounds.topLeft & Size(args['width'], args['height']);
+            return null;
+          }
+          calls.add('move');
+          expect(bounds.size, const Size(900, 600));
           bounds = Rect.fromLTWH(
             args['x'],
             args['y'],
@@ -111,6 +118,7 @@ void main() {
     try {
       await WindowPlacement(bounds, true).applyToWindow();
       expect(bounds, const Rect.fromLTWH(510, 240, 900, 600));
+      expect(calls.indexOf('resize'), lessThan(calls.indexOf('move')));
       expect(calls.last, 'maximize');
       expect(WindowPlacement.cache.rect, bounds);
       expect(Log.logs.skip(previousLogCount).single.title, 'Window placement');

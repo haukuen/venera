@@ -632,6 +632,7 @@ class WindowPlacement {
           height: size.height,
         );
       }
+      await windowManager.setSize(bounds.size);
       await windowManager.setBounds(bounds);
       if (area == null) await windowManager.center();
       final placement = WindowPlacement(await windowManager.getBounds(), false);
