@@ -267,7 +267,7 @@ class PackageWebDavIo implements WebDavIo {
       response = await _moveRequest(from, to);
       status = response.statusCode;
     }
-    if (status == 201 || status == 204 || status == 207) {
+    if (status == 201 || status == 204) {
       return WebDavMoveResult.moved;
     }
     if (status == 404) return WebDavMoveResult.notFound;
@@ -785,7 +785,7 @@ class WebDavSyncTransport implements SyncTransport {
         try {
           final result = await _io.move(snapshot, previous);
           if (result == WebDavMoveResult.unsupported) _moveSupported = false;
-        } on SyncTransportException {
+        } on Object {
           // Ignore: backup is optional. The following PUT is authoritative.
         }
       }
@@ -969,15 +969,10 @@ class WebDavSyncTransport implements SyncTransport {
     }
     final tmp = '$path.tmp';
     await _io.write(tmp, bytes);
-    WebDavMoveResult result;
+    WebDavMoveResult? result;
     try {
       result = await _io.move(tmp, path);
-    } on SyncTransportException catch (error) {
-      // Fall through to the plain PUT below. Also stop offering tmp+MOVE for
-      // the rest of this session: a server that errors on MOVE would make
-      // every future write pay for the wasted attempt.
-      _moveSupported = false;
-      result = WebDavMoveResult.unsupported;
+    } on Object catch (error) {
       _logMoveDegraded(path, error);
     }
     if (result == WebDavMoveResult.moved) return;
