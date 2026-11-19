@@ -492,6 +492,7 @@ class WindowPlacement {
   Future<void> applyToWindow() async {
     if (await validate(rect)) {
       await windowManager.setBounds(rect);
+      cache = WindowPlacement(rect, false);
     } else {
       await _resetToPrimary();
     }
@@ -551,16 +552,17 @@ class WindowPlacement {
       if (_busy || _resetting) return;
       _busy = true;
       try {
-        final rect = await windowManager.getBounds();
+        final isMaximized = await windowManager.isMaximized();
+        final isFullScreen = await windowManager.isFullScreen();
+        final rect = isMaximized || isFullScreen
+            ? cache.rect
+            : await windowManager.getBounds();
         if (rect != _lastCheckedRect) {
           _lastRectValid = await validate(rect);
           _lastCheckedRect = rect;
         }
         if (!_lastRectValid) return;
-        final placement = WindowPlacement(
-          rect,
-          await windowManager.isMaximized(),
-        );
+        final placement = WindowPlacement(rect, isMaximized || isFullScreen);
         if (placement.rect != cache.rect ||
             placement.isMaximized != cache.isMaximized) {
           await placement.writeToFile();

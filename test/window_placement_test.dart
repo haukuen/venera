@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:venera/components/window_frame.dart';
+import 'package:venera/foundation/app.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   const displays = [
     Rect.fromLTWH(0, 0, 1920, 1080),
     Rect.fromLTWH(-1920, 0, 1920, 1080),
@@ -61,4 +67,58 @@ void main() {
       isTrue,
     );
   });
+
+  for (final state in ['maximized', 'fullscreen']) {
+    test('keeps restored normal bounds while $state', () async {
+      final directory = await Directory.systemTemp.createTemp('placement_test');
+      App.dataPath = directory.path;
+      const normal = WindowPlacement(Rect.fromLTWH(100, 80, 900, 700), true);
+      var expanded = false;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('window_manager'),
+        (call) async {
+          switch (call.method) {
+            case 'isMaximized':
+              return expanded && state == 'maximized';
+            case 'isFullScreen':
+              return expanded && state == 'fullscreen';
+            case 'maximize':
+              expanded = true;
+              return null;
+            case 'getBounds':
+              return {'x': -8.0, 'y': -8.0, 'width': 1936.0, 'height': 1096.0};
+            default:
+              return null;
+          }
+        },
+      );
+      try {
+        await normal.applyToWindow();
+        expect(WindowPlacement.cache.rect, normal.rect);
+        WindowPlacement.loop();
+        final file = File('${directory.path}/window_placement');
+        final deadline = DateTime.now().add(const Duration(seconds: 3));
+        while (WindowPlacement.cache.isMaximized != true &&
+            DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        final saved = jsonDecode(await file.readAsString());
+        expect(saved['x'], 100);
+        expect(saved['y'], 80);
+        expect(saved['width'], 900);
+        expect(saved['height'], 700);
+        expect(saved['isMaximized'], isTrue);
+      } finally {
+        WindowPlacement.timer?.cancel();
+        WindowPlacement.timer = null;
+        messenger.setMockMethodCallHandler(
+          const MethodChannel('window_manager'),
+          null,
+        );
+        await directory.delete(recursive: true);
+      }
+    });
+  }
 }
