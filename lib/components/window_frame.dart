@@ -4,8 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera/foundation/log.dart';
 import 'package:window_manager/window_manager.dart';
 
 const _kTitleBarHeight = 36.0;
@@ -489,10 +491,11 @@ class WindowPlacement {
   const WindowPlacement(this.rect, this.isMaximized);
 
   Future<void> applyToWindow() async {
-    await windowManager.setBounds(rect);
-
-    if (!validate(rect)) {
-      await windowManager.center();
+    if (await validate(rect)) {
+      await windowManager.setBounds(rect);
+      cache = WindowPlacement(rect, false);
+    } else {
+      await _resetToPrimary();
     }
 
     if (isMaximized) {
@@ -532,19 +535,6 @@ class WindowPlacement {
     }
   }
 
-  static Rect? lastValidRect;
-
-  static Future<WindowPlacement> get current async {
-    var rect = await windowManager.getBounds();
-    if (validate(rect)) {
-      lastValidRect = rect;
-    } else {
-      rect = lastValidRect ?? defaultPlacement.rect;
-    }
-    var isMaximized = await windowManager.isMaximized();
-    return WindowPlacement(rect, isMaximized);
-  }
-
   static const defaultPlacement = WindowPlacement(
     Rect.fromLTWH(10, 10, 900, 600),
     false,
@@ -553,20 +543,112 @@ class WindowPlacement {
   static WindowPlacement cache = defaultPlacement;
 
   static Timer? timer;
+  static bool _busy = false;
+  static bool _resetting = false;
+  static Rect? _lastCheckedRect;
+  static bool _lastRectValid = false;
 
   static void loop() async {
     timer ??= Timer.periodic(const Duration(milliseconds: 100), (timer) async {
-      var placement = await WindowPlacement.current;
-      if (placement.rect != cache.rect ||
-          placement.isMaximized != cache.isMaximized) {
-        cache = placement;
-        await placement.writeToFile();
+      if (_busy || _resetting) return;
+      _busy = true;
+      try {
+        final isMaximized = await windowManager.isMaximized();
+        final isFullScreen = await windowManager.isFullScreen();
+        final rect = isMaximized || isFullScreen
+            ? cache.rect
+            : await windowManager.getBounds();
+        if (rect != _lastCheckedRect) {
+          _lastRectValid = await validate(rect);
+          _lastCheckedRect = rect;
+        }
+        if (!_lastRectValid) return;
+        final placement = WindowPlacement(rect, isMaximized || isFullScreen);
+        if (placement.rect != cache.rect ||
+            placement.isMaximized != cache.isMaximized) {
+          await placement.writeToFile();
+          cache = placement;
+        }
+      } finally {
+        _busy = false;
       }
     });
   }
 
-  static bool validate(Rect rect) {
-    return rect.topLeft.dx >= 0 && rect.topLeft.dy >= 0;
+  static bool overlapsDisplays(Rect rect, List<Rect> displays) {
+    if (displays.isEmpty) return true;
+    return displays.any((display) {
+      final overlap = rect.intersect(display);
+      return overlap.width >= 100 && overlap.height >= 50;
+    });
+  }
+
+  static Rect _visibleArea(Display display) => Rect.fromLTWH(
+    display.visiblePosition?.dx ?? 0,
+    display.visiblePosition?.dy ?? 0,
+    (display.visibleSize ?? display.size).width,
+    (display.visibleSize ?? display.size).height,
+  );
+
+  static Future<bool> validate(Rect rect) async {
+    try {
+      final displays = await screenRetriever.getAllDisplays();
+      return overlapsDisplays(rect, displays.map(_visibleArea).toList());
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> _resetToPrimary() async {
+    if (_resetting) return;
+    _resetting = true;
+    while (_busy) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    _busy = true;
+    try {
+      if (await windowManager.isFullScreen()) {
+        await windowManager.setFullScreen(false);
+      }
+      if (await windowManager.isMaximized()) await windowManager.unmaximize();
+      Rect? area;
+      try {
+        area = _visibleArea(await screenRetriever.getPrimaryDisplay());
+      } catch (_) {
+        // Keep recovery available when display enumeration is unavailable.
+      }
+      var bounds = defaultPlacement.rect;
+      if (area != null) {
+        final size = Size(
+          bounds.width.clamp(0, area.width),
+          bounds.height.clamp(0, area.height),
+        );
+        await windowManager.setMinimumSize(
+          Size(500.0.clamp(0, area.width), 600.0.clamp(0, area.height)),
+        );
+        bounds = Rect.fromCenter(
+          center: area.center,
+          width: size.width,
+          height: size.height,
+        );
+      }
+      await windowManager.setSize(bounds.size);
+      await windowManager.setBounds(bounds);
+      if (area == null) await windowManager.center();
+      final placement = WindowPlacement(await windowManager.getBounds(), false);
+      if (await validate(placement.rect)) {
+        cache = placement;
+        try {
+          await placement.writeToFile();
+        } catch (e, s) {
+          Log.error('Window placement', e, s);
+        }
+      }
+      _lastCheckedRect = null;
+    } finally {
+      _busy = false;
+      _resetting = false;
+    }
   }
 }
 
