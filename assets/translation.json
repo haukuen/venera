@@ -1,7 +1,5 @@
 {
   "zh_CN": {
-    "Reset window position": "重置窗口位置",
-    "Move window to primary screen (Ctrl+Alt+R)": "将窗口移至主显示器（Ctrl+Alt+R）",
     "Home": "主页",
     "Favorites": "收藏",
     "Explore": "发现",
@@ -556,8 +554,6 @@
     "Delete device @d from the sync server? Changes not yet synced to other devices will be lost.": "将从同步服务器删除设备 @d？该设备尚未同步到其他设备的更改将会丢失。"
   },
   "zh_TW": {
-    "Reset window position": "重設視窗位置",
-    "Move window to primary screen (Ctrl+Alt+R)": "將視窗移至主螢幕（Ctrl+Alt+R）",
     "Home": "首頁",
     "Favorites": "收藏",
     "Explore": "探索",

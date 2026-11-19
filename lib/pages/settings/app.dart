@@ -15,16 +15,6 @@ class _AppSettingsState extends State<AppSettings> {
     return SmoothCustomScrollView(
       slivers: [
         SliverAppbar(title: Text("App".tl)),
-        if (App.isDesktop)
-          ListTile(
-            title: Text("Reset window position".tl),
-            subtitle: Text("Move window to primary screen (Ctrl+Alt+R)".tl),
-            trailing: Button.normal(
-              onPressed: WindowPlacement.resetToPrimary,
-              child: Text("Reset".tl),
-            ).fixHeight(28),
-            onTap: WindowPlacement.resetToPrimary,
-          ).toSliver(),
         _SettingPartTitle(title: "Data".tl, icon: Icons.storage),
         ListTile(
           title: Text("Storage Path for local comics".tl),

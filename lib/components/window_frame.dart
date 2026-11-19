@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
@@ -64,29 +63,6 @@ class _WindowFrameState extends State<WindowFrame> {
   bool isWindowFrameBackgroundTransparent = false;
   bool useDarkTheme = false;
   var closeListeners = <WindowCloseListener>[];
-
-  @override
-  void initState() {
-    super.initState();
-    if (App.isDesktop) HardwareKeyboard.instance.addHandler(_recoverWindow);
-  }
-
-  bool _recoverWindow(KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.keyR &&
-        HardwareKeyboard.instance.isControlPressed &&
-        HardwareKeyboard.instance.isAltPressed) {
-      unawaited(WindowPlacement.resetToPrimary());
-      return true;
-    }
-    return false;
-  }
-
-  @override
-  void dispose() {
-    if (App.isDesktop) HardwareKeyboard.instance.removeHandler(_recoverWindow);
-    super.dispose();
-  }
 
   /// Sets the visibility of the window frame.
   void setWindowFrame(bool show) {
@@ -517,7 +493,7 @@ class WindowPlacement {
     if (await validate(rect)) {
       await windowManager.setBounds(rect);
     } else {
-      await resetToPrimary();
+      await _resetToPrimary();
     }
 
     if (isMaximized) {
@@ -620,7 +596,7 @@ class WindowPlacement {
     }
   }
 
-  static Future<void> resetToPrimary() async {
+  static Future<void> _resetToPrimary() async {
     if (_resetting) return;
     _resetting = true;
     while (_busy) {
