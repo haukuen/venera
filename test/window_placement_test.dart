@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:venera/components/window_frame.dart';
 import 'package:venera/foundation/app.dart';
+import 'package:venera/foundation/log.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +69,61 @@ void main() {
     );
   });
 
+  test('recovery continues when placement cannot be written', () async {
+    final directory = await Directory.systemTemp.createTemp('placement_test');
+    App.dataPath = directory.path;
+    await Directory('${directory.path}/window_placement').create();
+    final originalPlatform = ScreenRetrieverPlatform.instance;
+    ScreenRetrieverPlatform.instance = _TestScreens();
+    final calls = <String>[];
+    var bounds = const Rect.fromLTWH(5000, 5000, 900, 600);
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(const MethodChannel('window_manager'), (
+      call,
+    ) async {
+      calls.add(call.method);
+      switch (call.method) {
+        case 'isMaximized':
+        case 'isFullScreen':
+          return false;
+        case 'setBounds':
+          final args = call.arguments as Map;
+          bounds = Rect.fromLTWH(
+            args['x'],
+            args['y'],
+            args['width'],
+            args['height'],
+          );
+          return null;
+        case 'getBounds':
+          return {
+            'x': bounds.left,
+            'y': bounds.top,
+            'width': bounds.width,
+            'height': bounds.height,
+          };
+        default:
+          return null;
+      }
+    });
+    final previousLogCount = Log.logs.length;
+    try {
+      await WindowPlacement(bounds, true).applyToWindow();
+      expect(bounds, const Rect.fromLTWH(510, 240, 900, 600));
+      expect(calls.last, 'maximize');
+      expect(WindowPlacement.cache.rect, bounds);
+      expect(Log.logs.skip(previousLogCount).single.title, 'Window placement');
+    } finally {
+      ScreenRetrieverPlatform.instance = originalPlatform;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('window_manager'),
+        null,
+      );
+      await directory.delete(recursive: true);
+    }
+  });
+
   for (final state in ['maximized', 'fullscreen']) {
     test('keeps restored normal bounds while $state', () async {
       final directory = await Directory.systemTemp.createTemp('placement_test');
@@ -121,4 +177,19 @@ void main() {
       }
     });
   }
+}
+
+class _TestScreens extends ScreenRetrieverPlatform {
+  static const display = Display(
+    id: 'primary',
+    size: Size(1920, 1080),
+    visiblePosition: Offset.zero,
+    visibleSize: Size(1920, 1080),
+  );
+
+  @override
+  Future<List<Display>> getAllDisplays() async => [display];
+
+  @override
+  Future<Display> getPrimaryDisplay() async => display;
 }

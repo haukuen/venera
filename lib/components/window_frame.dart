@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera/foundation/log.dart';
 import 'package:window_manager/window_manager.dart';
 
 const _kTitleBarHeight = 36.0;
@@ -635,8 +636,12 @@ class WindowPlacement {
       if (area == null) await windowManager.center();
       final placement = WindowPlacement(await windowManager.getBounds(), false);
       if (await validate(placement.rect)) {
-        await placement.writeToFile();
         cache = placement;
+        try {
+          await placement.writeToFile();
+        } catch (e, s) {
+          Log.error('Window placement', e, s);
+        }
       }
       _lastCheckedRect = null;
     } finally {
